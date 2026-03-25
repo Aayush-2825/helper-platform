@@ -1,0 +1,29 @@
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { connection } from "next/server";
+import { auth } from "@/lib/auth/server";
+import { getSellerLandingPath } from "@/lib/seller/routing";
+import { SellerOnboardingClientPage } from "./seller-onboarding-client";
+
+/**
+ * Seller Onboarding Page
+ * Redirects already-onboarded sellers away from onboarding form.
+ */
+export default async function SellerOnboardingPage() {
+  await connection();
+
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session?.user) {
+    redirect("/auth/signin?next=%2Fseller%2Fonboarding");
+  }
+
+  const landingPath = await getSellerLandingPath(session.user.id);
+  if (landingPath !== "/seller/onboarding") {
+    redirect(landingPath);
+  }
+
+  return <SellerOnboardingClientPage />;
+}
