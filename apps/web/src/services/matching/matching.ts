@@ -2,7 +2,26 @@ import { db } from "@/db";
 import { bookingCandidate  } from "@/db/schema";
 import { publishBookingEvent } from "@/lib/realtime/client";
 
-export const startMatching = async (bookingData:any) => {
+type BookingDataForMatching = {
+  id: string;
+  customerId: string;
+  categoryId: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+};
+
+type HelperServiceCategory =
+  | "driver"
+  | "electrician"
+  | "plumber"
+  | "cleaner"
+  | "chef"
+  | "delivery_helper"
+  | "caretaker"
+  | "security_guard"
+  | "other";
+
+export const startMatching = async (bookingData: BookingDataForMatching) => {
   try {
     const url = new URL("http://localhost:3001/api/helpers/nearby");
     url.searchParams.append("latitude", bookingData.latitude?.toString() || "");
@@ -12,9 +31,11 @@ export const startMatching = async (bookingData:any) => {
     const response = await fetch(url.toString());
     if (!response.ok) throw new Error("Failed to fetch nearby helpers");
     
-    const {helpers} = await response.json();
+    const { helpers } = (await response.json()) as {
+      helpers: Array<{ helperId: string }>;
+    };
     
-    const nearbyHelperIds = helpers.map((helper:any) => helper.helperId);
+    const nearbyHelperIds = helpers.map((helper) => helper.helperId);
 
     if (nearbyHelperIds.length === 0) {
        console.log("No nearby helpers found.");
@@ -24,7 +45,7 @@ export const startMatching = async (bookingData:any) => {
     const eligibleHelpers = await db.query.helperProfile.findMany({
       where: (helper, {inArray, eq, and}) => and(
         inArray(helper.userId, nearbyHelperIds),
-        eq(helper.primaryCategory, bookingData.categoryId),
+        eq(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
         eq(helper.isActive, true)
       ),
     });

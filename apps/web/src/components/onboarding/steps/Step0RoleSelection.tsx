@@ -1,6 +1,6 @@
 "use client";
 
-import { useController, UseFormReturn, FieldValues } from "react-hook-form";
+import { useController, UseFormReturn, FieldValues, type FieldPath } from "react-hook-form";
 import { Building2, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,10 +15,9 @@ interface Step0RoleSelectionProps<T extends FieldValues> {
 export function Step0RoleSelection<T extends FieldValues>({
   form,
 }: Step0RoleSelectionProps<T>) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { field } = useController({
     control: form.control,
-    name: "helperType" as any,
+    name: "helperType" as FieldPath<T>,
   });
 
   return (

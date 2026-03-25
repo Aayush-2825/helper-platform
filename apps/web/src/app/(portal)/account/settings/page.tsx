@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -21,11 +21,22 @@ import { Separator } from "@/components/ui/separator";
 export default function AccountSettings() {
   const router = useRouter();
   const { session, loading } = useSession();
-  const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+  const [twoFAOverride, setTwoFAOverride] = useState<boolean | null>(null);
   const [formError, setFormError] = useState("");
   const [totpURI, setTotpURI] = useState("");
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [confirmedBackupCodes, setConfirmedBackupCodes] = useState(false);
+
+  const sessionTwoFAEnabled = Boolean(
+    (session?.user as { twoFactorEnabled?: boolean } | undefined)?.twoFactorEnabled,
+  );
+  const twoFAEnabled = twoFAOverride ?? sessionTwoFAEnabled;
+
+  useEffect(() => {
+    if (!loading && !session) {
+      router.push("/auth/signin");
+    }
+  }, [loading, router, session]);
 
   const enableForm = useForm<TwoFactorPasswordFormValues>({
     resolver: zodResolver(twoFactorPasswordSchema),
@@ -40,17 +51,6 @@ export default function AccountSettings() {
       password: "",
     },
   });
-
-  useEffect(() => {
-    if (!loading && !session) {
-      router.push("/auth/signin");
-      return;
-    }
-
-    if (session) {
-      setTwoFAEnabled(Boolean((session.user as { twoFactorEnabled?: boolean }).twoFactorEnabled));
-    }
-  }, [loading, router, session]);
 
   const handleEnable2FA = enableForm.handleSubmit(async (values) => {
     setFormError("");
@@ -67,7 +67,7 @@ export default function AccountSettings() {
 
       setTotpURI(data?.totpURI || "");
       setBackupCodes(data?.backupCodes || []);
-      setTwoFAEnabled(true);
+      setTwoFAOverride(true);
       enableForm.reset();
       showFormSuccess("Two-factor setup started", "Scan the QR code and save your backup codes.");
     } catch (error) {
@@ -94,7 +94,7 @@ export default function AccountSettings() {
         return;
       }
 
-      setTwoFAEnabled(false);
+      setTwoFAOverride(false);
       setTotpURI("");
       setBackupCodes([]);
       setConfirmedBackupCodes(false);

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,10 +24,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface NavbarProps {
   title: string;
-  onMenuClick?: () => void;
 }
 
-export function Navbar({ title, onMenuClick }: NavbarProps) {
+export function Navbar({ title }: NavbarProps) {
   const router = useRouter();
   const { session, loading } = useSession();
 

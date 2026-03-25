@@ -18,9 +18,9 @@ const wss = new WebSocketServer({ server });
 const clients = new Map<string, WebSocket>();
 
 type Message =
-  | { type: "chat"; to: string; payload: any }
-  | { type: "broadcast"; payload: any }
-  | { type: "booking_request"; payload: any };
+  | { type: "chat"; to: string; payload: unknown }
+  | { type: "broadcast"; payload: unknown }
+  | { type: "booking_request"; payload: unknown };
 
 wss.on("connection", (socket: WebSocket) => {
   const userId = randomUUID();
@@ -28,9 +28,9 @@ wss.on("connection", (socket: WebSocket) => {
   console.log(`[WS] ${userId} connected. Total: ${clients.size}`);
 
   socket.on("message", (dataRaw) => {
-    let data: Message & { [key: string]: any };
+    let data: Message & Record<string, unknown>;
     try {
-      data = JSON.parse(dataRaw.toString());
+      data = JSON.parse(dataRaw.toString()) as Message & Record<string, unknown>;
     } catch (err) {
       console.warn("[WS] Invalid JSON received", err);
       return;
@@ -52,7 +52,9 @@ wss.on("connection", (socket: WebSocket) => {
         handleBookingRequest({ userId, payload: data.payload, socket });
         break;
       default:
-        console.warn(`[WS] Unknown message type: ${(data as any).type}`);
+        // Unreachable with the current `Message` union; kept for runtime safety.
+        console.warn("[WS] Unknown message type received");
+        break;
     }
   });
 
@@ -70,7 +72,7 @@ function sendAck(
   socket: WebSocket,
   type: string,
   status: "ok" | "error",
-  extra?: any,
+  extra?: Record<string, unknown>,
 ) {
   if (socket.readyState === WebSocket.OPEN) {
     socket.send(
@@ -92,7 +94,7 @@ function handleChat({
 }: {
   userId: string;
   to: string;
-  payload: any;
+  payload: unknown;
   socket: WebSocket;
 }) {
   const target = clients.get(to);
@@ -123,13 +125,13 @@ function handleBroadcast({
 }: {
   socket: WebSocket;
   userId: string;
-  payload: any;
+  payload: unknown;
 }) {
   if (!payload) {
     sendAck(socket, "broadcast", "error", { message: "Missing payload" });
     return;
   }
-  clients.forEach((client, id) => {
+  clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(
         JSON.stringify({
@@ -150,13 +152,14 @@ function handleBookingRequest({
 }: {
   socket: WebSocket;
   userId: string;
-  payload: any;
+  payload: unknown;
 }) {
   if (!payload) {
     sendAck(socket, "booking_request", "error", { message: "Missing payload" });
     return;
   }
-  if (!payload.service || !payload.location) {
+  const payloadObj = payload as { service?: unknown; location?: unknown };
+  if (!payloadObj.service || !payloadObj.location) {
     socket.send(
       JSON.stringify({
         type: "error",
@@ -168,7 +171,7 @@ function handleBookingRequest({
     });
     return;
   }
-  clients.forEach((client, id) => {
+  clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(
         JSON.stringify({

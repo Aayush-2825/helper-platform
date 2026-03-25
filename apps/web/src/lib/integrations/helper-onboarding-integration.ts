@@ -1,4 +1,4 @@
-﻿/**
+/**
  * INTEGRATION GUIDE - Helper Onboarding System
  * 
  * This file demonstrates how to integrate the helper onboarding system
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
           id: profileId,
           userId: session.user.id,
           organizationId,
-          primaryCategory: data.primaryCategory as any,
+          primaryCategory: data.primaryCategory,
           headline: data.bio?.substring(0, 100) || null,
           bio: data.bio || null,
           yearsExperience: data.yearsExperience || 0,
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
       // ===== STORE PAYOUT DETAILS (ENCRYPTED) =====
       try {
         if (data.bankAccountNumber) {
-          const encrypted = encryptBankDetails({
+          void encryptBankDetails({
             accountHolderName: data.accountHolderName,
             bankAccountNumber: data.bankAccountNumber,
             ifscCode: data.ifscCode,
@@ -272,11 +272,12 @@ export async function POST(request: NextRequest) {
 
 // ============= STEP 3: VERIFICATION EMAIL TEMPLATE =============
 
-async function sendVerificationEmail(options: {
+async function sendVerificationEmail(_options: {
   email: string;
   profileId: string;
   helperType: string;
 }) {
+  void _options;
   // Using Resend (from your dependencies)
   // const { Resend } = require("resend");
   // const resend = new Resend(process.env.RESEND_API_KEY);

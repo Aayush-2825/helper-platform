@@ -1,6 +1,6 @@
 "use client";
 
-import { UseFormReturn, FieldValues } from "react-hook-form";
+import { UseFormReturn, FieldValues, type FieldPath } from "react-hook-form";
 import { Check, AlertCircle } from "lucide-react";
 
 interface Step6FinalReviewProps<T extends FieldValues> {
@@ -160,7 +160,7 @@ export function Step6FinalReview<T extends FieldValues>({
                 ⏳ Pending Verification
               </p>
               <p className="text-xs text-amber-700 mt-1">
-                Your profile will be reviewed within 24-48 hours. You'll receive email updates on the status.
+                Your profile will be reviewed within 24-48 hours. You will receive email updates on the status.
               </p>
             </div>
           </div>
@@ -172,8 +172,7 @@ export function Step6FinalReview<T extends FieldValues>({
         <label className="flex items-start space-x-3 rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-50">
           <input
             type="checkbox"
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            {...register("agreedToTerms" as any)}
+            {...register("agreedToTerms" as FieldPath<T>)}
             className="mt-1 rounded"
           />
           <div>
@@ -199,8 +198,7 @@ export function Step6FinalReview<T extends FieldValues>({
         <label className="flex items-start space-x-3 rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-50">
           <input
             type="checkbox"
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            {...register("agreedToCommission" as any)}
+            {...register("agreedToCommission" as FieldPath<T>)}
             className="mt-1 rounded"
           />
           <div>
@@ -208,7 +206,7 @@ export function Step6FinalReview<T extends FieldValues>({
               I accept the commission structure (10-25% varies by service)
             </p>
             <p className="text-xs text-gray-500 mt-0.5">
-              Different services have different commission rates. You'll see exact details in your dashboard.
+              Different services have different commission rates. You will see exact details in your dashboard.
             </p>
           </div>
         </label>
@@ -221,7 +219,7 @@ export function Step6FinalReview<T extends FieldValues>({
       <div className="rounded-lg bg-green-50 border border-green-200 p-4">
         <p className="text-sm text-green-900">
           <Check className="inline h-4 w-4 mr-1" />
-          <strong>You're all set!</strong> Submit your application and start receiving bookings once verified.
+          <strong>You are all set!</strong> Submit your application and start receiving bookings once verified.
         </p>
       </div>
     </div>

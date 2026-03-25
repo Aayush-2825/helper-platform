@@ -16,7 +16,7 @@ export async function getHelperLandingPath(userId: string): Promise<string> {
   }
 
   if (profile.verificationStatus === "approved") {
-    return "/helper/dashboard";
+    return "/helper";
   }
 
   return `/helper/verification-pending?id=${profile.id}`;

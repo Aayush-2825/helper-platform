@@ -1,7 +1,6 @@
 "use client";
 
-import { UseFormReturn, FieldValues, Controller } from "react-hook-form";
-import { Input } from "@/components/ui/input";
+import { UseFormReturn, FieldValues, Controller, type FieldPath } from "react-hook-form";
 import { Label } from "@/components/ui/label";
 import { FormField } from "@/components/ui/form-field";
 import { ServiceSelector } from "../ServiceSelector";
@@ -21,8 +20,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
   form,
   isIndividual,
 }: Step2ServiceDetailsProps<T>) {
-  const { control, formState } = form;
-  const { errors } = formState;
+  const { control } = form;
 
   const languages = [
     "English",
@@ -51,7 +49,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
       {/* Primary Category - always required */}
       <ServiceSelector
         control={control}
-        name={"primaryCategory" as any}
+        name={"primaryCategory" as FieldPath<T>}
         label="Primary Service Category"
         multi={false}
         hint="Select the main service you provide. You can add more later."
@@ -61,7 +59,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
       {!isIndividual && (
         <ServiceSelector
           control={control}
-          name={"workerTypesOffered" as any}
+          name={"workerTypesOffered" as FieldPath<T>}
           label="Worker Types You Offer"
           multi={true}
           hint="Select all the service types your team can provide."
@@ -71,7 +69,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
       {/* Years of Experience */}
       <Controller
         control={control}
-        name={"yearsExperience" as any}
+        name={"yearsExperience" as FieldPath<T>}
         render={({ field, fieldState: { error } }) => (
           <div>
             <FormField
@@ -98,7 +96,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
       {/* Bio / Description */}
       <Controller
         control={control}
-        name={"bio" as any}
+        name={"bio" as FieldPath<T>}
         render={({ field }) => (
           <div>
             <Label htmlFor="bio">Bio / Description (Optional)</Label>
@@ -118,7 +116,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
       {/* Languages */}
       <Controller
         control={control}
-        name={"languages" as any}
+        name={"languages" as FieldPath<T>}
         render={({ field, fieldState: { error } }) => (
           <div>
             <Label>
@@ -134,10 +132,15 @@ export function Step2ServiceDetails<T extends FieldValues>({
                   <input
                     type="checkbox"
                     value={lang.toLowerCase()}
-                    checked={((field.value as any) || []).includes(lang.toLowerCase())}
+                    checked={
+                      Array.isArray(field.value) &&
+                      (field.value as string[]).includes(lang.toLowerCase())
+                    }
                     onChange={(e) => {
                       const value = e.target.value;
-                      const currentValue = ((field.value as any) || []) as string[];
+                      const currentValue = Array.isArray(field.value)
+                        ? (field.value as string[])
+                        : [];
                       const newLanguages = e.target.checked
                         ? [...currentValue, value]
                         : currentValue.filter((l: string) => l !== value);
@@ -161,7 +164,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
       {/* Service Radius */}
       <Controller
         control={control}
-        name={"serviceRadiusKm" as any}
+        name={"serviceRadiusKm" as FieldPath<T>}
         render={({ field, fieldState: { error } }) => (
           <div>
             <FormField
@@ -191,7 +194,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
         <>
           <Controller
             control={control}
-            name={"numberOfWorkers" as any}
+            name={"numberOfWorkers" as FieldPath<T>}
             render={({ field, fieldState: { error } }) => (
               <FormField
                 {...field}
@@ -207,10 +210,9 @@ export function Step2ServiceDetails<T extends FieldValues>({
             )}
           />
 
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           <Controller
             control={control}
-            name={"canAssignJobsInternally" as any}
+            name={"canAssignJobsInternally" as FieldPath<T>}
             render={({ field }) => (
               <label className="flex items-center space-x-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
                 <input

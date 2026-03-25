@@ -3,8 +3,8 @@ import { eq, and } from "drizzle-orm";
 import { booking } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
-    const bookingId = params.id;
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+    const { id: bookingId } = await context.params;
     const user = await auth.api.getSession({
         headers: request.headers,
     });

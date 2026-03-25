@@ -297,8 +297,11 @@ export class FileManifest {
       const data = localStorage.getItem(manifest.storageKey);
       if (data) {
         const entries = JSON.parse(data);
-        entries.forEach(([key, value]: [string, any]) => {
-          manifest.files.set(key, value);
+        entries.forEach(([key, value]: [string, unknown]) => {
+          manifest.files.set(
+            key,
+            value as { url: string; id: string; timestamp: number },
+          );
         });
       }
     } catch (error) {

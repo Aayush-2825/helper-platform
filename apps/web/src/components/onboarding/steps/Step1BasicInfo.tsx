@@ -1,6 +1,6 @@
 "use client";
 
-import { UseFormReturn, FieldValues, Controller } from "react-hook-form";
+import { UseFormReturn, FieldValues, Controller, type FieldPath } from "react-hook-form";
 import { FormField } from "@/components/ui/form-field";
 import { FileUploadField } from "../FileUploadField";
 import { Phone, Mail, MapPin } from "lucide-react";
@@ -17,8 +17,7 @@ export function Step1BasicInfo<T extends FieldValues>({
   form,
 }: Step1BasicInfoProps<T>) {
   const { control, watch } = form;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isIndividual = watch("helperType" as any) === "individual";
+  const isIndividual = watch("helperType" as FieldPath<T>) === "individual";
 
   return (
     <div className="space-y-6">
@@ -39,7 +38,7 @@ export function Step1BasicInfo<T extends FieldValues>({
         <>
           <Controller
             control={control}
-            name={"fullName" as any}
+            name={"fullName" as FieldPath<T>}
             render={({ field, fieldState: { error } }) => (
               <FormField
                 {...field}
@@ -53,7 +52,7 @@ export function Step1BasicInfo<T extends FieldValues>({
 
           <Controller
             control={control}
-            name={"phone" as any}
+            name={"phone" as FieldPath<T>}
             render={({ field, fieldState: { error } }) => (
               <FormField
                 {...field}
@@ -70,7 +69,7 @@ export function Step1BasicInfo<T extends FieldValues>({
 
           <Controller
             control={control}
-            name={"email" as any}
+            name={"email" as FieldPath<T>}
             render={({ field }) => (
               <FormField
                 {...field}
@@ -84,7 +83,7 @@ export function Step1BasicInfo<T extends FieldValues>({
 
           <Controller
             control={control}
-            name={"city" as any}
+            name={"city" as FieldPath<T>}
             render={({ field, fieldState: { error } }) => (
               <FormField
                 {...field}
@@ -97,10 +96,9 @@ export function Step1BasicInfo<T extends FieldValues>({
             )}
           />
 
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           <FileUploadField
             control={control}
-            name={"profilePhotoUrl" as any}
+            name={"profilePhotoUrl" as FieldPath<T>}
             label="Profile Photo"
             accept="image/*"
             maxSize={3}
@@ -112,7 +110,7 @@ export function Step1BasicInfo<T extends FieldValues>({
         <>
           <Controller
             control={control}
-            name={"businessName" as any}
+            name={"businessName" as FieldPath<T>}
             render={({ field, fieldState: { error } }) => (
               <FormField
                 {...field}
@@ -126,7 +124,7 @@ export function Step1BasicInfo<T extends FieldValues>({
 
           <Controller
             control={control}
-            name={"ownerName" as any}
+            name={"ownerName" as FieldPath<T>}
             render={({ field, fieldState: { error } }) => (
               <FormField
                 {...field}
@@ -140,7 +138,7 @@ export function Step1BasicInfo<T extends FieldValues>({
 
           <Controller
             control={control}
-            name={"phone" as any}
+            name={"phone" as FieldPath<T>}
             render={({ field, fieldState: { error } }) => (
               <FormField
                 {...field}
@@ -157,7 +155,7 @@ export function Step1BasicInfo<T extends FieldValues>({
 
           <Controller
             control={control}
-            name={"email" as any}
+            name={"email" as FieldPath<T>}
             render={({ field, fieldState: { error } }) => (
               <FormField
                 {...field}
@@ -173,7 +171,7 @@ export function Step1BasicInfo<T extends FieldValues>({
 
           <Controller
             control={control}
-            name={"businessAddress" as any}
+            name={"businessAddress" as FieldPath<T>}
             render={({ field, fieldState: { error } }) => (
               <FormField
                 {...field}
@@ -187,7 +185,7 @@ export function Step1BasicInfo<T extends FieldValues>({
 
           <Controller
             control={control}
-            name={"city" as any}
+            name={"city" as FieldPath<T>}
             render={({ field, fieldState: { error } }) => (
               <FormField
                 {...field}
@@ -200,10 +198,9 @@ export function Step1BasicInfo<T extends FieldValues>({
             )}
           />
 
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           <FileUploadField
             control={control}
-            name={"logoUrl" as any}
+            name={"logoUrl" as FieldPath<T>}
             label="Company Logo"
             accept="image/*"
             maxSize={3}
