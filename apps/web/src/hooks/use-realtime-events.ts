@@ -2,10 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  createRealtimeSubscription,
   getRealtimeWsUrl,
   type RealtimeOpEventType,
-  unsubscribeRealtimeSubscription,
 } from "@/lib/realtime/client";
 
 type SocketConnectedMessage = {
@@ -49,7 +47,6 @@ export function useRealtimeEvents(options?: Options) {
   const userId = options?.userId;
   const userRole = options?.userRole;
   const eventTypes = options?.eventTypes;
-  const resourceId = options?.resourceId;
   const [connectionId] = useState(() => createConnectionId());
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<RealtimeMessage[]>([]);
@@ -100,46 +97,20 @@ export function useRealtimeEvents(options?: Options) {
     };
   }, [connectionId, maxEvents, userId, userRole]);
 
-  useEffect(() => {
-    if (!userId || !eventTypes || eventTypes.length === 0) {
-      return;
-    }
-
-    const currentConnectionId = connectionId;
-    let disposed = false;
-
-    (async () => {
-      await Promise.allSettled(
-        eventTypes.map((eventType) =>
-          createRealtimeSubscription({
-            userId,
-            connectionId: currentConnectionId,
-            eventType,
-            resourceId,
-          }),
-        ),
-      );
-    })();
-
-    return () => {
-      disposed = true;
-      if (disposed) {
-        void Promise.allSettled(
-          eventTypes.map((eventType) =>
-            unsubscribeRealtimeSubscription({
-              connectionId: currentConnectionId,
-              eventType,
-              resourceId,
-            }),
-          ),
-        );
-      }
-    };
-  }, [connectionId, eventTypes, resourceId, userId]);
-
   const eventMessages = useMemo(
-    () => messages.filter((message): message is SocketEventMessage => message.type === "event"),
-    [messages],
+    () =>
+      messages.filter((message): message is SocketEventMessage => {
+        if (message.type !== "event") {
+          return false;
+        }
+
+        if (!eventTypes || eventTypes.length === 0) {
+          return true;
+        }
+
+        return eventTypes.includes(message.event as RealtimeOpEventType);
+      }),
+    [eventTypes, messages],
   );
 
   return {

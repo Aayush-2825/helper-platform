@@ -14,6 +14,10 @@ import {
   Sparkles,
   Users,
   Wrench,
+  Bolt,
+  Search,
+  Zap,
+  Star
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -118,152 +122,116 @@ const customerVoices = [
   },
 ];
 
+import { ThemeToggle } from "@/components/ThemeToggle";
+
 export default function Home() {
   return (
-    <div className="min-h-screen pb-16">
-      <header className="mx-auto w-full max-w-6xl px-4 pt-5 sm:px-6 lg:px-8">
-        <div className="surface-card reveal-up flex items-center justify-between px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-              <Building2 />
+    <div className="min-h-screen pb-20 overflow-x-hidden">
+      {/* Premium Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between bg-background/60 backdrop-blur-2xl px-6 py-3 rounded-full border border-border/40 shadow-xl reveal-up">
+          <div className="flex items-center gap-2">
+            <div className="size-8 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg">
+              <Bolt className="size-5 fill-white" />
             </div>
-            <div>
-              <p className="text-sm font-semibold">Zapier Services</p>
-              <p className="text-xs text-muted-foreground">Precision marketplace for local service ops</p>
-            </div>
+            <span className="font-heading font-black text-xl tracking-tight">Helper</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Link href="/dashboard" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-              Dashboard
+          <div className="hidden md:flex items-center gap-8 text-sm font-bold text-muted-foreground">
+             <Link href="#services" className="hover:text-primary transition-colors">Services</Link>
+             <Link href="#how-it-works" className="hover:text-primary transition-colors">How it Works</Link>
+             <Link href="/helper" className="hover:text-primary transition-colors">For Helpers</Link>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Link href="/auth/signin" className="hidden sm:block text-sm font-bold hover:text-primary transition-colors">
+              Sign In
             </Link>
-            <Link href="/auth/signin" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-              Sign in
-            </Link>
-            <Link href="/auth/signup" className={buttonVariants({ size: "sm" })}>
-              Get started
+            <Link href="/auth/signup" className="bg-primary text-white px-5 py-2.5 rounded-full font-black text-sm shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all">
+              Join Now
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-4 pt-8 sm:px-6 lg:px-8 lg:pt-12">
-        <section className="hero-ambient grid items-start gap-6 lg:grid-cols-[1.08fr_0.92fr]">
-          <div className="reveal-up flex flex-col gap-5">
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">Live dispatch board</Badge>
-              <Badge variant="secondary">Verified professionals</Badge>
-              <Badge variant="secondary">OTP-secured completion</Badge>
-            </div>
-
-            <h1 className="max-w-2xl text-balance text-4xl leading-[1.04] font-semibold sm:text-5xl lg:text-6xl">
-              One platform for every home and business service request.
+      <main className="max-w-7xl mx-auto px-6 space-y-24 pb-32">
+        {/* Refined Hero Section */}
+        <section className="text-center relative pt-24 pb-12">
+          {/* Subtler Background */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[600px] bg-[radial-gradient(circle_at_center,var(--color-primary)_0%,transparent_70%)] opacity-[0.03] -z-10" />
+          
+          <div className="space-y-10 reveal-up max-w-4xl mx-auto">
+            <Badge 
+              variant="outline" 
+              className="bg-primary/5 text-primary border-primary/20 py-1.5 px-4 rounded-full font-bold text-[10px] uppercase tracking-widest animate-reveal-up"
+            >
+               Reliable Service Infrastructure
+            </Badge>
+            
+            <h1 className="text-5xl md:text-7xl font-heading font-black tracking-tight leading-tight text-balance text-foreground">
+              Marketplace Operations <br />
+              <span className="text-primary font-extrabold italic">Simplified.</span>
             </h1>
 
-            <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
-              Stop juggling calls, chats, and uncertain arrivals. Post a requirement, compare trusted professionals,
-              schedule in seconds, and track completion from one crisp workflow.
+            <p className="text-lg md:text-xl text-muted-foreground font-medium max-w-2xl mx-auto text-balance leading-relaxed">
+              Precision-built marketplace platform for home and business services. Global dispatch, verified providers, and real-time tracking.
             </p>
 
-            <div className="surface-card reveal-up delay-1 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
-              <Input placeholder="Try: Deep clean 2BHK this Saturday" className="h-11 bg-background/70" />
-              <Button className="shrink-0" size="lg">
-                Find my service team
-                <ArrowRight data-icon="inline-end" />
-              </Button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 max-w-2xl mx-auto">
+               <div className="w-full relative group">
+                  <Input 
+                    placeholder="Search over 40+ service categories..." 
+                    className="h-14 pl-12 pr-6 rounded-2xl border border-border/60 bg-background/50 backdrop-blur-sm text-base font-medium transition-all focus-visible:ring-primary/10 focus-visible:border-primary group-hover:border-primary/30" 
+                  />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+               </div>
+               <Button size="lg" className="h-14 px-10 rounded-2xl font-black text-base shadow-xl shadow-primary/10 hover:shadow-primary/20 transition-all bg-primary text-white shrink-0">
+                  Join the Network
+               </Button>
             </div>
 
-            <div className="reveal-up delay-2 flex flex-wrap gap-3">
-              <Link href="/auth/signup" className={buttonVariants({ variant: "outline", size: "lg" })}>
-                Book now
-                <CalendarCheck2 data-icon="inline-end" />
-              </Link>
-              <Link href="/helper" className={buttonVariants({ variant: "ghost", size: "lg" })}>
-                Become a provider
-                <Users data-icon="inline-end" />
-              </Link>
-            </div>
-
-            <p className="reveal-up delay-3 text-xs text-muted-foreground">
-              Trusted by households, co-working hubs, and local stores in 40+ cities.
-            </p>
-          </div>
-
-          <Card className="surface-card-strong reveal-up delay-3 border-none p-1">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Clock3 className="text-primary" />
-                Live service command board
-              </CardTitle>
-              <CardDescription>Track dispatches in real time while keeping approvals and payments secure.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 pb-4">
-              {dispatchQueue.map((item) => (
-                <div key={item.service} className="gradient-outline rounded-2xl p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">{item.service}</p>
-                      <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="size-3.5 text-primary" />
-                        {item.location}
-                      </p>
-                    </div>
-                    <Badge variant="secondary">{item.status}</Badge>
+            <div className="flex items-center justify-center gap-10 pt-12 border-t border-border/10 max-w-xl mx-auto opacity-50">
+               {[ShieldCheck, Star, Zap].map((Icon, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                     <Icon className="size-4 text-primary" />
+                     <span className="text-[10px] font-black uppercase tracking-widest">{["Verified", "4.9 Multi-Zone", "Real-time"].at(i)}</span>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">{item.time}</p>
-                </div>
-              ))}
-
-              <div className="rounded-2xl border border-border/70 bg-secondary/45 p-3">
-                <p className="flex items-center gap-2 text-sm font-medium">
-                  <ShieldCheck className="text-primary" />
-                  OTP verification, protected payments, and post-service quality checks
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <section className="reveal-up delay-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {trustStats.map((stat) => (
-            <Card key={stat.label} className="surface-card border-none">
-              <CardContent className="flex flex-col gap-1 p-4 sm:p-5">
-                <p className="text-[0.7rem] font-semibold tracking-[0.12em] text-muted-foreground uppercase">{stat.label}</p>
-                <p className="text-2xl font-semibold sm:text-3xl">{stat.value}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </section>
-
-        <section className="flex flex-col gap-4">
-          <div className="reveal-up flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold tracking-[0.14em] text-primary uppercase">High-demand services</p>
-              <h2 className="mt-1 max-w-3xl text-3xl font-semibold sm:text-4xl">
-                Everything you need to run your day without service chaos
-              </h2>
+               ))}
             </div>
           </div>
+        </section>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Structured Categories Section */}
+        <section id="services" className="space-y-16 py-12">
+          <div className="text-center space-y-3 reveal-up">
+            <h2 className="text-3xl md:text-5xl font-heading font-black tracking-tight">Enterprise <span className="text-primary">Ecosystem</span></h2>
+            <p className="text-muted-foreground font-medium max-w-xl mx-auto text-sm md:text-base leading-relaxed">
+              Standardized dispatch board for managing fragmented service operations across multiple urban zones.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {serviceCategories.map((service, index) => {
               const Icon = service.icon;
               return (
-                <Card
-                  key={service.title}
-                  className="surface-card reveal-up border-none transition-transform duration-300 hover:-translate-y-1"
-                  style={{ animationDelay: `${index * 70}ms` }}
+                <Card 
+                  key={service.title} 
+                  className="bg-card/30 border border-border/50 hover:border-primary/20 transition-all duration-300 group cursor-pointer reveal-up rounded-2xl overflow-hidden shadow-sm hover:shadow-xl"
+                  style={{ animationDelay: `${index * 40}ms` }}
                 >
-                  <CardContent className="flex flex-col gap-3 p-5">
-                    <div className="flex size-11 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground">
-                      <Icon />
+                  <CardContent className="p-8 space-y-6">
+                    <div className="size-12 rounded-xl bg-primary/5 flex items-center justify-center text-primary transition-colors group-hover:bg-primary/10">
+                      <Icon className="size-5" />
                     </div>
-                    <h3 className="text-xl font-semibold">{service.title}</h3>
-                    <p className="text-sm text-muted-foreground">{service.description}</p>
-                    <p className="mt-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                      <BadgeCheck className="size-3.5 text-primary" />
-                      {service.pulse}
-                    </p>
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-heading font-bold tracking-tight">{service.title}</h3>
+                      <p className="text-muted-foreground text-xs font-medium leading-relaxed opacity-80">{service.description}</p>
+                    </div>
+                    <div className="pt-4 border-t border-border/30 flex items-center justify-between">
+                       <span className="text-[10px] font-black uppercase tracking-[0.15em] text-primary/70">{service.pulse}</span>
+                       <ArrowRight className="size-3 text-primary opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                    </div>
                   </CardContent>
                 </Card>
               );
@@ -271,74 +239,34 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
-          <Card className="surface-card reveal-up delay-3 border-none px-1">
-            <CardHeader>
-              <p className="text-xs font-semibold tracking-[0.14em] text-primary uppercase">How it works</p>
-              <CardTitle className="text-3xl">From request to completion in three clear steps</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4 pb-5">
-              {processSteps.map((step, index) => (
-                <div key={step.title} className="flex flex-col gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground">
-                      {index + 1}
+        {/* Professional Trust Section */}
+        <section className="reveal-up py-12">
+           <Card className="border border-border bg-foreground text-background dark:bg-card dark:text-foreground p-12 overflow-hidden relative rounded-3xl shadow-2xl hover:bg-foreground dark:hover:bg-card">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center relative z-10">
+                 {trustStats.map((stat) => (
+                    <div key={stat.label} className="space-y-2">
+                       <p className="text-4xl md:text-5xl font-black font-heading tracking-tighter">{stat.value}</p>
+                       <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 h-8 flex items-center justify-center">{stat.label}</p>
                     </div>
-                    <div className="pt-0.5">
-                      <p className="font-semibold">{step.title}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{step.description}</p>
-                    </div>
-                  </div>
-                  {index < processSteps.length - 1 ? <Separator /> : null}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card className="surface-card reveal-up delay-4 border-none px-1">
-            <CardHeader>
-              <p className="text-xs font-semibold tracking-[0.14em] text-primary uppercase">Customer voice</p>
-              <CardTitle className="text-3xl">Teams and households are switching to one reliable flow</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 pb-5">
-              {customerVoices.map((voice) => (
-                <div key={voice.name} className="rounded-2xl border border-border/70 bg-background/70 p-4">
-                  <p className="text-sm leading-relaxed">&ldquo;{voice.quote}&rdquo;</p>
-                  <p className="mt-3 text-xs font-medium text-muted-foreground">
-                    {voice.name} - {voice.role}
-                  </p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </section>
-
-        <section className="reveal-up delay-4 surface-card-strong border-none px-5 py-6 sm:px-8">
-          <div className="grid items-center gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <div>
-              <p className="text-xs font-semibold tracking-[0.14em] text-primary uppercase">For individuals and organizations</p>
-              <h2 className="mt-2 text-3xl font-semibold">Build your service engine once, run it daily with confidence</h2>
-              <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
-                Independent professionals can start receiving quality leads quickly, while teams can manage members,
-                approvals, recurring jobs, and service history from one account.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end lg:flex-col">
-              <Link href="/auth/signup" className={buttonVariants({ size: "lg" })}>
-                Start selling services
-                <ArrowRight data-icon="inline-end" />
-              </Link>
-              <Link href="/organizations" className={buttonVariants({ size: "lg", variant: "outline" })}>
-                Explore organization tools
-              </Link>
-            </div>
-          </div>
+                 ))}
+              </div>
+           </Card>
         </section>
       </main>
 
-      <footer className="mx-auto mt-12 w-full max-w-6xl px-4 text-center text-xs text-muted-foreground sm:px-6 lg:px-8">
-        Built for dependable local service operations, from first request to final completion.
+      <footer className="max-w-7xl mx-auto px-6 py-16 border-t border-border/20 flex flex-col md:flex-row items-center justify-between gap-10 text-muted-foreground/60">
+        <div className="flex items-center gap-2.5 opacity-80">
+          <div className="size-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+            <Bolt className="size-3.5" />
+          </div>
+          <span className="font-heading font-black text-lg tracking-tight text-foreground/80">Helper</span>
+        </div>
+        <p className="text-[10px] font-bold uppercase tracking-widest">© 2026 Helper Platform. Industrial-grade service infrastructure.</p>
+        <div className="flex gap-8 text-[10px] font-black uppercase tracking-[0.2em]">
+           <Link href="#" className="hover:text-primary transition-colors">Legal</Link>
+           <Link href="#" className="hover:text-primary transition-colors">Service Level</Link>
+           <Link href="#" className="hover:text-primary transition-colors">Node API</Link>
+        </div>
       </footer>
     </div>
   );

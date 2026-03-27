@@ -1,62 +1,144 @@
 import express from "express";
 import http from "http";
 import WebSocket, { WebSocketServer } from "ws";
-import { randomUUID } from "crypto";
 import router from "./routes/helpers.js";
+import realtimeRouter from "./routes/realtime.js";
+import cors from "cors";
+import { routeMessage } from "./handlers/index.js";
+import { webDb } from "./db/index.js";
+import { booking } from "./db/schema.js";
+import { and, eq, lt } from "drizzle-orm";
 
 const PORT = Number(process.env.PORT) || 3001;
 
 const app = express();
-app.use(express.json()); 
 
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
+    credentials: true,
+  }),
+);
+
+app.use(express.json());
 app.use("/api/helpers", router);
+app.use("/api/realtime", realtimeRouter);
 
 const server = http.createServer(app);
-
 const wss = new WebSocketServer({ server });
 
+/**
+ * 🔥 Map<userId, socket>
+ */
 const clients = new Map<string, WebSocket>();
 
-type Message =
-  | { type: "chat"; to: string; payload: unknown }
-  | { type: "broadcast"; payload: unknown }
-  | { type: "booking_request"; payload: unknown };
+// =========================
+// ✅ UTIL FUNCTIONS
+// =========================
 
-wss.on("connection", (socket: WebSocket) => {
-  const userId = randomUUID();
-  clients.set(userId, socket);
-  console.log(`[WS] ${userId} connected. Total: ${clients.size}`);
+function sendToUser(userId: string, message: object) {
+  const client = clients.get(userId);
 
-  socket.on("message", (dataRaw) => {
-    let data: Message & Record<string, unknown>;
-    try {
-      data = JSON.parse(dataRaw.toString()) as Message & Record<string, unknown>;
-    } catch (err) {
-      console.warn("[WS] Invalid JSON received", err);
-      return;
-    }
+  if (client && client.readyState === WebSocket.OPEN) {
+    client.send(JSON.stringify(message));
+  }
+}
 
-    if (!data.type) {
-      console.warn("[WS] Message missing type", data);
-      return;
-    }
-
-    switch (data.type) {
-      case "chat":
-        handleChat({ userId, to: data.to, payload: data.payload, socket });
-        break;
-      case "broadcast":
-        handleBroadcast({ userId, payload: data.payload, socket });
-        break;
-      case "booking_request":
-        handleBookingRequest({ userId, payload: data.payload, socket });
-        break;
-      default:
-        // Unreachable with the current `Message` union; kept for runtime safety.
-        console.warn("[WS] Unknown message type received");
-        break;
+function broadcastToAll(message: object) {
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(message));
     }
   });
+}
+
+// =========================
+// 🔥 CORE EVENT DISPATCHER
+// =========================
+
+export function broadcastEvent({
+  event,
+  data,
+  targetUserIds,
+}: {
+  event: string;
+  data: any;
+  targetUserIds?: string[];
+}) {
+  const message = {
+    type: "event",
+    event,
+    data,
+  };
+
+  console.log("📡 Broadcasting:", event, targetUserIds ?? "ALL");
+
+  if (targetUserIds && targetUserIds.length > 0) {
+    targetUserIds.forEach((userId) => {
+      sendToUser(userId, message);
+    });
+  } else {
+    broadcastToAll(message);
+  }
+}
+
+// =========================
+// 🌐 WS CONNECTION
+// =========================
+
+wss.on("connection", (socket: WebSocket, request) => {
+  const url = new URL(request.url || "", "http://localhost");
+  const userId = url.searchParams.get("userId");
+
+  if (!userId) {
+    console.warn("[WS] Missing userId → rejected");
+    socket.close(1008, "Missing userId");
+    return;
+  }
+
+  // ⚠️ Handle duplicate connections (same user)
+  if (clients.has(userId)) {
+    console.log(`[WS] Replacing existing connection for ${userId}`);
+    clients.get(userId)?.close();
+  }
+
+  clients.set(userId, socket);
+
+  console.log(`[WS] ${userId} connected. Total: ${clients.size}`);
+
+  // ✅ Connection ack
+  socket.send(
+    JSON.stringify({
+      type: "connected",
+      userId,
+      timestamp: new Date().toISOString(),
+    }),
+  );
+
+  // =========================
+  // 📩 MESSAGE HANDLER
+  // =========================
+
+  socket.on("message", (raw) => {
+    try {
+      const data = JSON.parse(raw.toString());
+
+      // ❤️ Handle heartbeat
+      if (data.type === "ping") {
+        socket.send(JSON.stringify({ type: "pong" }));
+        return;
+      }
+
+      routeMessage(userId, data);
+    } catch (err) {
+      console.warn("[WS] Invalid message", err);
+    }
+  });
+
+  // =========================
+  // 🔌 CLEANUP
+  // =========================
 
   socket.on("close", () => {
     clients.delete(userId);
@@ -64,127 +146,52 @@ wss.on("connection", (socket: WebSocket) => {
   });
 
   socket.on("error", (err) => {
-    console.error(`[WS] Error for user ${userId}:`, err);
+    console.error(`[WS] Error for ${userId}:`, err);
   });
 });
 
-function sendAck(
-  socket: WebSocket,
-  type: string,
-  status: "ok" | "error",
-  extra?: Record<string, unknown>,
-) {
-  if (socket.readyState === WebSocket.OPEN) {
-    socket.send(
-      JSON.stringify({
-        type: "ack",
-        ackType: type,
-        status,
-        ...extra,
-      }),
-    );
-  }
-}
+// =========================
+// 🚀 START SERVER
+// =========================
 
-function handleChat({
-  userId,
-  to,
-  payload,
-  socket,
-}: {
-  userId: string;
-  to: string;
-  payload: unknown;
-  socket: WebSocket;
-}) {
-  const target = clients.get(to);
-  if (!target) {
-    console.warn(`[WS] Target user ${to} not found for chat from ${userId}`);
-    sendAck(socket, "chat", "error", { message: "Target user not found" });
-    return;
-  }
-  if (target.readyState === WebSocket.OPEN) {
-    target.send(
-      JSON.stringify({
-        type: "chat",
-        from: userId,
-        payload,
-      }),
-    );
-    sendAck(socket, "chat", "ok");
-  } else {
-    console.warn(`[WS] Target user ${to} socket not open`);
-    sendAck(socket, "chat", "error", { message: "Target socket not open" });
-  }
-}
+// =========================
+// 🕒 BOOKING EXPIRATION JOB (runs every 30s)
+// =========================
 
-function handleBroadcast({
-  socket,
-  userId,
-  payload,
-}: {
-  socket: WebSocket;
-  userId: string;
-  payload: unknown;
-}) {
-  if (!payload) {
-    sendAck(socket, "broadcast", "error", { message: "Missing payload" });
-    return;
-  }
-  clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(
-        JSON.stringify({
-          type: "broadcast",
-          from: userId,
-          payload,
-        }),
-      );
+setInterval(async () => {
+  try {
+    const now = new Date();
+    const expired = await webDb
+      .update(booking)
+      .set({ status: "expired", updatedAt: now })
+      .where(
+        and(
+          eq(booking.status, "requested"),
+          lt(booking.acceptanceDeadline, now)
+        )
+      )
+      .returning({ id: booking.id, customerId: booking.customerId });
+
+    if (expired.length > 0) {
+      console.log(`🕒 [Expiration] Marked ${expired.length} bookings as expired`);
+      expired.forEach((b) => {
+        broadcastEvent({
+          event: "booking_update",
+          data: { bookingId: b.id, status: "expired", eventType: "expired" },
+          targetUserIds: [b.customerId],
+        });
+      });
     }
-  });
-  sendAck(socket, "broadcast", "ok");
-}
-
-function handleBookingRequest({
-  socket,
-  userId,
-  payload,
-}: {
-  socket: WebSocket;
-  userId: string;
-  payload: unknown;
-}) {
-  if (!payload) {
-    sendAck(socket, "booking_request", "error", { message: "Missing payload" });
-    return;
-  }
-  const payloadObj = payload as { service?: unknown; location?: unknown };
-  if (!payloadObj.service || !payloadObj.location) {
-    socket.send(
-      JSON.stringify({
-        type: "error",
-        message: "Invalid booking request: missing service or location",
-      }),
-    );
-    sendAck(socket, "booking_request", "error", {
-      message: "Missing service or location",
-    });
-    return;
-  }
-  clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(
-        JSON.stringify({
-          type: "booking_request",
-          from: userId,
-          payload,
-        }),
-      );
+  } catch (err) {
+    // Silence error if booking table doesn't exist yet or other DB issues
+    if (process.env.NODE_ENV === "development") {
+      // console.warn("🕒 [Expiration] Job skipped (likely DB or table not ready)");
+    } else {
+      console.error("❌ [Expiration] Job failed:", err);
     }
-  });
-  sendAck(socket, "booking_request", "ok");
-}
+  }
+}, 30000);
 
 server.listen(PORT, () => {
-  console.log(`[Server] Express & WS listening on port ${PORT}`);
+  console.log(`[Server] Express + WS running on port ${PORT}`);
 });

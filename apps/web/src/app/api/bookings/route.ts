@@ -6,6 +6,11 @@ import { auth } from "@/lib/auth/server";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
 import { startMatching } from "@/services/matching/matching";
+import { headers } from "next/headers";
+
+function emptyToNull(value?: string | null) {
+  return value && value.trim() !== "" ? value : null;
+}
 
 // ✅ Validation schema
 const createBookingSchema = z.object({
@@ -31,7 +36,7 @@ const createBookingSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth.api.getSession();
+    const session = await auth.api.getSession({ headers: await headers() });
 
     if (!session) {
       return NextResponse.json(
@@ -62,22 +67,22 @@ export async function POST(request: NextRequest) {
 
         customerId: session.user.id,
         categoryId: data.categoryID,
-        subcategoryId: data.subcategoryID ?? null,
+
+        subcategoryId: emptyToNull(data.subcategoryID),
 
         status: "requested",
         requestedAt: new Date(),
-        scheduledFor: data.scheduledFor ? new Date(data.scheduledFor) : null,
 
         addressLine: data.addressLine,
-        area: data.area ?? null,
+        area: emptyToNull(data.area),
         city: data.city,
-        state: data.state ?? null,
-        postalCode: data.postalCode ?? null,
+        state: emptyToNull(data.state),
+        postalCode: emptyToNull(data.postalCode),
 
-        latitude: data.latitude?.toString() ?? null,
-        longitude: data.longitude?.toString() ?? null,
+        latitude: emptyToNull(data.latitude?.toString()),
+        longitude: emptyToNull(data.longitude?.toString()),
 
-        notes: data.notes ?? null,
+        notes: emptyToNull(data.notes),
 
         quotedAmount: data.quotedAmount,
         finalAmount: data.finalAmount ?? null,
@@ -86,7 +91,9 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    startMatching(newBooking);
+    startMatching(newBooking).catch((err) => {
+      console.error("Matching error:", err);
+    });
 
     return NextResponse.json(
       {
@@ -99,7 +106,7 @@ export async function POST(request: NextRequest) {
     console.error("Booking Error:", error);
 
     return NextResponse.json(
-      { message: "Internal server error" },
+      { message: "Internal server error", error: (error as Error).message },
       { status: 500, headers: NO_STORE_HEADERS },
     );
   }
@@ -107,7 +114,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession();
+    const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
       return NextResponse.json(
         { message: "Unauthorized" },
@@ -128,7 +135,7 @@ export async function GET() {
       );
     }
 
-    if (session.user.role === "customer") {
+    if (session.user.role === "customer" || session.user.role === "user") {
       const bookings = await db
         .select()
         .from(booking)

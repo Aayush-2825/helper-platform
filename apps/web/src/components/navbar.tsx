@@ -21,6 +21,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface NavbarProps {
   title: string;
@@ -50,38 +51,18 @@ export function Navbar({ title }: NavbarProps) {
   };
 
   return (
-    <nav className="surface-card sticky top-0 z-40 border-b">
-      <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        {/* Left Section - Mobile Menu & Title */}
+    <nav className="sticky top-0 z-40 border-b border-border/40 bg-background/60 backdrop-blur-xl">
+      <div className="flex items-center justify-between gap-4 px-6 py-4">
+        {/* Left Section - Logo/Title */}
         <div className="flex items-center gap-3">
-          <Sheet>
-            <SheetTrigger
-              render={<Button variant="ghost" size="icon" className="lg:hidden" />}
-              aria-label="Toggle menu"
-            >
-              <Menu className="h-5 w-5" />
-              <span className="sr-only">Toggle menu</span>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64">
-              <SheetHeader>
-                <SheetTitle>{title}</SheetTitle>
-              </SheetHeader>
-              {/* Mobile nav content goes here */}
-              <div className="mt-8">
-                <p className="text-sm text-muted-foreground">Navigation items will be populated by layouts</p>
-              </div>
-            </SheetContent>
-          </Sheet>
-
-          <div className="hidden sm:block">
-            <Link href="/dashboard" className="text-lg font-semibold hover:opacity-80 transition-opacity">
-              {title}
-            </Link>
-          </div>
+          <Link href="/dashboard" className="text-xl font-heading font-bold hover:opacity-80 transition-all hover:scale-105 active:scale-95">
+            {title}
+          </Link>
         </div>
 
         {/* Right Section - User Menu */}
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button variant="ghost" className="relative h-10 w-10 rounded-full" />}

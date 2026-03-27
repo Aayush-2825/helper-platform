@@ -76,7 +76,7 @@ export async function sendVerificationEmail(data: VerificationEmailData) {
     subject: "Verify your email address",
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Welcome to Zapier Clone, ${user.name}!</h2>
+        <h2>Welcome to Helper Platform, ${user.name}!</h2>
         <p>Please verify your email address by clicking the button below:</p>
         <a href="${url}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">
           Verify Email

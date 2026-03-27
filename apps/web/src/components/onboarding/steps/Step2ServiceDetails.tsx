@@ -105,6 +105,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
               placeholder="Tell customers about your experience, specialties, and what makes you unique... (500 chars max)"
               maxLength={500}
               {...field}
+              value={typeof field.value === "string" ? field.value : ""}
             />
             <p className="mt-1 text-xs text-gray-500">
               {field.value?.length || 0}/500 characters

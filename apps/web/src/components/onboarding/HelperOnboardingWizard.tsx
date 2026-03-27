@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useOnboardingForm, clearOnboardingDraft } from "@/lib/hooks/useOnboardingForm";
 import { completeOnboardingSchema, CompleteOnboarding } from "@/lib/schemas/helper-onboarding";
 import { Step0RoleSelection } from "./steps/Step0RoleSelection";
@@ -70,8 +70,21 @@ function getStepTitle(step: number): string {
   return titles[step] || "";
 }
 
+const PHONE_REGEX = /^[0-9]{10}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const UPI_REGEX = /^[a-zA-Z0-9.-]{3,}@[a-zA-Z]{3,}$/;
+
+function hasText(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function hasUploadValue(value: unknown) {
+  return hasText(value) || (typeof value === "object" && value !== null);
+}
+
 interface HelperOnboardingWizardProps {
-  onSuccess?: (data: CompleteOnboarding) => void;
+  onSuccess?: (data: CompleteOnboarding) => void | Promise<void>;
   onCancel?: () => void;
 }
 
@@ -111,10 +124,213 @@ export function HelperOnboardingWizard({
 
   const isIndividual = form.watch("helperType") === "individual";
   const watchedValues = form.watch();
+  const persistedStep = form.watch("currentStep");
+
+  useEffect(() => {
+    if (typeof persistedStep !== "number") {
+      return;
+    }
+
+    const nextStep = Math.max(0, Math.min(TOTAL_STEPS - 1, persistedStep));
+    if (nextStep !== currentStep) {
+      setCurrentStep(nextStep);
+    }
+  }, [currentStep, persistedStep]);
 
   const validateStep = async (step: number, shouldFocus = false) => {
     const fields = getStepFieldPaths(step, isIndividual);
-    return form.trigger(fields, { shouldFocus });
+    form.clearErrors(fields);
+
+    let firstInvalidField: OnboardingFieldPath | null = null;
+    const values = form.getValues();
+
+    const addError = (field: OnboardingFieldPath, message: string) => {
+      if (!firstInvalidField) {
+        firstInvalidField = field;
+      }
+
+      form.setError(field, {
+        type: "manual",
+        message,
+      });
+    };
+
+    switch (step) {
+      case 0: {
+        if (values.helperType !== "individual" && values.helperType !== "agency") {
+          addError("helperType", "Choose how you want to work with us.");
+        }
+        break;
+      }
+
+      case 1: {
+        if (isIndividual) {
+          if (!hasText(values.fullName) || values.fullName.trim().length < 2) {
+            addError("fullName", "Full name required");
+          }
+          if (!PHONE_REGEX.test(values.phone ?? "")) {
+            addError("phone", "Valid 10-digit phone required");
+          }
+          if (hasText(values.email) && !EMAIL_REGEX.test(values.email.trim())) {
+            addError("email", "Valid email required");
+          }
+          if (!hasText(values.city) || values.city.trim().length < 2) {
+            addError("city", "City is required");
+          }
+        } else {
+          if (!hasText(values.businessName) || values.businessName.trim().length < 2) {
+            addError("businessName", "Business name required");
+          }
+          if (!hasText(values.ownerName) || values.ownerName.trim().length < 2) {
+            addError("ownerName", "Owner name required");
+          }
+          if (!PHONE_REGEX.test(values.phone ?? "")) {
+            addError("phone", "Valid 10-digit phone required");
+          }
+          if (!hasText(values.email) || !EMAIL_REGEX.test(values.email.trim())) {
+            addError("email", "Valid email required");
+          }
+          if (!hasText(values.businessAddress) || values.businessAddress.trim().length < 5) {
+            addError("businessAddress", "Address required");
+          }
+          if (!hasText(values.city) || values.city.trim().length < 2) {
+            addError("city", "City required");
+          }
+        }
+        break;
+      }
+
+      case 2: {
+        if (!hasText(values.primaryCategory)) {
+          addError("primaryCategory", "Select a service category");
+        }
+        if (!Array.isArray(values.languages) || values.languages.length === 0) {
+          addError("languages", "Select at least one language");
+        }
+        if (typeof values.yearsExperience !== "number" || values.yearsExperience < 0) {
+          addError("yearsExperience", "Must be 0 or more");
+        }
+        if (typeof values.serviceRadiusKm !== "number" || values.serviceRadiusKm < 1 || values.serviceRadiusKm > 50) {
+          addError("serviceRadiusKm", "Service radius must be between 1 and 50 km");
+        }
+
+        if (!isIndividual) {
+          if (!Array.isArray(values.workerTypesOffered) || values.workerTypesOffered.length === 0) {
+            addError("workerTypesOffered", "Select worker types");
+          }
+          if (
+            values.numberOfWorkers === undefined ||
+            typeof values.numberOfWorkers !== "number" ||
+            values.numberOfWorkers < 1
+          ) {
+            addError("numberOfWorkers", "At least 1 worker is required");
+          }
+        }
+        break;
+      }
+
+      case 3: {
+        if (!hasText(values.pricingType)) {
+          addError("pricingType", "Choose a pricing model");
+        }
+        if (!Array.isArray(values.availableDays) || values.availableDays.length === 0) {
+          addError("availableDays", "Select at least one day");
+        }
+        if (!hasText(values.workingHours?.start)) {
+          addError("workingHours.start", "Start time required");
+        }
+        if (!hasText(values.workingHours?.end)) {
+          addError("workingHours.end", "End time required");
+        }
+        if (
+          hasText(values.workingHours?.start) &&
+          hasText(values.workingHours?.end) &&
+          values.workingHours.end <= values.workingHours.start
+        ) {
+          addError("workingHours.end", "End time must be after start time");
+        }
+        if (
+          values.basePrice !== undefined &&
+          typeof values.basePrice === "number" &&
+          values.basePrice < 0
+        ) {
+          addError("basePrice", "Price must be positive");
+        }
+        break;
+      }
+
+      case 4: {
+        if (isIndividual) {
+          if (!hasText(values.idDocumentType)) {
+            addError("idDocumentType", "Select a government ID type");
+          }
+          if (!hasText(values.idDocumentNumber) || values.idDocumentNumber.trim().length < 5) {
+            addError("idDocumentNumber", "Invalid document number");
+          }
+          if (!hasUploadValue(values.idDocumentUrl)) {
+            addError("idDocumentUrl", "Upload your ID document");
+          }
+        } else {
+          if (!hasUploadValue(values.businessRegistrationUrl)) {
+            addError("businessRegistrationUrl", "Upload your business registration document");
+          }
+          if (!hasText(values.ownerIdDocumentType)) {
+            addError("ownerIdDocumentType", "Select the owner or manager ID type");
+          }
+          if (!hasUploadValue(values.ownerIdDocumentUrl)) {
+            addError("ownerIdDocumentUrl", "Upload the owner or manager ID document");
+          }
+          if (!values.workerDeclarationAgreed) {
+            addError("workerDeclarationAgreed", "You must confirm worker identity verification");
+          }
+        }
+        break;
+      }
+
+      case 5: {
+        if (!hasText(values.accountHolderName) || values.accountHolderName.trim().length < 2) {
+          addError("accountHolderName", "Name required");
+        }
+        if (!/^[0-9]{9,18}$/.test(values.bankAccountNumber ?? "")) {
+          addError("bankAccountNumber", "Valid account number required");
+        }
+
+        const normalizedIfsc = values.ifscCode?.toUpperCase() ?? "";
+        if (normalizedIfsc && normalizedIfsc !== values.ifscCode) {
+          form.setValue("ifscCode", normalizedIfsc, {
+            shouldDirty: true,
+            shouldValidate: false,
+          });
+        }
+        if (!IFSC_REGEX.test(normalizedIfsc)) {
+          addError("ifscCode", "Valid IFSC code required (e.g., SBIN0001234)");
+        }
+
+        if (hasText(values.upiId) && !UPI_REGEX.test(values.upiId.trim())) {
+          addError("upiId", "Valid UPI ID required (e.g., user@upi)");
+        }
+        break;
+      }
+
+      case 6: {
+        if (!values.agreedToTerms) {
+          addError("agreedToTerms", "You must agree to terms");
+        }
+        if (!values.agreedToCommission) {
+          addError("agreedToCommission", "You must agree to commission terms");
+        }
+        break;
+      }
+
+      default:
+        break;
+    }
+
+    if (firstInvalidField && shouldFocus && !String(firstInvalidField).endsWith("Url")) {
+      form.setFocus(firstInvalidField);
+    }
+
+    return !firstInvalidField;
   };
 
   // Validate and move to next step
@@ -150,7 +366,9 @@ export function HelperOnboardingWizard({
 
     if (isValid) {
       if (currentStep < TOTAL_STEPS - 1) {
-        setCurrentStep(currentStep + 1);
+        const nextStep = currentStep + 1;
+        setCurrentStep(nextStep);
+        form.setValue("currentStep", nextStep);
         // Auto-save the fact that this step is completed
         const completedSteps = new Set(watchedValues.completedSteps || []);
         completedSteps.add(currentStep);
@@ -164,7 +382,9 @@ export function HelperOnboardingWizard({
 
   const goToPreviousStep = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      const nextStep = currentStep - 1;
+      setCurrentStep(nextStep);
+      form.setValue("currentStep", nextStep);
     }
   };
 
@@ -175,6 +395,7 @@ export function HelperOnboardingWizard({
       if (!isStepValid) {
         if (step !== currentStep) {
           setCurrentStep(step);
+          form.setValue("currentStep", step);
         }
 
         // Wait for step UI to render, then focus first invalid field in that step.
@@ -193,7 +414,8 @@ export function HelperOnboardingWizard({
 
       // Call onSuccess callback if provided
       if (onSuccess) {
-        onSuccess(formData);
+        await onSuccess(formData);
+        clearOnboardingDraft();
       } else {
         // Default: log and show success
         console.log("Onboarding data:", formData);

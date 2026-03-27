@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
+    "db:migrate": "pnpm --filter @repo/db migrate",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
@@ -10,6 +11,7 @@
   },
   "devDependencies": {
     "prettier": "^3.7.4",
+    "tsx": "^4.21.0",
     "turbo": "^2.8.20",
     "typescript": "5.9.2"
   },

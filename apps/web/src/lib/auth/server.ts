@@ -1,4 +1,4 @@
-﻿import { betterAuth } from "better-auth";
+import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { organization } from "better-auth/plugins/organization";
@@ -7,7 +7,7 @@ import * as schema from "@/db/schema";
 import { sendInvitationEmail, sendPasswordResetEmail, sendVerificationEmail } from "@/lib/notifications/email";
 
 export const auth = betterAuth({
-  appName: "Zapier Clone",
+  appName: "Helper Platform",
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,

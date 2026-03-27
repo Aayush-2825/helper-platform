@@ -1,3 +1,5 @@
+import { wsSend } from "./wsManager";
+
 type JsonRecord = Record<string, unknown>;
 
 export type RealtimeOpEventType =
@@ -48,17 +50,17 @@ async function postJson(path: string, payload: JsonRecord): Promise<Response> {
   });
 }
 
-export async function publishHelperPresence(input: {
+export function publishHelperPresence(input: {
   helperUserId: string;
   status: "online" | "offline" | "busy" | "away";
   latitude?: number;
   longitude?: number;
   availableSlots?: number;
 }) {
-  return postJson("/api/realtime/ops/helper-presence", input);
+  wsSend({ type: "helper_presence", ...input });
 }
 
-export async function publishLocationUpdate(input: {
+export function publishLocationUpdate(input: {
   helperUserId: string;
   bookingId: string;
   latitude: number;
@@ -67,24 +69,79 @@ export async function publishLocationUpdate(input: {
   speed?: number;
   heading?: number;
 }) {
-  return postJson("/api/realtime/ops/location-updates", input);
+  wsSend({ type: "location_update", ...input });
 }
 
-export async function publishBookingEvent(input: {
+export function publishBookingEvent(input: {
   bookingId: string;
   customerId: string;
-  helperId?: string;
+  helperId?: string; // single helper (updates)
   eventType:
     | "created"
     | "accepted"
     | "rejected"
+    | "cancelled"
     | "in_progress"
     | "completed"
-    | "cancelled"
-    | "matching_timeout";
-  data?: JsonRecord;
+    | "matching_update";
+  data?: any;
 }) {
-  return postJson("/api/realtime/ops/booking-events", input);
+  let wsEvent = "";
+
+  // 🧠 Step 1: Map DB → WS event
+  if (input.eventType === "created") {
+    wsEvent = "booking_request";
+  } else {
+    wsEvent = "booking_update";
+  }
+
+  // 🧠 Step 2: Decide targets
+  let targetUserIds: string[] = [];
+
+  if (wsEvent === "booking_request") {
+    // ✅ SUPPORT BATCH (from matching)
+    if (input.data?.candidates?.length > 0) {
+      targetUserIds = input.data.candidates.map((c: any) => c.helperId);
+    }
+    // ✅ fallback (single helper)
+    else if (input.helperId) {
+      targetUserIds = [input.helperId];
+    }
+  }
+
+  if (wsEvent === "booking_update") {
+    targetUserIds = [input.customerId, input.helperId].filter(
+      Boolean,
+    ) as string[];
+  }
+
+  const payload = {
+    event: wsEvent,
+    data: {
+      bookingId: input.bookingId,
+      eventType: input.eventType,
+      ...input.data,
+    },
+    targetUserIds,
+  };
+
+  // 🔥 Step 3: Dispatch (HTTP if server, WS if client)
+  if (typeof window === "undefined") {
+    // 🧠 On server, we must use HTTP because there is no per-user WS connection
+    return postJson("/api/realtime/broadcast", payload).catch((err) => {
+      console.error("❌ Failed to broadcast booking event via HTTP:", err);
+      throw err;
+    });
+  } else {
+    // 🌐 On client, we can use the existing WS connection
+    wsSend({
+      type: wsEvent,
+      bookingId: input.bookingId,
+      eventType: input.eventType,
+      targetUserIds,
+      ...input.data,
+    });
+  }
 }
 
 export async function createIncomingJob(input: {

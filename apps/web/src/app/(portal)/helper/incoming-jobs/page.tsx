@@ -1,122 +1,175 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { createIncomingJob, publishHelperPresence, publishLocationUpdate } from "@/lib/realtime/client";
-import { useRealtimeEvents } from "@/hooks/use-realtime-events";
+import { useState, useEffect } from "react";
+import { IncomingJobsPanel } from "@/components/IncomingJobsPanel";
+import { IncomingJobsMap } from "@/components/IncomingJobsMap";
+import { useIncomingJobs } from "./useIncomingJobs";
+import { useWebSocket } from "@/hooks/useWebsocket";
 import { useSession } from "@/lib/auth/session";
-import { normalizeRole } from "@/lib/auth/roles";
+import { publishHelperPresence } from "@/lib/realtime/client";
+import { Badge } from "@/components/ui/badge";
+import { CurrentJobPanel } from "@/components/CurrentJobPanel";
 
-export default function HelperIncomingJobsPage() {
-  const { session, loading } = useSession();
-  const role = normalizeRole(session?.user.role);
-  const sessionUserId = session?.user.id ?? "";
-  const sessionUserRole = session?.user.role;
-  const [helperId, setHelperId] = useState("hlp_9");
-  const [bookingId, setBookingId] = useState("bk_123");
-  const [sending, setSending] = useState(false);
-  const [requestError, setRequestError] = useState<string | null>(null);
-  const { connected, eventMessages } = useRealtimeEvents({
-    maxEvents: 30,
-    userId: sessionUserId || undefined,
-    userRole: sessionUserRole,
-    eventTypes: ["booking_request", "helper_presence", "location_update", "booking_update"],
-    resourceId: sessionUserId || undefined,
+export default function HelperPage() {
+  const user = useSession();
+  const userId = user?.session?.user.id || "unknown";
+
+  const { jobs, addJob, removeJob } = useIncomingJobs();
+  const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
+
+  // Track the helper's own live location
+  const [workerLocation, setWorkerLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+
+  // Get initial position and start periodic heartbeat
+  useEffect(() => {
+    if (!userId || userId === "unknown") return;
+
+    let heartbeatInterval: NodeJS.Timeout;
+
+    const sendPresence = (lat?: number, lng?: number) => {
+      publishHelperPresence({
+        helperUserId: userId,
+        status: "online",
+        ...(lat != null ? { latitude: lat } : {}),
+        ...(lng != null ? { longitude: lng } : {}),
+      });
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setWorkerLocation({ lat, lng });
+        
+        // Send initial presence
+        sendPresence(lat, lng);
+
+        // Start heartbeat every 30 seconds
+        heartbeatInterval = setInterval(() => {
+          navigator.geolocation.getCurrentPosition(
+            (p) => sendPresence(p.coords.latitude, p.coords.longitude),
+            () => sendPresence(), // fallback if GPS fails during heartbeat
+          );
+        }, 30000);
+      },
+      () => {
+        // Geolocation denied — still send presence as "online" without coords
+        sendPresence();
+        heartbeatInterval = setInterval(() => sendPresence(), 30000);
+      },
+    );
+
+    return () => {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+    };
+  }, [userId]);
+
+  // High-frequency location updates for ACTIVE jobs
+  useEffect(() => {
+    if (!userId || userId === "unknown" || !activeBookingId) return;
+
+    console.log(`🚀 [Tracking] Starting high-frequency tracking for job: ${activeBookingId}`);
+
+    const trackInterval = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          
+          // Send high-frequency location update specifically for this booking
+          import("@/lib/realtime/client").then(({ publishLocationUpdate }) => {
+            publishLocationUpdate({
+              helperUserId: userId,
+              bookingId: activeBookingId,
+              latitude: lat,
+              longitude: lng,
+            });
+          });
+          
+          setWorkerLocation({ lat, lng });
+        },
+        (err) => console.warn("[Tracking] Failed to get GPS for high-frequency update:", err),
+        { enableHighAccuracy: true }
+      );
+    }, 5000); // Every 5 seconds
+
+    return () => {
+      console.log("🛑 [Tracking] Stopping high-frequency tracking");
+      clearInterval(trackInterval);
+    };
+  }, [userId, activeBookingId]);
+
+  useWebSocket(userId, (msg) => {
+    if (msg.type === "event" && msg.event === "booking_request") {
+      addJob(msg.data);
+    }
+
+    if (msg.type === "event" && msg.event === "booking_update") {
+      removeJob(msg.data.bookingId);
+    }
+
+    // Track the helper's own live location updates
+    if (msg.type === "event" && msg.event === "location_update") {
+      const d = msg.data as {
+        helperUserId?: string;
+        latitude?: number;
+        longitude?: number;
+      } | undefined;
+      if (d?.helperUserId === userId && d.latitude != null && d.longitude != null) {
+        setWorkerLocation({ lat: d.latitude, lng: d.longitude });
+      }
+    }
   });
 
-  useEffect(() => {
-    if (sessionUserId) {
-      setHelperId(sessionUserId);
-    }
-  }, [sessionUserId]);
-
-  const incomingJobs = useMemo(
-    () => eventMessages.filter((message) => message.event === "booking_request"),
-    [eventMessages],
-  );
-
-  async function handleSimulateIncomingJob() {
-    setSending(true);
-    setRequestError(null);
-
-    try {
-      await Promise.all([
-        publishHelperPresence({ helperUserId: helperId, status: "online", availableSlots: 1 }),
-        publishLocationUpdate({
-          helperUserId: helperId,
-          bookingId,
-          latitude: 12.9123,
-          longitude: 77.6421,
-          accuracy: 5,
-        }),
-        createIncomingJob({ bookingId, helperId, status: "pending" }),
-      ]);
-    } catch {
-      setRequestError("Could not push realtime helper events. Check realtime service URL.");
-    } finally {
-      setSending(false);
-    }
-  }
-
   return (
-    <main className="space-y-4 p-6">
-      <h1 className="text-2xl font-semibold">Incoming Job Requests</h1>
-      <p className="text-sm text-muted-foreground">Accept or reject nearby job requests.</p>
+    <main className="space-y-8 pb-20 max-w-4xl mx-auto">
+      <div className="flex flex-col gap-2 reveal-up">
+        <h1 className="text-4xl font-heading font-black tracking-tight">
+          Service <span className="text-primary">Radar</span>
+        </h1>
+        <p className="text-muted-foreground font-medium">
+          {activeBookingId ? "Focus on your current task" : "Accept nearby requests to start earning"}
+        </p>
+      </div>
 
-      {loading ? <p className="text-sm text-muted-foreground">Loading session...</p> : null}
-      {!loading && role !== "helper" && role !== "admin" ? (
-        <p className="text-sm text-amber-700">This workspace is intended for helper/admin roles.</p>
-      ) : null}
-
-      <section className="rounded-lg border p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm">
-          <span className={connected ? "text-green-600" : "text-amber-600"}>{connected ? "WS connected" : "WS disconnected"}</span>
+      {activeBookingId ? (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+           <CurrentJobPanel 
+             bookingId={activeBookingId} 
+             onJobCompleted={() => setActiveBookingId(null)} 
+           />
+           <div className="space-y-4">
+              <h3 className="text-xl font-heading font-bold px-1">Navigation</h3>
+              <IncomingJobsMap
+                jobs={[]}
+                workerLocation={workerLocation}
+              />
+           </div>
         </div>
+      ) : (
+        <div className="space-y-8">
+          <IncomingJobsMap
+            jobs={jobs}
+            workerLocation={workerLocation}
+          />
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="text-sm">
-            Helper ID
-            <input
-              className="mt-1 w-full rounded border px-2 py-1"
-              value={helperId}
-              onChange={(event) => setHelperId(event.target.value)}
+          <section className="space-y-6">
+            <div className="flex items-center justify-between px-1">
+               <h2 className="text-2xl font-heading font-black tracking-tight">Requests</h2>
+               <Badge className="bg-primary/10 text-primary border-none font-bold">{jobs.length} Nearby</Badge>
+            </div>
+            
+            <IncomingJobsPanel
+              jobs={jobs}
+              removeJob={removeJob}
+              onJobAccepted={(id) => setActiveBookingId(id)}
             />
-          </label>
-          <label className="text-sm">
-            Booking ID
-            <input
-              className="mt-1 w-full rounded border px-2 py-1"
-              value={bookingId}
-              onChange={(event) => setBookingId(event.target.value)}
-            />
-          </label>
+          </section>
         </div>
-
-        <button
-          className="mt-3 rounded bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60"
-          disabled={sending}
-          onClick={handleSimulateIncomingJob}
-        >
-          {sending ? "Sending..." : "Send Incoming Job"}
-        </button>
-
-        {requestError ? <p className="mt-2 text-sm text-red-600">{requestError}</p> : null}
-      </section>
-
-      <section className="rounded-lg border p-4">
-        <h2 className="text-base font-medium">Live Incoming Jobs</h2>
-        {incomingJobs.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-foreground">No incoming job events yet.</p>
-        ) : (
-          <ul className="mt-2 space-y-2 text-sm">
-            {incomingJobs.map((message, index) => (
-              <li key={`${message.occurredAt ?? "t"}-${index}`} className="rounded border p-2">
-                <p className="font-medium">{message.event}</p>
-                <pre className="mt-1 overflow-x-auto text-xs">{JSON.stringify(message.data, null, 2)}</pre>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      )}
     </main>
   );
 }

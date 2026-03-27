@@ -1,55 +1,195 @@
-import Link from "next/link";
-import { ArrowRight, CalendarClock, CreditCard, MessageSquareText, PlusCircle } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+"use client";
 
-const customerActions = [
-  {
-    title: "Create Booking",
-    description: "Start a new helper request with location and task details.",
-    href: "/customer/book",
-    icon: PlusCircle,
-  },
-  {
-    title: "My Bookings",
-    description: "Track live requests and completed services.",
-    href: "/customer/bookings",
-    icon: CalendarClock,
-  },
-  {
-    title: "Payments",
-    description: "See transaction status, receipts, and payment methods.",
-    href: "/customer/payments",
-    icon: CreditCard,
-  },
-  {
-    title: "Reviews",
-    description: "Rate completed jobs and view feedback history.",
-    href: "/customer/reviews",
-    icon: MessageSquareText,
-  },
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useSession } from "@/lib/auth/session";
+import {
+  ArrowRight,
+  CalendarClock,
+  CreditCard,
+  Loader2,
+  MessageSquareText,
+  Search,
+  Car,
+  Zap,
+  Droplets,
+  Brush,
+  UtensilsCrossed,
+  Truck,
+  HeartIcon,
+  ShieldCheck,
+  MoreHorizontal,
+} from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/StatusBadge";
+import type { Booking } from "@/components/BookingCard";
+
+const categoryLabels: Record<string, string> = {
+  driver: "Driver",
+  electrician: "Electrician",
+  plumber: "Plumber",
+  cleaner: "Cleaner",
+  chef: "Chef",
+  delivery_helper: "Delivery Helper",
+  caretaker: "Caretaker",
+  security_guard: "Security Guard",
+  other: "Other",
+};
+
+const ACTIVE_STATUSES = new Set(["requested", "accepted", "in_progress"]);
+
+const CATEGORIES = [
+  { id: "driver", label: "Driver", icon: Car, color: "oklch(0.6 0.15 250)" },
+  { id: "electrician", label: "Electrician", icon: Zap, color: "oklch(0.7 0.2 80)" },
+  { id: "plumber", label: "Plumber", icon: Droplets, color: "oklch(0.6 0.15 200)" },
+  { id: "cleaner", label: "Cleaner", icon: Brush, color: "oklch(0.65 0.15 160)" },
+  { id: "chef", label: "Chef", icon: UtensilsCrossed, color: "oklch(0.6 0.18 40)" },
+  { id: "delivery_helper", label: "Delivery", icon: Truck, color: "oklch(0.55 0.18 25)" },
+  { id: "caretaker", label: "Caretaker", icon: HeartIcon, color: "oklch(0.65 0.12 340)" },
+  { id: "security_guard", label: "Security", icon: ShieldCheck, color: "oklch(0.45 0.05 240)" },
+  { id: "other", label: "More", icon: MoreHorizontal, color: "oklch(0.6 0.02 240)" },
 ];
 
 export default function CustomerHomePage() {
+  const { session } = useSession();
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/bookings", { credentials: "include" })
+      .then((res) => res.json() as Promise<{ bookings?: Booking[] }>)
+      .then((data) => setBookings(data.bookings ?? []))
+      .catch(() => setBookings([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const activeBookings = bookings.filter((b) => ACTIVE_STATUSES.has(b.status));
+  const userName = session?.user?.name?.split(" ")[0] || "there";
+
   return (
-    <main className="grid gap-4 sm:grid-cols-2">
-      {customerActions.map((action) => (
-        <Card key={action.href} className="surface-card border-none">
+    <main className="space-y-10">
+      {/* Welcome Hero */}
+      <section className="space-y-6">
+        <div className="reveal-up">
+          <h1 className="text-4xl font-heading font-bold tracking-tight">
+            Hello, <span className="text-primary">{userName}!</span>
+          </h1>
+          <p className="text-muted-foreground mt-2 text-lg">
+            What do you need help with today?
+          </p>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative reveal-up delay-1 max-w-2xl">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search for 'electrician', 'cleaning'..."
+            className="w-full pl-12 pr-4 py-4 rounded-3xl bg-card border border-border/50 shadow-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-lg"
+          />
+        </div>
+      </section>
+
+      {/* Active Requests */}
+      {!loading && activeBookings.length > 0 && (
+        <section className="reveal-up delay-2">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-heading font-bold">Active Requests</h2>
+            <Link href="/customer/bookings" className="text-primary text-sm font-semibold hover:underline">
+              View all
+            </Link>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+            {activeBookings.map((booking) => (
+              <Link
+                key={booking.id}
+                href={`/customer/bookings`}
+                className="surface-card p-5 min-w-[280px] flex flex-col gap-3 group"
+              >
+                <div className="flex items-center justify-between">
+                  <Badge className="bg-primary/10 text-primary border-none text-[10px] uppercase tracking-wider font-bold">
+                    {categoryLabels[booking.categoryId] || booking.categoryId}
+                  </Badge>
+                  <StatusBadge status={booking.status} />
+                </div>
+                <div>
+                  <p className="font-bold text-lg leading-tight truncate">
+                    Helper {booking.status === "accepted" ? "is on the way" : "Finding helper..."}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
+                    {booking.addressLine}
+                  </p>
+                </div>
+                <div className="mt-2 flex items-center text-primary text-sm font-bold group-hover:gap-2 transition-all">
+                  Track Status <ArrowRight className="size-4 ml-1" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Service Grid */}
+      <section className="reveal-up delay-3">
+        <h2 className="text-xl font-heading font-bold mb-6">Our Services</h2>
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 sm:gap-6">
+          {CATEGORIES.map((cat) => (
+            <Link
+              key={cat.id}
+              href={`/customer/book?category=${cat.id}`}
+              className="flex flex-col items-center gap-3 transition-all duration-300 hover:scale-110 active:scale-95 group"
+            >
+              <div
+                className="size-16 sm:size-20 rounded-[1.5rem] flex items-center justify-center shadow-lg transition-all duration-300 group-hover:rotate-6 group-hover:shadow-2xl"
+                style={{ backgroundColor: `${cat.color}15`, border: `1px solid ${cat.color}30` }}
+              >
+                <cat.icon className="size-8 sm:size-10" style={{ color: cat.color }} />
+              </div>
+              <span className="text-sm font-bold text-center tracking-tight text-foreground/80 group-hover:text-primary">
+                {cat.label}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Bottom Actions */}
+      <section className="grid sm:grid-cols-2 gap-6 reveal-up delay-4 pb-10">
+        <Card className="surface-card-strong border-none p-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <action.icon className="text-primary" />
-              {action.title}
+            <CardTitle className="flex items-center gap-3 text-xl">
+              <CreditCard className="text-primary size-6" />
+              Manage Payments
             </CardTitle>
-            <CardDescription>{action.description}</CardDescription>
+            <CardDescription className="text-muted-foreground font-medium">
+              View transaction history and invoices.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href={action.href} className={buttonVariants({ size: "sm" })}>
-              Open
-              <ArrowRight data-icon="inline-end" />
+            <Link href="/customer/payments" className={buttonVariants({ variant: "default", className: "w-full rounded-2xl py-6 text-lg" })}>
+              Open Wallet
             </Link>
           </CardContent>
         </Card>
-      ))}
+        <Card className="surface-card border-none p-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-xl">
+              <MessageSquareText className="text-accent size-6" />
+              Help & Support
+            </CardTitle>
+            <CardDescription className="text-muted-foreground font-medium">
+              Get assistance with your bookings.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/customer/reviews" className={buttonVariants({ variant: "outline", className: "w-full rounded-2xl py-6 text-lg" })}>
+              Contact Us
+            </Link>
+          </CardContent>
+        </Card>
+      </section>
     </main>
   );
 }

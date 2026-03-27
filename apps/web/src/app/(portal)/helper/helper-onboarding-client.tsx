@@ -1,32 +1,85 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertCircle } from "lucide-react";
+import { HelperOnboardingWizard } from "@/components/onboarding/HelperOnboardingWizard";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { type CompleteOnboarding, clearOnboardingDraft } from "@/types/onboarding";
 
-type HelperType = "individual" | "agency";
+function appendFormDataValue(formData: FormData, key: string, value: unknown) {
+  if (value === undefined || value === null) {
+    return;
+  }
 
-type HelperOnboardingPayload = {
-  helperType: HelperType;
-  primaryCategory: string;
-  phone: string;
-  city: string;
-  bio?: string;
-  yearsExperience?: number;
-  serviceRadiusKm?: number;
-  isOnline?: boolean;
-  businessName?: string;
-  logoUrl?: string;
-  businessAddress?: string;
-  gstNumber?: string;
-};
+  if (value instanceof File) {
+    if (value.size > 0) {
+      formData.append(key, value);
+    }
+    return;
+  }
 
-function toNumberOrUndefined(value: string): number | undefined {
-  const n = Number(value);
-  if (Number.isNaN(n)) return undefined;
-  return n;
+  if (Array.isArray(value) || (typeof value === "object" && !(value instanceof Date))) {
+    formData.append(key, JSON.stringify(value));
+    return;
+  }
+
+  if (typeof value === "boolean" || typeof value === "number") {
+    formData.append(key, String(value));
+    return;
+  }
+
+  const text = String(value).trim();
+  if (text.length > 0) {
+    formData.append(key, text);
+  }
+}
+
+function buildOnboardingFormData(data: CompleteOnboarding) {
+  const formData = new FormData();
+
+  appendFormDataValue(formData, "helperType", data.helperType);
+  appendFormDataValue(formData, "fullName", data.fullName);
+  appendFormDataValue(formData, "businessName", data.businessName);
+  appendFormDataValue(formData, "ownerName", data.ownerName);
+  appendFormDataValue(formData, "phone", data.phone);
+  appendFormDataValue(formData, "email", data.email);
+  appendFormDataValue(formData, "businessAddress", data.businessAddress);
+  appendFormDataValue(formData, "city", data.city);
+  appendFormDataValue(formData, "profilePhotoUrl", data.profilePhotoUrl);
+  appendFormDataValue(formData, "logoUrl", data.logoUrl);
+  appendFormDataValue(formData, "primaryCategory", data.primaryCategory);
+  appendFormDataValue(formData, "yearsExperience", data.yearsExperience);
+  appendFormDataValue(formData, "bio", data.bio);
+  appendFormDataValue(formData, "languages", data.languages);
+  appendFormDataValue(formData, "serviceRadiusKm", data.serviceRadiusKm);
+  appendFormDataValue(formData, "numberOfWorkers", data.numberOfWorkers);
+  appendFormDataValue(formData, "workerTypesOffered", data.workerTypesOffered);
+  appendFormDataValue(formData, "canAssignJobsInternally", data.canAssignJobsInternally);
+  appendFormDataValue(formData, "pricingType", data.pricingType);
+  appendFormDataValue(formData, "basePrice", data.basePrice);
+  appendFormDataValue(formData, "isOnline", data.isOnline);
+  appendFormDataValue(formData, "workingHours", data.workingHours);
+  appendFormDataValue(formData, "availableDays", data.availableDays);
+  appendFormDataValue(formData, "idDocumentType", data.idDocumentType);
+  appendFormDataValue(formData, "idDocumentNumber", data.idDocumentNumber);
+  appendFormDataValue(formData, "idDocumentUrl", data.idDocumentUrl);
+  appendFormDataValue(formData, "selfieUrl", data.selfieUrl);
+  appendFormDataValue(formData, "addressProofUrl", data.addressProofUrl);
+  appendFormDataValue(formData, "businessRegistrationUrl", data.businessRegistrationUrl);
+  appendFormDataValue(formData, "gstNumber", data.gstNumber);
+  appendFormDataValue(formData, "gstDocumentUrl", data.gstDocumentUrl);
+  appendFormDataValue(formData, "ownerIdDocumentType", data.ownerIdDocumentType);
+  appendFormDataValue(formData, "ownerIdDocumentUrl", data.ownerIdDocumentUrl);
+  appendFormDataValue(formData, "workerDeclarationAgreed", data.workerDeclarationAgreed);
+  appendFormDataValue(formData, "accountHolderName", data.accountHolderName);
+  appendFormDataValue(formData, "bankAccountNumber", data.bankAccountNumber);
+  appendFormDataValue(formData, "ifscCode", data.ifscCode);
+  appendFormDataValue(formData, "upiId", data.upiId);
+  appendFormDataValue(formData, "agreedToTerms", data.agreedToTerms);
+  appendFormDataValue(formData, "agreedToCommission", data.agreedToCommission);
+
+  return formData;
 }
 
 function getStringProp(obj: unknown, key: string): string | null {
@@ -37,176 +90,59 @@ function getStringProp(obj: unknown, key: string): string | null {
 
 export function HelperOnboardingClientPage() {
   const router = useRouter();
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
 
-  const [helperType, setHelperType] = useState<HelperType>("individual");
-  const [primaryCategory, setPrimaryCategory] = useState<string>("");
-  const [phone, setPhone] = useState<string>("");
-  const [city, setCity] = useState<string>("");
+  async function handleSubmit(data: CompleteOnboarding) {
+    setSubmissionError(null);
 
-  const [bio, setBio] = useState<string>("");
-  const [yearsExperience, setYearsExperience] = useState<string>("");
-  const [serviceRadiusKm, setServiceRadiusKm] = useState<string>("8");
-  const [isOnline, setIsOnline] = useState<boolean>(false);
+    const res = await fetch("/api/helpers/onboarding", {
+      method: "POST",
+      body: buildOnboardingFormData(data),
+    });
 
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+    const json: unknown = await res.json().catch(() => null);
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-
-    try {
-      const payload: HelperOnboardingPayload = {
-        helperType,
-        primaryCategory,
-        phone,
-        city,
-        bio: bio || undefined,
-        yearsExperience: yearsExperience ? toNumberOrUndefined(yearsExperience) : undefined,
-        serviceRadiusKm: serviceRadiusKm
-          ? toNumberOrUndefined(serviceRadiusKm)
-          : undefined,
-        isOnline,
-      };
-
-      const res = await fetch("/api/helpers/onboarding", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const json: unknown = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        const message = getStringProp(json, "message") ?? `Request failed with status ${res.status}`;
-        setError(message);
-        return;
-      }
-
-      const id = getStringProp(json, "id");
-      if (id) {
-        router.push(`/helper/verification-pending?id=${encodeURIComponent(id)}`);
-        return;
-      }
-
-      setError("Unexpected response from server.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unexpected error");
-    } finally {
-      setSubmitting(false);
+    if (!res.ok) {
+      const message = getStringProp(json, "message") ?? `Request failed with status ${res.status}`;
+      setSubmissionError(message);
+      throw new Error(message);
     }
+
+    clearOnboardingDraft();
+
+    const landingPath = getStringProp(json, "landingPath");
+    if (landingPath) {
+      window.location.assign(landingPath);
+      return;
+    }
+
+    const id = getStringProp(json, "id");
+    if (id) {
+      window.location.assign(`/helper/verification-pending?id=${encodeURIComponent(id)}`);
+      return;
+    }
+
+    router.refresh();
   }
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Helper Onboarding</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="space-y-1">
-                <div className="text-sm font-medium">Helper Type</div>
-                <select
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={helperType}
-                  onChange={(e) => setHelperType(e.target.value as HelperType)}
-                >
-                  <option value="individual">Individual</option>
-                  <option value="agency">Agency</option>
-                </select>
-              </label>
+    <div className="relative">
+      {submissionError ? (
+        <div className="sticky top-3 z-50 mx-auto max-w-2xl px-4 pt-4 sm:px-6 lg:px-8">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Unable to submit onboarding</AlertTitle>
+            <AlertDescription>{submissionError}</AlertDescription>
+          </Alert>
+        </div>
+      ) : null}
 
-              <label className="space-y-1">
-                <div className="text-sm font-medium">Primary Category</div>
-                <Input
-                  value={primaryCategory}
-                  onChange={(e) => setPrimaryCategory(e.target.value)}
-                  placeholder="e.g. plumber, driver..."
-                  required
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="space-y-1">
-                <div className="text-sm font-medium">Phone</div>
-                <Input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+91..."
-                  required
-                />
-              </label>
-
-              <label className="space-y-1">
-                <div className="text-sm font-medium">City</div>
-                <Input
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="City"
-                  required
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="space-y-1">
-                <div className="text-sm font-medium">Bio (optional)</div>
-                <Input
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="Short bio"
-                />
-              </label>
-
-              <label className="space-y-1">
-                <div className="text-sm font-medium">Experience (years)</div>
-                <Input
-                  value={yearsExperience}
-                  onChange={(e) => setYearsExperience(e.target.value)}
-                  placeholder="e.g. 2"
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="space-y-1">
-                <div className="text-sm font-medium">Service Radius (km)</div>
-                <Input
-                  value={serviceRadiusKm}
-                  onChange={(e) => setServiceRadiusKm(e.target.value)}
-                  placeholder="8"
-                />
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={isOnline}
-                  onChange={(e) => setIsOnline(e.target.checked)}
-                />
-                <span className="text-sm">Available online</span>
-              </label>
-            </div>
-
-            {error ? (
-              <div className="rounded-md border border-destructive bg-destructive/5 p-3 text-sm text-destructive">
-                {error}
-              </div>
-            ) : null}
-
-            <div className="pt-2 flex justify-end">
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Submitting..." : "Submit"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </main>
+      <HelperOnboardingWizard
+        onSuccess={handleSubmit}
+        onCancel={() => {
+          router.push("/account/settings");
+        }}
+      />
+    </div>
   );
 }
-

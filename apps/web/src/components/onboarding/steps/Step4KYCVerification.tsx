@@ -71,6 +71,7 @@ export function Step4KYCVerification<T extends FieldValues>({
                 <select
                   id="idDocumentType"
                   {...field}
+                  value={typeof field.value === "string" ? field.value : ""}
                   className="w-full mt-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 >
                   <option value="">Select ID type...</option>
@@ -176,12 +177,13 @@ export function Step4KYCVerification<T extends FieldValues>({
             control={control}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             name={"ownerIdDocumentType" as any}
-            render={({ field }) => (
+            render={({ field, fieldState: { error } }) => (
               <div>
                 <Label htmlFor="ownerIdDocumentType">Owner/Manager ID Type</Label>
                 <select
                   id="ownerIdDocumentType"
                   {...field}
+                  value={typeof field.value === "string" ? field.value : ""}
                   className="w-full mt-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 >
                   <option value="">Select ID type...</option>
@@ -191,6 +193,9 @@ export function Step4KYCVerification<T extends FieldValues>({
                     </option>
                   ))}
                 </select>
+                {error?.message && (
+                  <p className="mt-1 text-xs text-red-500">{error.message}</p>
+                )}
               </div>
             )}
           />

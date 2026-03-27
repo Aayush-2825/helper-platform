@@ -1,0 +1,291 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration tests (PBT candidates)
+  - **Property 1: Bug Condition** - WS Message Drop, Payments finalAmount, INR Formatting, Batch Event Processing
+  - **CRITICAL**: These tests MUST FAIL on unfixed code — failure confirms the bugs exist
+  - **DO NOT attempt to fix the tests or the code when they fail**
+  - **GOAL**: Surface counterexamples that demonstrate each bug exists
+  - **Scoped PBT Approach**: Scope each property to the concrete failing case(s) for reproducibility
+
+  - Bug 1 (WS Queue): Call `wsSend` before `registerWsSend`. Assert message is delivered — expect FAIL (message is dropped)
+    - Property: for any message sent before socket ready, it is delivered after `registerWsSend` is called
+    - Counterexample to document: `wsSend({ type: "ping" })` before register → message never received
+  - Bug 6 (Payments finalAmount): Provide completed booking with `finalAmount=1500`, `quotedAmount=1200`. Assert `totalPaid=1500` — expect FAIL (uses quotedAmount=1200)
+    - Property: for any completed booking where `finalAmount != null`, `totalPaid` uses `finalAmount`
+    - Counterexample to document: `totalPaid` returns 1200 instead of 1500
+  - Bug 8 (INR Format): Render `BookingCard` with `quotedAmount=1200`. Assert output contains `₹1,200` — expect FAIL (shows `₹1200`)
+    - Property: for any amount >= 1000, rendered string equals `₹${amount.toLocaleString("en-IN")}`
+    - Counterexample to document: `₹1200` rendered instead of `₹1,200`
+  - Bug 15 (Batch Events): Deliver two simultaneous `booking_update` events. Assert both are applied — expect FAIL (only first applied)
+    - Property: for any batch of N booking_update events, all N updates are applied to state
+    - Counterexample to document: second event ignored, booking status not updated
+  - Run all tests on UNFIXED code
+  - **EXPECTED OUTCOME**: All tests FAIL (this is correct — it proves the bugs exist)
+  - Document all counterexamples found
+  - Mark task complete when tests are written, run, and failures are documented
+  - _Requirements: 1.1, 1.6, 1.8, 1.15_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fixes)
+  - **Property 2: Preservation** - Existing Booking Flow Behaviors
+  - **IMPORTANT**: Follow observation-first methodology — observe UNFIXED code behavior first
+  - Observe: Accept action on non-error response removes job from panel
+  - Observe: Invalid booking form shows validation errors without calling API
+  - Observe: Bookings page groups into Active/Past sections correctly
+  - Observe: Successful PATCH to availability calls `publishHelperPresence`
+  - Observe: Already-submitted reviews display correctly
+  - Write property-based tests capturing these observed behaviors:
+    - For any non-error reject response, job is removed from panel (Bug 3 preservation)
+    - For any invalid form submission, API is not called (Bug 14 preservation)
+    - For any booking list, Active/Past grouping is preserved after batch event processing (Bug 15 preservation)
+    - For any successful availability PATCH, `publishHelperPresence` is called (Bug 2 preservation)
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13_
+
+- [x] 3. Fix WS message queue (Bug 1)
+  - [x] 3.1 Implement message queue in wsManager
+    - Add `const _queue: object[] = []` alongside `_send`
+    - In `wsSend`: when `_send` is null, push to `_queue` instead of dropping
+    - In `registerWsSend`: after setting `_send`, flush `_queue` with a while loop
+    - File: `apps/web/src/lib/realtime/wsManager.ts`
+    - _Bug_Condition: `wsSend` called AND `_send` is null_
+    - _Expected_Behavior: message is queued and delivered once `registerWsSend` is called_
+    - _Preservation: normal send path (when `_send` is not null) unchanged_
+    - _Requirements: 2.1_
+  - [x] 3.2 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - WS Message Queue Delivery
+    - **IMPORTANT**: Re-run the SAME test from task 1 — do NOT write a new test
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug 1 is fixed)
+    - _Requirements: 2.1_
+  - [x] 3.3 Verify preservation tests still pass
+    - **Property 2: Preservation** - WS Normal Send Path
+    - Re-run preservation tests from task 2
+    - **EXPECTED OUTCOME**: Tests PASS (no regressions)
+
+- [x] 4. Fix availability PATCH credentials (Bug 2)
+  - [x] 4.1 Add `credentials: "include"` to availability fetch
+    - In `handleStatusChange` in `helper/availability/page.tsx`, add `credentials: "include"` to the fetch options object
+    - File: `apps/web/src/app/(portal)/helper/availability/page.tsx`
+    - _Bug_Condition: PATCH `/api/helper/availability` without credentials_
+    - _Expected_Behavior: request includes session cookie, route returns 200_
+    - _Preservation: successful PATCH still calls `publishHelperPresence`_
+    - _Requirements: 2.2, 3.8_
+
+- [x] 5. Fix reject action error feedback (Bug 3)
+  - [x] 5.1 Add rejectError state and display in JobCard
+    - Add `const [rejectError, setRejectError] = useState<string | null>(null)` to `JobCard`
+    - In `handleReject` else branch: parse response body for `message`, set `rejectError`
+    - In catch block: set `rejectError("Network error. Please try again.")`
+    - Render `{rejectError && <div className="text-sm text-destructive">{rejectError}</div>}` in JSX
+    - File: `apps/web/src/components/IncomingJobsPanel.tsx`
+    - _Bug_Condition: reject action AND `apiResponse.ok === false`_
+    - _Expected_Behavior: error message shown, job not removed from panel_
+    - _Preservation: accept action on 200 still removes job from panel_
+    - _Requirements: 2.3, 3.2_
+
+- [x] 6. Fix dual WebSocket connections (Bug 4)
+  - [x] 6.1 Replace hardcoded WS URL in useWebSocket with getRealtimeWsUrl()
+    - Import `getRealtimeWsUrl` from `@/lib/realtime/client`
+    - Replace `ws://localhost:3001` with a URL built from `getRealtimeWsUrl()` with `userId` as a search param
+    - File: `apps/web/src/hooks/useWebsocket.ts`
+    - _Bug_Condition: `useWebSocket` and `useRealtimeEvents` both mounted simultaneously_
+    - _Expected_Behavior: both hooks connect to the same configurable server URL_
+    - _Preservation: WS connection still established with correct userId param_
+    - _Requirements: 2.4_
+
+- [x] 7. Fix review submission error handling (Bug 5)
+  - [x] 7.1 Add error state and check res.ok in ReviewCard
+    - Add `const [error, setError] = useState<string | null>(null)` to `ReviewCard`
+    - Check `res.ok` before calling `setSuccess(true)`; on non-ok, set error from response body
+    - In catch block: set error message, do NOT call `setSuccess(true)`
+    - Render `{error && <p className="text-sm text-destructive">{error}</p>}` below submit button
+    - File: `apps/web/src/app/(portal)/customer/reviews/page.tsx`
+    - _Bug_Condition: fetch throws OR `res.ok === false`_
+    - _Expected_Behavior: error shown, `success` state remains false_
+    - _Preservation: successful review submission still shows "Thanks for your feedback!"_
+    - _Requirements: 2.5_
+
+- [x] 8. Fix payments page to use finalAmount (Bug 6)
+  - [x] 8.1 Update totalPaid calculation and per-row display
+    - Change `totalPaid` reduce to use `b.finalAmount ?? b.quotedAmount ?? 0`
+    - Update per-row amount display to `(booking.finalAmount ?? booking.quotedAmount).toLocaleString("en-IN")`
+    - Ensure `Booking` type includes `finalAmount?: number | null`
+    - File: `apps/web/src/app/(portal)/customer/payments/page.tsx`
+    - _Bug_Condition: completed booking with `finalAmount !== null` AND `finalAmount !== quotedAmount`_
+    - _Expected_Behavior: `totalPaid` equals sum of `finalAmount ?? quotedAmount` for all completed bookings_
+    - _Preservation: bookings without `finalAmount` still use `quotedAmount`_
+    - _Requirements: 2.6_
+  - [x] 8.2 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - Payments finalAmount
+    - Re-run the SAME test from task 1
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug 6 is fixed)
+    - _Requirements: 2.6_
+
+- [x] 9. Fix shared commission rate constant (Bug 7)
+  - [x] 9.1 Create shared COMMISSION_RATE constant
+    - Create `apps/web/src/lib/constants.ts` with `export const COMMISSION_RATE = 0.15`
+    - File: `apps/web/src/lib/constants.ts`
+    - _Requirements: 2.7_
+  - [x] 9.2 Update helper home page to use shared constant
+    - Import `COMMISSION_RATE` from `@/lib/constants`
+    - Replace `* 0.85` with `* (1 - COMMISSION_RATE)` in `totalNet` calculation
+    - File: `apps/web/src/app/(portal)/helper/page.tsx`
+    - _Bug_Condition: `page === "helper-home"` using hardcoded `0.85`_
+    - _Expected_Behavior: both pages use same constant, net earnings are consistent_
+    - _Preservation: net earnings value unchanged (0.85 === 1 - 0.15)_
+    - _Requirements: 2.7_
+  - [x] 9.3 Update helper earnings page to use shared constant
+    - Remove local `const COMMISSION_RATE = 0.15`
+    - Import `COMMISSION_RATE` from `@/lib/constants`
+    - File: `apps/web/src/app/(portal)/helper/earnings/page.tsx`
+    - _Requirements: 2.7_
+
+- [x] 10. Fix INR amount formatting (Bug 8)
+  - [x] 10.1 Add toLocaleString("en-IN") to BookingCard
+    - Replace `₹{booking.quotedAmount}` with `₹{booking.quotedAmount.toLocaleString("en-IN")}`
+    - File: `apps/web/src/components/BookingCard.tsx`
+    - _Bug_Condition: `amount >= 1000` rendered without locale formatting_
+    - _Expected_Behavior: amounts formatted as `₹1,200` not `₹1200`_
+    - _Requirements: 2.8_
+  - [x] 10.2 Add toLocaleString("en-IN") to JobCard
+    - Replace `₹{booking.quotedAmount}` with `₹{booking.quotedAmount.toLocaleString("en-IN")}`
+    - File: `apps/web/src/components/JobCard.tsx`
+    - _Requirements: 2.8_
+  - [x] 10.3 Add toLocaleString("en-IN") to IncomingJobsPanel
+    - Replace `₹{job.quotedAmount}` with `₹{job.quotedAmount.toLocaleString("en-IN")}`
+    - File: `apps/web/src/components/IncomingJobsPanel.tsx`
+    - _Requirements: 2.8_
+  - [x] 10.4 Add toLocaleString("en-IN") to helper home active jobs list
+    - Replace `₹{b.quotedAmount}` with `₹{b.quotedAmount.toLocaleString("en-IN")}`
+    - File: `apps/web/src/app/(portal)/helper/page.tsx`
+    - _Requirements: 2.8_
+  - [x] 10.5 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - INR Formatting
+    - Re-run the SAME test from task 1
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug 8 is fixed)
+    - _Requirements: 2.8_
+
+- [x] 11. Document map coordinate placeholder behavior (Bug 9)
+  - [x] 11.1 Add clarifying comment in map-component.tsx
+    - Add comment explaining that initial helper positions use deterministic index-based offsets as placeholders until a real `location_update` WS event arrives
+    - Confirm the existing WS `location_update` handler in `map-component.tsx` correctly replaces placeholder coordinates (no code change needed)
+    - File: `apps/web/src/components/map-component.tsx`
+    - _Bug_Condition: helpers mapped with index-derived lat/lng offsets_
+    - _Expected_Behavior: placeholder behavior documented; WS update path replaces with real coords_
+    - _Requirements: 2.9_
+
+- [x] 12. Fix booking_update WS event missing startedAt/completedAt (Bug 10)
+  - [x] 12.1 Pass startedAt in start route publishBookingEvent call
+    - Add `data: { startedAt: updatedRows[0].startedAt?.toISOString() }` to the `publishBookingEvent` call
+    - File: `apps/web/src/app/api/bookings/[id]/start/route.ts`
+    - _Bug_Condition: `booking_update` event with `eventType === "in_progress"` missing `startedAt`_
+    - _Expected_Behavior: event payload includes `startedAt` timestamp_
+    - _Requirements: 2.10_
+  - [x] 12.2 Pass completedAt in complete route publishBookingEvent call
+    - Add `data: { completedAt: updatedRows[0].completedAt?.toISOString() }` to the `publishBookingEvent` call
+    - File: `apps/web/src/app/api/bookings/[id]/complete/route.ts`
+    - _Requirements: 2.10_
+
+- [x] 13. Fix client-generated timestamps (Bug 11)
+  - [x] 13.1 Use server timestamps in handleStart and handleComplete
+    - In `handleStart`: parse `await res.json()` as `{ booking: Booking }`, use `data.booking.startedAt` in state update
+    - In `handleComplete`: parse `await res.json()` as `{ booking: Booking }`, use `data.booking.completedAt` in state update
+    - Remove `new Date().toISOString()` from both handlers
+    - File: `apps/web/src/app/(portal)/helper/job-history/page.tsx`
+    - _Bug_Condition: `handleStart` or `handleComplete` succeeds AND API response has timestamp_
+    - _Expected_Behavior: local state uses server timestamp, not client clock_
+    - _Preservation: Start/Complete buttons still update job status on success_
+    - _Requirements: 2.11, 3.4, 3.5_
+
+- [x] 14. Fix useWebSocket reconnect loop (Bug 12)
+  - [x] 14.1 Stabilize onMessage via ref in useWebSocket
+    - Add `const onMessageRef = useRef(onMessage)`
+    - Add `useEffect(() => { onMessageRef.current = onMessage; }, [onMessage])` to keep ref current
+    - In `ws.onmessage` handler, call `onMessageRef.current(data)` instead of `onMessage(data)`
+    - Remove `onMessage` from `connect`'s `useCallback` dependency array (keep only `[userId]`)
+    - File: `apps/web/src/hooks/useWebsocket.ts`
+    - _Bug_Condition: caller re-renders with new `onMessage` reference (not memoized)_
+    - _Expected_Behavior: no new WS connection opened on re-render; only `userId` change triggers reconnect_
+    - _Preservation: WS messages still delivered to the latest `onMessage` callback_
+    - _Requirements: 2.12_
+
+- [x] 15. Fix availability page silent profile load failure (Bug 13)
+  - [x] 15.1 Add loadError state and display in availability page
+    - Add `const [loadError, setLoadError] = useState<string | null>(null)`
+    - Replace empty catch block with `setLoadError("Could not load your current status. Please refresh to try again.")`
+    - Also check `!res.ok` after fetch and set `loadError` if true
+    - Render `{loadError && <p className="text-sm text-destructive">{loadError}</p>}` in JSX
+    - File: `apps/web/src/app/(portal)/helper/availability/page.tsx`
+    - _Bug_Condition: `GET /api/helper/profile` fetch fails AND catch block is empty_
+    - _Expected_Behavior: error message shown to helper_
+    - _Preservation: successful profile load still sets status correctly_
+    - _Requirements: 2.13_
+
+- [x] 16. Fix BookingForm category re-population after submit (Bug 14)
+  - [x] 16.1 Add onSuccess callback to BookingForm and reset selectedCategory in MyMap
+    - Add `onSuccess?: () => void` to `BookingFormProps` interface
+    - Call `onSuccess?.()` after internal resets on successful 201 response in `handleSubmit`
+    - In `MyMap`, pass `onSuccess={() => setSelectedCategory("")}` to `<BookingForm>`
+    - Files: `apps/web/src/components/BookingForm.tsx`, `apps/web/src/components/map-component.tsx`
+    - _Bug_Condition: form submitted successfully AND `defaultCategory` prop still holds old value_
+    - _Expected_Behavior: `selectedCategory` in parent reset to `""`, form does not re-populate_
+    - _Preservation: invalid form still shows validation errors without calling API_
+    - _Requirements: 2.14, 3.13_
+
+- [x] 17. Fix WS event batch processing (Bug 15)
+  - [x] 17.1 Replace single-event processing with loop in customer bookings page
+    - Replace `const latest = eventMessages[0]` pattern with a `setBookings` updater that loops over all `eventMessages`
+    - Apply each `booking_update` event to the booking list in a single state update
+    - File: `apps/web/src/app/(portal)/customer/bookings/page.tsx`
+    - _Bug_Condition: `eventMessages.length > 1` AND only `eventMessages[0]` processed_
+    - _Expected_Behavior: all N events in batch applied to booking state_
+    - _Preservation: Active/Past grouping still correct after batch processing_
+    - _Requirements: 2.15, 3.9_
+  - [x] 17.2 Replace single-event processing with loop in helper job history page
+    - Same loop pattern as 17.1
+    - File: `apps/web/src/app/(portal)/helper/job-history/page.tsx`
+    - _Requirements: 2.15, 3.10_
+  - [x] 17.3 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - Batch Event Processing
+    - Re-run the SAME test from task 1
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug 15 is fixed)
+    - _Requirements: 2.15_
+
+- [x] 18. Fix location broadcasting stopping on navigation (Bug 16)
+  - [x] 18.1 Move useHelperLocation to helper layout
+    - Import `useHelperLocation` in `apps/web/src/app/(portal)/helper/layout.tsx`
+    - Fetch active bookings at layout level to find any `in_progress` booking ID
+    - Call `useHelperLocation(session?.user.id, inProgressBookingId, !!inProgressBookingId)` in layout
+    - Remove `useHelperLocation` call from `helper/job-history/page.tsx` to avoid double-watching
+    - Files: `apps/web/src/app/(portal)/helper/layout.tsx`, `apps/web/src/app/(portal)/helper/job-history/page.tsx`
+    - _Bug_Condition: helper navigates away from job-history AND booking is `in_progress`_
+    - _Expected_Behavior: location updates continue from layout, unaffected by page navigation_
+    - _Preservation: geolocation watch still cleared when no active booking exists_
+    - _Requirements: 2.16_
+
+- [x] 19. Fix nearby helpers returning offline/busy helpers (Bug 17)
+  - [x] 19.1 Add availabilityStatus filter to GET /api/helpers/nearby
+    - Read optional `status` query param from `request.nextUrl.searchParams`
+    - Default to `"online"` when param is absent; pass `"all"` to skip status filter
+    - Add `eq(helperProfile.availabilityStatus, status)` to the `where` clause using `and()`
+    - File: `apps/web/src/app/api/helpers/nearby/route.ts`
+    - _Bug_Condition: route returns helpers with `availabilityStatus !== "online"`_
+    - _Expected_Behavior: only `online` helpers returned by default; `?status=all` returns all_
+    - _Preservation: `verificationStatus === "approved"` filter still applied_
+    - _Requirements: 2.17_
+
+- [x] 20. Fix helper profile missing bio and headline fields (Bug 18)
+  - [x] 20.1 Add bio and headline to profile columns selection
+    - Add `bio: true` and `headline: true` to the `columns` object in `db.query.helperProfile.findFirst`
+    - File: `apps/web/src/app/api/helper/profile/route.ts`
+    - _Bug_Condition: profile query uses explicit columns list omitting `bio` and `headline`_
+    - _Expected_Behavior: `GET /api/helper/profile` response includes `bio` and `headline`_
+    - _Preservation: all previously returned fields still present in response_
+    - _Requirements: 2.18_
+
+- [x] 21. Checkpoint — Ensure all tests pass
+  - Re-run all exploration tests (Property 1) — all should PASS after fixes
+  - Re-run all preservation tests (Property 2) — all should PASS (no regressions)
+  - Verify no TypeScript errors introduced (`pnpm --filter web check-types`)
+  - Ask the user if any questions arise

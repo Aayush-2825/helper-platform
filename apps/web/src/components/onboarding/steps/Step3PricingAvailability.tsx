@@ -103,11 +103,11 @@ export function Step3PricingAvailability<T extends FieldValues>({
                       field.value === option.value ? "#f0f9ff" : "#ffffff",
                   }}
                 >
-                  <input
-                    type="radio"
-                    value={option.value}
-                    checked={field.value === option.value}
-                    onChange={(e) => field.onChange(e.target.value)}
+                <input
+                  type="radio"
+                  value={option.value}
+                  checked={field.value === option.value}
+                  onChange={(e) => field.onChange(e.target.value)}
                     className="h-4 w-4"
                   />
                   <div>
@@ -206,6 +206,7 @@ export function Step3PricingAvailability<T extends FieldValues>({
                 <input
                   {...field}
                   type="time"
+                  value={typeof field.value === "string" ? field.value : ""}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 />
               </div>
@@ -223,6 +224,7 @@ export function Step3PricingAvailability<T extends FieldValues>({
                 <input
                   {...field}
                   type="time"
+                  value={typeof field.value === "string" ? field.value : ""}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 />
               </div>

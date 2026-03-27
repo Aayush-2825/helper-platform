@@ -1068,31 +1068,38 @@ function MapRoute({
   const sourceId = `route-source-${id}`;
   const layerId = `route-layer-${id}`;
 
-  // Add source and layer on mount
+  const stylePropsRef = useRef({ color, width, opacity, dashArray });
+
+  // Add source and layer on mount and handle updates
   useEffect(() => {
     if (!isLoaded || !map) return;
 
-    map.addSource(sourceId, {
-      type: "geojson",
-      data: {
-        type: "Feature",
-        properties: {},
-        geometry: { type: "LineString", coordinates: [] },
-      },
-    });
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: { 
+            type: "LineString", 
+            coordinates: coordinates.length >= 2 ? coordinates : [[0,0], [0,0]]
+          },
+        },
+      });
 
-    map.addLayer({
-      id: layerId,
-      type: "line",
-      source: sourceId,
-      layout: { "line-join": "round", "line-cap": "round" },
-      paint: {
-        "line-color": color,
-        "line-width": width,
-        "line-opacity": opacity,
-        ...(dashArray && { "line-dasharray": dashArray }),
-      },
-    });
+      map.addLayer({
+        id: layerId,
+        type: "line",
+        source: sourceId,
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: {
+          "line-color": color,
+          "line-width": width,
+          "line-opacity": opacity,
+          ...(dashArray && { "line-dasharray": dashArray }),
+        },
+      });
+    }
 
     return () => {
       try {
@@ -1103,9 +1110,9 @@ function MapRoute({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, map]);
+  }, [isLoaded, map, sourceId]);
 
-  // When coordinates change, update the source data
+  // Update data when coordinates change
   useEffect(() => {
     if (!isLoaded || !map || coordinates.length < 2) return;
 
@@ -1119,24 +1126,25 @@ function MapRoute({
     }
   }, [isLoaded, map, coordinates, sourceId]);
 
+  // Update styles when props change
   useEffect(() => {
     if (!isLoaded || !map || !map.getLayer(layerId)) return;
 
-    map.setPaintProperty(layerId, "line-color", color);
-    map.setPaintProperty(layerId, "line-width", width);
-    map.setPaintProperty(layerId, "line-opacity", opacity);
-    if (dashArray) {
+    const prev = stylePropsRef.current;
+    if (prev.color !== color) map.setPaintProperty(layerId, "line-color", color);
+    if (prev.width !== width) map.setPaintProperty(layerId, "line-width", width);
+    if (prev.opacity !== opacity) map.setPaintProperty(layerId, "line-opacity", opacity);
+    if (prev.dashArray !== dashArray && dashArray) {
       map.setPaintProperty(layerId, "line-dasharray", dashArray);
     }
+    stylePropsRef.current = { color, width, opacity, dashArray };
   }, [isLoaded, map, layerId, color, width, opacity, dashArray]);
 
   // Handle click and hover events
   useEffect(() => {
     if (!isLoaded || !map || !interactive) return;
 
-    const handleClick = () => {
-      onClick?.();
-    };
+    const handleClick = () => onClick?.();
     const handleMouseEnter = () => {
       map.getCanvas().style.cursor = "pointer";
       onMouseEnter?.();
@@ -1155,15 +1163,7 @@ function MapRoute({
       map.off("mouseenter", layerId, handleMouseEnter);
       map.off("mouseleave", layerId, handleMouseLeave);
     };
-  }, [
-    isLoaded,
-    map,
-    layerId,
-    onClick,
-    onMouseEnter,
-    onMouseLeave,
-    interactive,
-  ]);
+  }, [isLoaded, map, layerId, onClick, onMouseEnter, onMouseLeave, interactive]);
 
   return null;
 }

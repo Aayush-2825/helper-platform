@@ -1,39 +1,186 @@
+import { headers } from "next/headers";
+import { and, eq, ne } from "drizzle-orm";
+import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { eq, and } from "drizzle-orm";
-import { booking } from "@/db/schema";
+import { booking, bookingCandidate, helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
+import { NO_STORE_HEADERS } from "@/lib/http/cache";
+import { publishBookingEvent } from "@/lib/realtime/client";
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function POST(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
     const { id: bookingId } = await context.params;
-    const user = await auth.api.getSession({
-        headers: request.headers,
+    const now = new Date();
+
+    const session = await auth.api.getSession({
+      headers: await headers(),
     });
-    if (!user) {
-        return new Response("Unauthorized", { status: 401 });
+
+    if (!session?.user) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
+
+    const profile = await db.query.helperProfile.findFirst({
+      where: eq(helperProfile.userId, session.user.id),
+      columns: {
+        id: true,
+        verificationStatus: true,
+        availabilityStatus: true,
+        isActive: true,
+      },
+    });
+
+    if (!profile) {
+      return NextResponse.json(
+        { message: "Helper profile not found." },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (profile.verificationStatus !== "approved") {
+      return NextResponse.json(
+        { message: "Finish verification before accepting jobs." },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!profile.isActive || profile.availabilityStatus !== "online") {
+      return NextResponse.json(
+        { message: "Set your helper profile online before accepting jobs." },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const existingBooking = await db.query.booking.findFirst({
-        where: (b, { eq }) => eq(b.id, bookingId)
+      where: (bookingRecord, { eq: equals }) => equals(bookingRecord.id, bookingId),
     });
 
     if (!existingBooking) {
-        return new Response("Booking not found", { status: 404 });
+      return NextResponse.json({ message: "Booking not found." }, { status: 404, headers: NO_STORE_HEADERS });
     }
-    if (existingBooking.customerId !== user.user.id) {
-        return new Response("Unauthorized", { status: 403 });
+
+    const candidate = await db.query.bookingCandidate.findFirst({
+      where: and(
+        eq(bookingCandidate.bookingId, bookingId),
+        eq(bookingCandidate.helperProfileId, profile.id)
+      ),
+      columns: {
+        id: true,
+        response: true,
+        expiresAt: true,
+      },
+    });
+
+    if (!candidate) {
+      return NextResponse.json(
+        { message: "This booking was not assigned to your helper profile." },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
     }
+
+    if (candidate.response !== "pending") {
+      return NextResponse.json(
+        { message: "This booking request is no longer pending." },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (candidate.expiresAt && candidate.expiresAt <= now) {
+      await db
+        .update(bookingCandidate)
+        .set({
+          response: "timeout",
+          respondedAt: now,
+        })
+        .where(eq(bookingCandidate.id, candidate.id));
+
+      return NextResponse.json(
+        { message: "This booking request has expired." },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (existingBooking.helperId && existingBooking.helperId !== session.user.id) {
+      return NextResponse.json(
+        { message: "Booking already assigned." },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
     if (existingBooking.status !== "requested") {
-        return new Response("Booking is not in requested state", { status: 400 });
+      return NextResponse.json(
+        { message: "Booking is not in requested state." },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
-    const updatedRows = await db.update(booking).set({
+
+    const updatedRows = await db
+      .update(booking)
+      .set({
         status: "accepted",
-        helperId: user.user.id,
-        updatedAt: new Date(),
-    }).where(and(
-        eq(booking.id, bookingId),
-        eq(booking.status, "requested")
-    )).returning();
+        helperId: session.user.id,
+        helperProfileId: profile.id,
+        acceptedAt: now,
+        updatedAt: now,
+      })
+      .where(and(eq(booking.id, bookingId), eq(booking.status, "requested")))
+      .returning();
+
     if (updatedRows.length === 0) {
-        return new Response("Booking not found or not in requested state", { status: 400 });
+      return NextResponse.json(
+        { message: "Booking not found or not in requested state." },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
-    return new Response(JSON.stringify(updatedRows), { status: 200 });
+
+    await db
+      .update(bookingCandidate)
+      .set({
+        response: "accepted",
+        respondedAt: now,
+      })
+      .where(eq(bookingCandidate.id, candidate.id));
+
+    await db
+      .update(bookingCandidate)
+      .set({
+        response: "timeout",
+        respondedAt: now,
+      })
+      .where(
+        and(
+          eq(bookingCandidate.bookingId, bookingId),
+          ne(bookingCandidate.id, candidate.id),
+          eq(bookingCandidate.response, "pending")
+        )
+      );
+
+    await publishBookingEvent({
+      bookingId,
+      customerId: existingBooking.customerId,
+      helperId: session.user.id,
+      eventType: "accepted",
+      data: {
+        candidateId: candidate.id,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        message: "Booking accepted successfully.",
+        booking: updatedRows[0],
+      },
+      { status: 200, headers: NO_STORE_HEADERS }
+    );
+  } catch (err) {
+    console.error("Accept booking error:", err);
+
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
 }

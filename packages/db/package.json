@@ -1,0 +1,80 @@
+{
+  "name": "@repo/db",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "default": "./dist/index.mjs"
+    },
+    "./web": {
+      "types": "./src/web.ts",
+      "import": "./dist/web.mjs",
+      "require": "./dist/web.js",
+      "default": "./dist/web.mjs"
+    },
+    "./realtime": {
+      "types": "./src/realtime.ts",
+      "import": "./dist/realtime.mjs",
+      "require": "./dist/realtime.js",
+      "default": "./dist/realtime.mjs"
+    },
+    "./config": {
+      "types": "./src/config/index.ts",
+      "import": "./dist/config/index.mjs",
+      "require": "./dist/config/index.js",
+      "default": "./dist/config/index.mjs"
+    },
+    "./schema": {
+      "types": "./src/schema/index.ts",
+      "import": "./dist/schema/index.mjs",
+      "require": "./dist/schema/index.js",
+      "default": "./dist/schema/index.mjs"
+    },
+    "./schema/web": {
+      "types": "./src/schema/web.ts",
+      "import": "./dist/schema/web.mjs",
+      "require": "./dist/schema/web.js",
+      "default": "./dist/schema/web.mjs"
+    },
+    "./schema/realtime": {
+      "types": "./src/schema/realtime.ts",
+      "import": "./dist/schema/realtime.mjs",
+      "require": "./dist/schema/realtime.js",
+      "default": "./dist/schema/realtime.mjs"
+    }
+  },
+  "files": [
+    "dist/**"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+    "studio": "drizzle-kit studio --config=drizzle.config.ts"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^20",
+    "@types/pg": "^8.18.0",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

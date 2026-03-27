@@ -6,7 +6,7 @@ import { MailCheck } from "lucide-react";
 import { auth } from "@/lib/auth/server";
 import { getHomeRouteForRole } from "@/lib/auth/roles";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function CheckEmailPage() {

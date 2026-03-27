@@ -14,6 +14,10 @@ const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
   ({ label, error, helperText, required, id, icon, ...props }, ref) => {
     const inputId = id || (props.name as string);
     const errorMessage = typeof error === "string" ? error : undefined;
+    const normalizedProps =
+      "value" in props && props.value === undefined
+        ? { ...props, value: "" }
+        : props;
 
     return (
       <div className="flex flex-col gap-1.5">
@@ -28,7 +32,7 @@ const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           id={inputId}
           className={errorMessage ? "border-red-500 focus-visible:ring-red-500/50" : ""}
           aria-invalid={!!errorMessage}
-          {...props}
+          {...normalizedProps}
         />
         {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
         {helperText && !errorMessage && <p className="text-sm text-muted-foreground">{helperText}</p>}

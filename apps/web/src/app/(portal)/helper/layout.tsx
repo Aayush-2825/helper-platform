@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { RoleSectionLayout } from "@/components/portal/role-section-layout";
 import {
   LayoutDashboard,
@@ -7,6 +11,8 @@ import {
   Clock,
   CheckCircle2,
 } from "lucide-react";
+import { useHelperLocation } from "@/hooks/useHelperLocation";
+import { useSession } from "@/lib/auth/session";
 
 const helperLinks = [
   { href: "/helper", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -18,6 +24,29 @@ const helperLinks = [
 ];
 
 export default function HelperLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const { session } = useSession();
+  const [inProgressBookingId, setInProgressBookingId] = useState<string | undefined>();
+
+  useEffect(() => {
+    fetch("/api/bookings", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: { bookings?: Array<{ id: string; status: string }> }) => {
+        const active = data.bookings?.find((b) => b.status === "in_progress");
+        setInProgressBookingId(active?.id);
+      })
+      .catch(() => {});
+  }, []);
+
+  useHelperLocation(session?.user.id, inProgressBookingId, !!inProgressBookingId);
+
+  const isHelperAccessSetupRoute =
+    pathname === "/helper/onboarding" || pathname.startsWith("/helper/verification-pending");
+
+  if (isHelperAccessSetupRoute) {
+    return <>{children}</>;
+  }
+
   return (
     <RoleSectionLayout
       title="Helper Portal"

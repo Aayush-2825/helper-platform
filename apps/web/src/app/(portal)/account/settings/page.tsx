@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, CircleUserRound } from "lucide-react";
+import {
+  ArrowRight,
+  Briefcase,
+  CheckCircle2,
+  CircleUserRound,
+  Clock3,
+  ShieldCheck,
+} from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { authClient } from "@/lib/auth/client";
@@ -18,11 +25,22 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
+type HelperStatus = {
+  hasProfile: boolean;
+  profileId: string | null;
+  verificationStatus: "pending" | "approved" | "rejected" | "resubmission_required" | null;
+  landingPath: string;
+  canStartService: boolean;
+};
+
 export default function AccountSettings() {
   const router = useRouter();
   const { session, loading } = useSession();
   const [twoFAOverride, setTwoFAOverride] = useState<boolean | null>(null);
   const [formError, setFormError] = useState("");
+  const [helperStatus, setHelperStatus] = useState<HelperStatus | null>(null);
+  const [helperStatusLoading, setHelperStatusLoading] = useState(true);
+  const [helperStatusError, setHelperStatusError] = useState("");
   const [totpURI, setTotpURI] = useState("");
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [confirmedBackupCodes, setConfirmedBackupCodes] = useState(false);
@@ -37,6 +55,61 @@ export default function AccountSettings() {
       router.push("/auth/signin");
     }
   }, [loading, router, session]);
+
+  useEffect(() => {
+    if (loading || !session) {
+      return;
+    }
+
+    let ignore = false;
+
+    const loadHelperStatus = async () => {
+      setHelperStatusLoading(true);
+      setHelperStatusError("");
+
+      try {
+        const response = await fetch("/api/helpers/onboarding", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        const json = (await response.json().catch(() => null)) as
+          | (Partial<HelperStatus> & { message?: string })
+          | null;
+
+        if (!response.ok) {
+          if (!ignore) {
+            setHelperStatusError(json?.message ?? "Unable to load helper status.");
+          }
+          return;
+        }
+
+        if (!ignore && json) {
+          setHelperStatus({
+            hasProfile: Boolean(json.hasProfile),
+            profileId: json.profileId ?? null,
+            verificationStatus: json.verificationStatus ?? null,
+            landingPath: json.landingPath ?? "/helper/onboarding",
+            canStartService: Boolean(json.canStartService),
+          });
+        }
+      } catch (error) {
+        if (!ignore) {
+          setHelperStatusError(error instanceof Error ? error.message : "Unable to load helper status.");
+        }
+      } finally {
+        if (!ignore) {
+          setHelperStatusLoading(false);
+        }
+      }
+    };
+
+    void loadHelperStatus();
+
+    return () => {
+      ignore = true;
+    };
+  }, [loading, session]);
 
   const enableForm = useForm<TwoFactorPasswordFormValues>({
     resolver: zodResolver(twoFactorPasswordSchema),
@@ -127,6 +200,40 @@ export default function AccountSettings() {
     return null;
   }
 
+  const helperBadge = helperStatusLoading
+    ? "Loading"
+    : helperStatus?.canStartService
+    ? "Approved"
+    : helperStatus?.verificationStatus === "pending"
+    ? "Verification pending"
+    : helperStatus?.verificationStatus === "resubmission_required"
+    ? "Needs update"
+    : helperStatus?.verificationStatus === "rejected"
+    ? "Action required"
+    : "Not started";
+
+  const helperDescription = helperStatusLoading
+    ? "Checking whether your account is already in the helper flow."
+    : helperStatus?.canStartService
+    ? "Your helper profile is approved. Open the helper workspace and start accepting service requests."
+    : helperStatus?.verificationStatus === "pending"
+    ? "Your helper application is under review. We will keep routing you to the verification status page until approval."
+    : helperStatus?.verificationStatus === "resubmission_required"
+    ? "Your helper profile needs a few updates before approval. Re-open onboarding and continue from there."
+    : helperStatus?.verificationStatus === "rejected"
+    ? "Your previous helper application was rejected. Review the flow again and resubmit your details."
+    : "Use this account to become a helper, complete onboarding, and start offering services from the helper portal.";
+
+  const helperActionLabel = helperStatusLoading
+    ? "Loading helper flow..."
+    : helperStatus?.canStartService
+    ? "Start service"
+    : helperStatus?.hasProfile
+    ? "Continue helper flow"
+    : "Become a helper";
+
+  const helperActionHref = helperStatus?.landingPath ?? "/helper/onboarding";
+
   return (
     <div className="min-h-screen p-4 py-6 sm:p-6 lg:p-8">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -137,7 +244,7 @@ export default function AccountSettings() {
             </div>
             <div>
               <p className="text-sm font-semibold">Account settings</p>
-              <p className="text-xs text-muted-foreground">Manage profile and two-factor security</p>
+              <p className="text-xs text-muted-foreground">Manage profile, helper access, and two-factor security</p>
             </div>
           </div>
           <Link href="/dashboard" className={buttonVariants({ size: "sm", variant: "ghost" })}>
@@ -161,11 +268,68 @@ export default function AccountSettings() {
                   <FieldDescription>{session.user.email}</FieldDescription>
                   {session.user.emailVerified ? <Badge variant="secondary">Verified</Badge> : null}
                 </Field>
+                <Field>
+                  <FieldLabel>Current role</FieldLabel>
+                  <FieldDescription className="capitalize">{session.user.role ?? "user"}</FieldDescription>
+                </Field>
               </FieldGroup>
             </CardContent>
           </Card>
 
-          <Card className="surface-card-strong reveal-up delay-2 border-none">
+          <Card className="surface-card reveal-up delay-2 border-none">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-primary" />
+                Become a helper
+              </CardTitle>
+              <CardDescription>
+                Move from customer mode into the helper flow, complete onboarding, and start service from this same
+                account.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={helperStatus?.canStartService ? "default" : "secondary"}>{helperBadge}</Badge>
+                {helperStatus?.canStartService ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Ready to take jobs
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock3 className="h-3.5 w-3.5" />
+                    We route you to the right next step automatically
+                  </span>
+                )}
+              </div>
+
+              <p className="text-sm text-muted-foreground">{helperDescription}</p>
+
+              {helperStatusError ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Helper status unavailable</AlertTitle>
+                  <AlertDescription>{helperStatusError}</AlertDescription>
+                </Alert>
+              ) : null}
+            </CardContent>
+            <CardFooter className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Link
+                href={helperActionHref}
+                className={buttonVariants({
+                  className: "w-full sm:w-auto",
+                  variant: helperStatus?.canStartService ? "default" : "outline",
+                })}
+              >
+                {helperActionLabel}
+                <ArrowRight data-icon="inline-end" />
+              </Link>
+              <p className="text-xs text-muted-foreground">
+                Customers can apply as helpers here and continue later from the same settings page.
+              </p>
+            </CardFooter>
+          </Card>
+
+          <Card className="surface-card-strong reveal-up delay-3 border-none">
             <CardHeader>
               <CardTitle>Two-factor authentication</CardTitle>
               <CardDescription>Protect your account with an additional verification step.</CardDescription>
@@ -178,70 +342,70 @@ export default function AccountSettings() {
                 </Alert>
               ) : null}
 
-            {!twoFAEnabled && !totpURI && (
-              <div className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">
-                  Two-factor authentication adds an extra layer of security to your account.
-                </p>
-                <form onSubmit={handleEnable2FA} noValidate>
-                  <FieldGroup>
-                    <Controller
-                      name="password"
-                      control={enableForm.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor={field.name}>Confirm password</FieldLabel>
-                          <Input
-                            {...field}
-                            id={field.name}
-                            type="password"
-                            autoComplete="current-password"
-                            placeholder="********"
-                            aria-invalid={fieldState.invalid}
-                          />
-                          {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-                        </Field>
-                      )}
+              {!twoFAEnabled && !totpURI && (
+                <div className="flex flex-col gap-4">
+                  <p className="text-sm text-muted-foreground">
+                    Two-factor authentication adds an extra layer of security to your account.
+                  </p>
+                  <form onSubmit={handleEnable2FA} noValidate>
+                    <FieldGroup>
+                      <Controller
+                        name="password"
+                        control={enableForm.control}
+                        render={({ field, fieldState }) => (
+                          <Field data-invalid={fieldState.invalid}>
+                            <FieldLabel htmlFor={field.name}>Confirm password</FieldLabel>
+                            <Input
+                              {...field}
+                              id={field.name}
+                              type="password"
+                              autoComplete="current-password"
+                              placeholder="********"
+                              aria-invalid={fieldState.invalid}
+                            />
+                            {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+                          </Field>
+                        )}
+                      />
+
+                      <Button type="submit" className="w-full" disabled={enableForm.formState.isSubmitting}>
+                        {enableForm.formState.isSubmitting ? "Setting up..." : "Enable 2FA"}
+                      </Button>
+                    </FieldGroup>
+                  </form>
+                </div>
+              )}
+
+              {totpURI && !confirmedBackupCodes && (
+                <div className="flex flex-col gap-4">
+                  <p className="text-sm text-muted-foreground">
+                    Scan this QR code with your authenticator app (Google Authenticator, Authy, Microsoft
+                    Authenticator, etc.)
+                  </p>
+                  <div className="flex justify-center rounded-lg bg-muted p-4">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(totpURI)}`}
+                      alt="QR Code"
+                      className="h-48 w-48"
                     />
-
-                    <Button type="submit" className="w-full" disabled={enableForm.formState.isSubmitting}>
-                      {enableForm.formState.isSubmitting ? "Setting up..." : "Enable 2FA"}
-                    </Button>
-                  </FieldGroup>
-                </form>
-              </div>
-            )}
-
-            {totpURI && !confirmedBackupCodes && (
-              <div className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">
-                  Scan this QR code with your authenticator app (Google Authenticator, Authy, Microsoft Authenticator, etc.)
-                </p>
-                <div className="flex justify-center rounded-lg bg-muted p-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(totpURI)}`}
-                    alt="QR Code"
-                    className="w-48 h-48"
-                  />
-                </div>
-
-                <Alert>
-                  <AlertTitle>Save your backup codes</AlertTitle>
-                  <AlertDescription>
-                    Keep these codes safe. You&apos;ll need them if you lose access to your authenticator app.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="rounded-lg border bg-background p-3 font-mono text-xs">
-                  <div className="grid gap-2">
-                    {backupCodes.map((code, i) => (
-                      <div key={i}>{code}</div>
-                    ))}
                   </div>
-                </div>
 
-                <Button
+                  <Alert>
+                    <AlertTitle>Save your backup codes</AlertTitle>
+                    <AlertDescription>
+                      Keep these codes safe. You&apos;ll need them if you lose access to your authenticator app.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="rounded-lg border bg-background p-3 font-mono text-xs">
+                    <div className="grid gap-2">
+                      {backupCodes.map((code, i) => (
+                        <div key={i}>{code}</div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Button
                     type="button"
                     onClick={() => {
                       setConfirmedBackupCodes(true);
@@ -249,57 +413,57 @@ export default function AccountSettings() {
                     }}
                   >
                     I&apos;ve saved my backup codes
-                </Button>
-              </div>
-            )}
+                  </Button>
+                </div>
+              )}
 
-            {confirmedBackupCodes && (
-              <Alert>
-                <CheckCircle2 />
-                <AlertTitle>Two-factor authentication is enabled</AlertTitle>
-              </Alert>
-            )}
+              {confirmedBackupCodes && (
+                <Alert>
+                  <CheckCircle2 />
+                  <AlertTitle>Two-factor authentication is enabled</AlertTitle>
+                </Alert>
+              )}
 
-            {twoFAEnabled && (
-              <>
-                <Separator />
-                <form
-                  onSubmit={disableForm.handleSubmit(async () => {
-                    await handleDisable2FA();
-                  })}
-                  noValidate
-                >
-                  <FieldGroup>
-                    <Controller
-                      name="password"
-                      control={disableForm.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor={field.name}>Confirm password to disable 2FA</FieldLabel>
-                          <Input
-                            {...field}
-                            id={field.name}
-                            type="password"
-                            autoComplete="current-password"
-                            placeholder="********"
-                            aria-invalid={fieldState.invalid}
-                          />
-                          {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-                        </Field>
-                      )}
-                    />
+              {twoFAEnabled && (
+                <>
+                  <Separator />
+                  <form
+                    onSubmit={disableForm.handleSubmit(async () => {
+                      await handleDisable2FA();
+                    })}
+                    noValidate
+                  >
+                    <FieldGroup>
+                      <Controller
+                        name="password"
+                        control={disableForm.control}
+                        render={({ field, fieldState }) => (
+                          <Field data-invalid={fieldState.invalid}>
+                            <FieldLabel htmlFor={field.name}>Confirm password to disable 2FA</FieldLabel>
+                            <Input
+                              {...field}
+                              id={field.name}
+                              type="password"
+                              autoComplete="current-password"
+                              placeholder="********"
+                              aria-invalid={fieldState.invalid}
+                            />
+                            {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+                          </Field>
+                        )}
+                      />
 
-                    <Button type="submit" variant="destructive" disabled={disableForm.formState.isSubmitting}>
-                      {disableForm.formState.isSubmitting ? "Disabling..." : "Disable 2FA"}
-                    </Button>
-                  </FieldGroup>
-                </form>
-              </>
-            )}
+                      <Button type="submit" variant="destructive" disabled={disableForm.formState.isSubmitting}>
+                        {disableForm.formState.isSubmitting ? "Disabling..." : "Disable 2FA"}
+                      </Button>
+                    </FieldGroup>
+                  </form>
+                </>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="surface-card reveal-up delay-3 border-none">
+          <Card className="surface-card reveal-up delay-4 border-none">
             <CardHeader>
               <CardTitle>Sign out</CardTitle>
             </CardHeader>
@@ -314,4 +478,3 @@ export default function AccountSettings() {
     </div>
   );
 }
-
