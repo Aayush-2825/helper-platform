@@ -140,9 +140,36 @@ wss.on("connection", (socket: WebSocket, request) => {
   // 🔌 CLEANUP
   // =========================
 
-  socket.on("close", () => {
+  socket.on("close", async () => {
     clients.delete(userId);
     console.log(`[WS] ${userId} disconnected. Total: ${clients.size}`);
+
+    // ✅ NEW: Auto-cancel 'requested' bookings on disconnect
+    try {
+      const now = new Date();
+      const nowTs = now.getTime();
+      const cancelledCount = await webDb
+        .update(booking)
+        .set({ status: "cancelled", cancelledAt: nowTs, cancelledBy: "customer" })
+        .where(
+          and(
+            eq(booking.customerId, userId),
+            eq(booking.status, "requested")
+          )
+        )
+        .returning({ id: booking.id, cancelledAt: booking.cancelledAt });
+
+      if (cancelledCount.length > 0) {
+        console.log(`🔌 [Auto-Cancel] Cancelled ${cancelledCount.length} bookings for disconnected user ${userId}`);
+        cancelledCount.forEach((b) => {
+          if (typeof b.cancelledAt !== "number") {
+            console.warn("[Auto-Cancel] cancelledAt is not a number:", b.cancelledAt);
+          }
+        });
+      }
+    } catch (err) {
+      console.error("[WS-Close] Auto-cancel failed:", err);
+    }
   });
 
   socket.on("error", (err) => {

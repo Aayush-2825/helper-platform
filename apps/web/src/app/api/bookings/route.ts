@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { db } from "@/db";
 import { booking } from "@/db/schema";
@@ -59,6 +59,10 @@ export async function POST(request: NextRequest) {
 
     const data = parsed.data;
 
+    // Generate 4-digit OTPs
+    const startCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const completeCode = Math.floor(1000 + Math.random() * 9000).toString();
+
     // ✅ Insert booking
     const [newBooking] = await db
       .insert(booking)
@@ -88,6 +92,9 @@ export async function POST(request: NextRequest) {
         finalAmount: data.finalAmount ?? null,
 
         currency: "INR",
+
+        startCode,
+        completeCode,
       })
       .returning();
 

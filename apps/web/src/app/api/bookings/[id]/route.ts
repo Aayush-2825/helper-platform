@@ -51,8 +51,15 @@ export async function GET(
         }
     }
 
+    // 🔒 Mask OTP codes if not the customer
+    const sanitizedBooking = { ...bookingResult };
+    if (session.user.id !== bookingResult.customerId) {
+        (sanitizedBooking as any).startCode = null;
+        (sanitizedBooking as any).completeCode = null;
+    }
+
     return NextResponse.json(
-      { message: "Booking fetched successfully.", booking: bookingResult },
+      { message: "Booking fetched successfully.", booking: sanitizedBooking },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (err) {

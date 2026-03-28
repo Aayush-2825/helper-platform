@@ -23,35 +23,10 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [searchMessage, setSearchMessage] = useState<string>("We've notified nearby professionals. Hang tight!");
   const [loading, setLoading] = useState(true);
+  const [startOTP, setStartOTP] = useState<string | null>(null);
+  const [completeOTP, setCompleteOTP] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchBooking() {
-      try {
-        const res = await fetch(`/api/bookings/${bookingId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setStatus(data.booking.status);
-          if (data.booking.helper) {
-            setHelperName(data.booking.helper.user.name);
-            setHelperId(data.booking.helper.user.id);
-          }
-          if (data.booking.latitude && data.booking.longitude) {
-              setLocation({ 
-                  lat: parseFloat(data.booking.latitude), 
-                  lng: parseFloat(data.booking.longitude) 
-              });
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch booking status:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchBooking();
-  }, [bookingId]);
-
-  useWebSocket(session?.user.id || "unknown", (msg) => {
+  const { send } = useWebSocket(session?.user.id || "unknown", (msg) => {
     if (msg.type === "event" && msg.event === "booking_update" && msg.data.bookingId === bookingId) {
       console.log("🔔 Booking update received:", msg.data);
       const newStatus = msg.data.status || msg.data.eventType;
@@ -77,11 +52,50 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
                       setHelperName(data.booking.helper.user.name);
                       setHelperId(data.booking.helper.user.id);
                   }
+                  if (data.booking.startCode) setStartOTP(data.booking.startCode);
+                  if (data.booking.completeCode) setCompleteOTP(data.booking.completeCode);
               }
           });
       }
     }
   });
+
+  useEffect(() => {
+    async function fetchBooking() {
+      try {
+        const res = await fetch(`/api/bookings/${bookingId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setStatus(data.booking.status);
+          if (data.booking.helper) {
+            setHelperName(data.booking.helper.user.name);
+            setHelperId(data.booking.helper.user.id);
+          }
+          if (data.booking.latitude && data.booking.longitude) {
+              setLocation({ 
+                  lat: parseFloat(data.booking.latitude), 
+                  lng: parseFloat(data.booking.longitude) 
+              });
+          }
+          if (data.booking.startCode) setStartOTP(data.booking.startCode);
+          if (data.booking.completeCode) setCompleteOTP(data.booking.completeCode);
+        }
+      } catch (err) {
+        console.error("Failed to fetch booking status:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchBooking();
+
+    // ✅ CLEANUP: Cancel search if user leaves during 'requested' state
+    return () => {
+        if (status === "requested") {
+            console.log("🔌 [Cleanup] Cancelling search for booking:", bookingId);
+            send({ type: "cancel_search", bookingId } as any);
+        }
+    };
+  }, [bookingId, status, send]);
 
   if (loading) {
     return (
@@ -161,6 +175,21 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
                     </Button>
                 </div>
               </div>
+
+              {/* OTP Section */}
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="surface-card p-4 rounded-2xl border border-border/50 text-center space-y-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Start Job OTP</p>
+                      <p className="text-2xl font-black tracking-widest text-primary">{startOTP || "----"}</p>
+                  </div>
+                  <div className="surface-card p-4 rounded-2xl border border-border/50 text-center space-y-1">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">Complete Job OTP</p>
+                      <p className="text-2xl font-black tracking-widest text-primary">{completeOTP || "----"}</p>
+                  </div>
+              </div>
+              <p className="text-[10px] text-center text-muted-foreground font-medium px-4">
+                  Provide the Start OTP to the professional to begin, and the Complete OTP only after the work is finished to your satisfaction.
+              </p>
 
               {location && (
                 <div className="rounded-[2rem] overflow-hidden border border-border/50 shadow-inner h-64 relative group">

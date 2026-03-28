@@ -69,7 +69,7 @@
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "@types/node": "^20",
+    "@types/node": "^20.19.37",
     "@types/pg": "^8.18.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",

@@ -25,7 +25,7 @@ export function ThemeToggle() {
           </Button>
         }
       />
-      <DropdownMenuContent align="end" className="rounded-2xl border-border/50 bg-card/80 backdrop-blur-xl">
+      <DropdownMenuContent align="end" className=" border-border/50 bg-card/80 backdrop-blur-xl">
         <DropdownMenuItem onClick={() => setTheme("light")} className="rounded-xl cursor-pointer">
           Light
         </DropdownMenuItem>

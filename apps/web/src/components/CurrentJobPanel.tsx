@@ -20,6 +20,8 @@ export function CurrentJobPanel({ bookingId, onJobCompleted }: CurrentJobPanelPr
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchBooking() {
@@ -39,28 +41,55 @@ export function CurrentJobPanel({ bookingId, onJobCompleted }: CurrentJobPanelPr
   }, [bookingId]);
 
   const handleStart = async () => {
+    if (!otp || otp.length < 4) {
+      setError("Please enter the 4-digit Start OTP from the customer.");
+      return;
+    }
     setStarting(true);
+    setError(null);
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/start`, { method: "POST" });
+      const res = await fetch(`/api/bookings/${bookingId}/start`, { 
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ otp })
+      });
       if (res.ok) {
         setBooking({ ...booking, status: "in_progress" });
+        setOtp("");
+      } else {
+        const data = await res.json();
+        setError(data.message || "Invalid OTP");
       }
     } catch (err) {
       console.error("Failed to start job:", err);
+      setError("Connection error");
     } finally {
       setStarting(false);
     }
   };
 
   const handleComplete = async () => {
+    if (!otp || otp.length < 4) {
+      setError("Please enter the 4-digit Completion OTP from the customer.");
+      return;
+    }
     setCompleting(true);
+    setError(null);
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/complete`, { method: "POST" });
+      const res = await fetch(`/api/bookings/${bookingId}/complete`, { 
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ otp })
+      });
       if (res.ok) {
         onJobCompleted();
+      } else {
+        const data = await res.json();
+        setError(data.message || "Invalid OTP");
       }
     } catch (err) {
       console.error("Failed to complete job:", err);
+      setError("Connection error");
     } finally {
       setCompleting(false);
     }
@@ -125,6 +154,22 @@ export function CurrentJobPanel({ bookingId, onJobCompleted }: CurrentJobPanelPr
                   </div>
                </div>
             </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="relative">
+                <input 
+                    type="text" 
+                    placeholder={booking.status === "accepted" ? "Enter Start OTP" : "Enter Completion OTP"}
+                    maxLength={4}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
+                    className="w-full h-16 bg-muted/30 border-2 border-border/50 rounded-2xl text-center text-3xl font-black tracking-[0.5em] placeholder:text-muted-foreground/30 placeholder:tracking-normal placeholder:text-sm focus:border-primary/50 focus:bg-primary/5 outline-none transition-all"
+                />
+            </div>
+            {error && (
+                <p className="text-[10px] font-bold text-destructive text-center animate-shake">{error}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

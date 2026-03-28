@@ -534,6 +534,8 @@ export const booking = pgTable(
     commissionRate: integer("commission_rate").default(15).notNull(),
     commissionAmount: integer("commission_amount"),
     distanceKm: numeric("distance_km", { precision: 6, scale: 2 }),
+    startCode: text("start_code"),
+    completeCode: text("complete_code"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

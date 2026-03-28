@@ -8,11 +8,20 @@ import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { publishBookingEvent } from "@/lib/realtime/client";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: bookingId } = await context.params;
+    const body = await request.json().catch(() => ({}));
+    const otp = body.otp;
+
+    if (!otp) {
+      return NextResponse.json(
+        { message: "OTP is required to complete the booking." },
+        { status: 400, headers: NO_STORE_HEADERS },
+      );
+    }
     const now = new Date();
 
     const session = await auth.api.getSession({
@@ -60,6 +69,14 @@ export async function POST(
     if (existingBooking.status !== "in_progress") {
       return NextResponse.json(
         { message: "Booking must be in in_progress state to complete." },
+        { status: 400, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    // ✅ OTP Verification
+    if (existingBooking.completeCode !== otp) {
+      return NextResponse.json(
+        { message: "Invalid OTP. Please ask the customer for the correct Completion Code." },
         { status: 400, headers: NO_STORE_HEADERS },
       );
     }

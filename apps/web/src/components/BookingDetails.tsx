@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Badge } from "@/components/ui/badge";
-import { TrackingMap } from "./TrackingMap";
 import { 
   Loader2, 
   MapPin, 
@@ -33,6 +32,8 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpError, setOtpError] = useState<string | null>(null);
 
   const fetchBooking = async () => {
     try {
@@ -66,15 +67,27 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
   }, [eventMessages, bookingId]);
 
   const handleAction = async (action: "start" | "complete" | "cancel") => {
+    if ((action === "start" || action === "complete") && role === "helper") {
+      if (!otp || otp.length < 4) {
+        setOtpError(`Please enter the 4-digit OTP to ${action === "start" ? "start" : "complete"} the job.`);
+        return;
+      }
+      setOtpError(null);
+    }
     if (!confirm(`Are you sure you want to ${action} this booking?`)) return;
-    
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/${action}`, { method: "POST" });
+      const body = (action === "start" || action === "complete") && role === "helper" ? JSON.stringify({ otp }) : undefined;
+      const res = await fetch(`/api/bookings/${bookingId}/${action}`, {
+        method: "POST",
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body,
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || `Failed to ${action} booking`);
       }
+      setOtp("");
       await fetchBooking();
     } catch (err: any) {
       alert(err.message);
@@ -91,9 +104,30 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
   const isRequested = booking.status === "requested";
 
   const showMap = isAccepted || isInProgress;
-
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-24 mt-4 px-4 sm:px-0">
+      {isAccepted && role === "customer" && booking.startCode && (
+        <div className="flex items-center gap-3 p-4 mb-2 rounded-lg bg-yellow-50 border border-yellow-200 shadow-sm">
+          <span className="font-semibold text-yellow-700 text-base">OTP to Start Job:</span>
+          <span className="text-2xl font-mono tracking-widest text-yellow-900 bg-yellow-100 px-3 py-1 rounded-lg border border-yellow-300">
+            {booking.startCode}
+          </span>
+        </div>
+      )}
+      {isInProgress && role === "customer" && booking.completeCode && (
+        <div className="flex items-center gap-3 p-4 mb-2 rounded-lg bg-blue-50 border border-blue-200 shadow-sm">
+          <span className="font-semibold text-blue-700 text-base">OTP to End Job:</span>
+          <span className="text-2xl font-mono tracking-widest text-blue-900 bg-blue-100 px-3 py-1 rounded-lg border border-blue-300">
+            {booking.completeCode}
+          </span>
+        </div>
+      )}
+      {isInProgress && (
+        <div className="flex items-center gap-3 p-4 mb-2 rounded-lg bg-green-50 border border-green-200 shadow-sm animate-pulse">
+          <Play className="size-5 text-green-600" />
+          <span className="font-semibold text-green-700 text-base">Job in Progress</span>
+        </div>
+      )}
       <div className="flex items-center gap-4">
         <Link href={role === "customer" ? "/customer/bookings" : "/helper/job-history"}>
           <Button variant="ghost" size="icon" className="rounded-full">
@@ -109,20 +143,29 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
         </div>
       </div>
 
-      {showMap && (
+      {/* Navigation Button instead of Tracking Map */}
+      {(isAccepted || isInProgress) && (
         <Card className="overflow-hidden shadow-md border-primary/20 bg-card">
           <CardHeader className="p-4 border-b bg-muted/30">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <div className="size-2 rounded-full bg-red-500 animate-pulse" />
-              Live Progress
+              <div className="size-2 rounded-full bg-green-500 animate-pulse" />
+              Navigate to Service Location
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-0 border-none">
-            <TrackingMap 
-                bookingId={bookingId} 
-                customerLocation={{ lat: parseFloat(booking.latitude), lng: parseFloat(booking.longitude) }}
-                helperId={booking.helperId}
-            />
+          <CardContent className="flex flex-col items-center justify-center gap-4 py-8">
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(booking.latitude)},${encodeURIComponent(booking.longitude)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "none" }}
+            >
+              <Button
+                className="gap-2 text-base font-semibold px-6 py-3"
+                size="lg"
+              >
+                <MapPin className="size-5" /> Open in Google Maps
+              </Button>
+            </a>
           </CardContent>
         </Card>
       )}
@@ -199,26 +242,43 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
       {/* Persistent Bottom Actions */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-lg border-t z-50 md:sticky md:bottom-4 md:rounded-xl md:shadow-lg md:border md:mb-6">
         <div className="max-w-3xl mx-auto flex gap-3">
-          {role === "helper" && isAccepted && (
-            <Button 
-                className="flex-1 gap-2 h-12 text-base font-semibold" 
-                size="lg" 
-                disabled={actionLoading}
-                onClick={() => handleAction("start")}
-            >
-              <Play className="size-5 fill-current" /> Start Job
-            </Button>
-          )}
 
-          {role === "helper" && isInProgress && (
-            <Button 
-                className="flex-1 gap-2 h-12 text-base font-semibold bg-green-600 hover:bg-green-700" 
-                size="lg" 
-                disabled={actionLoading}
-                onClick={() => handleAction("complete")}
-            >
-              <CheckCircle2 className="size-5" /> Complete Job
-            </Button>
+          {role === "helper" && (isAccepted || isInProgress) && (
+            <div className="flex-1 flex flex-col gap-2">
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{4,6}"
+                  maxLength={6}
+                  className="border rounded px-3 py-2 text-lg font-mono tracking-widest w-32 focus:outline-none focus:ring focus:border-primary"
+                  placeholder={isAccepted ? "Enter OTP to Start" : "Enter OTP to Complete"}
+                  value={otp}
+                  onChange={e => setOtp(e.target.value.replace(/\D/g, ""))}
+                  disabled={actionLoading}
+                />
+                {isAccepted ? (
+                  <Button
+                    className="gap-2 h-12 text-base font-semibold"
+                    size="lg"
+                    disabled={actionLoading || !otp || otp.length < 4}
+                    onClick={() => handleAction("start")}
+                  >
+                    <Play className="size-5 fill-current" /> Start Job
+                  </Button>
+                ) : (
+                  <Button
+                    className="gap-2 h-12 text-base font-semibold bg-green-600 hover:bg-green-700"
+                    size="lg"
+                    disabled={actionLoading || !otp || otp.length < 4}
+                    onClick={() => handleAction("complete")}
+                  >
+                    <CheckCircle2 className="size-5" /> Complete Job
+                  </Button>
+                )}
+              </div>
+              {otpError && <div className="text-xs text-destructive mt-1">{otpError}</div>}
+            </div>
           )}
 
           {role === "customer" && (isRequested || isAccepted) && (

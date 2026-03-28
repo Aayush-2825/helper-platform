@@ -172,7 +172,7 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
  * Shared logic to create candidates and broadcast notification
  */
 async function createAndNotifyCandidates(bookingData: BookingDataForMatching, helpers: any[]) {
-      const deadline = new Date(Date.now() + 10 * 60 * 1000);
+      const deadline = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
       await db.update(booking).set({ acceptanceDeadline: deadline }).where(eq(booking.id, bookingData.id));
 
       const candidates = helpers.map((helper) => ({
@@ -181,7 +181,7 @@ async function createAndNotifyCandidates(bookingData: BookingDataForMatching, he
         helperProfileId: helper.id,
         response: "pending" as const,
         rankScore: 100,
-        expiresAt: new Date(Date.now() + 600000), // 10 min
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
       }));
 
       await db.insert(bookingCandidate).values(candidates);
