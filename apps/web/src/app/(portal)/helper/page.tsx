@@ -23,9 +23,9 @@ type Booking = {
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
-  driver: "Driver", electrician: "Electrician", plumber: "Plumber",
-  cleaner: "Cleaner", chef: "Chef", delivery_helper: "Delivery Helper",
-  caretaker: "Caretaker", security_guard: "Security Guard", other: "Other",
+  cleaner: "Cleaner", electrician: "Electrician", plumber: "Plumber",
+  driver: "Driver", chef: "Chef", delivery_helper: "Delivery Helper",
+  caretaker: "Caretaker", other: "Other",
 };
 
 const helperActions = [
