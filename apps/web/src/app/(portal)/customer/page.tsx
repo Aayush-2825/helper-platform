@@ -19,6 +19,12 @@ import {
   HeartIcon,
   ShieldCheck,
   MoreHorizontal,
+  Sparkles,
+  PlugZap,
+  Wrench,
+  Utensils,
+  Package,
+  Heart
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,28 +33,26 @@ import { StatusBadge } from "@/components/StatusBadge";
 import type { Booking } from "@/components/BookingCard";
 
 const categoryLabels: Record<string, string> = {
-  driver: "Driver",
+  cleaner: "Cleaner",
   electrician: "Electrician",
   plumber: "Plumber",
-  cleaner: "Cleaner",
+  driver: "Driver",
   chef: "Chef",
   delivery_helper: "Delivery Helper",
-  caretaker: "Caretaker",
-  security_guard: "Security Guard",
+  caretaker: "Caretaker / Babysitter",
   other: "Other",
 };
 
 const ACTIVE_STATUSES = new Set(["requested", "accepted", "in_progress"]);
 
 const CATEGORIES = [
+  { id: "cleaner", label: "Cleaner", icon: Sparkles, color: "oklch(0.65 0.15 160)" },
+  { id: "electrician", label: "Electrician", icon: PlugZap, color: "oklch(0.7 0.2 80)" },
+  { id: "plumber", label: "Plumber", icon: Wrench, color: "oklch(0.6 0.15 200)" },
   { id: "driver", label: "Driver", icon: Car, color: "oklch(0.6 0.15 250)" },
-  { id: "electrician", label: "Electrician", icon: Zap, color: "oklch(0.7 0.2 80)" },
-  { id: "plumber", label: "Plumber", icon: Droplets, color: "oklch(0.6 0.15 200)" },
-  { id: "cleaner", label: "Cleaner", icon: Brush, color: "oklch(0.65 0.15 160)" },
-  { id: "chef", label: "Chef", icon: UtensilsCrossed, color: "oklch(0.6 0.18 40)" },
-  { id: "delivery_helper", label: "Delivery", icon: Truck, color: "oklch(0.55 0.18 25)" },
-  { id: "caretaker", label: "Caretaker", icon: HeartIcon, color: "oklch(0.65 0.12 340)" },
-  { id: "security_guard", label: "Security", icon: ShieldCheck, color: "oklch(0.45 0.05 240)" },
+  { id: "chef", label: "Chef", icon: Utensils, color: "oklch(0.6 0.18 40)" },
+  { id: "delivery_helper", label: "Delivery", icon: Package, color: "oklch(0.55 0.18 25)" },
+  { id: "caretaker", label: "Caretaker", icon: Heart, color: "oklch(0.65 0.12 340)" },
   { id: "other", label: "More", icon: MoreHorizontal, color: "oklch(0.6 0.02 240)" },
 ];
 
