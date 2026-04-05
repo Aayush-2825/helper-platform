@@ -34,6 +34,8 @@
     "razorpay": "^2.9.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "react-hook-form": "^7.71.2",
     "resend": "^6.9.4",
     "shadcn": "^4.1.0",
@@ -47,8 +49,6 @@
   "devDependencies": {
     "@types/node": "^20",
     "@types/pg": "^8.18.0",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^4.1.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
