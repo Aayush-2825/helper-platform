@@ -73,6 +73,7 @@
     "studio": "drizzle-kit studio --config=drizzle.config.ts"
   },
   "dependencies": {
+    "@types/node": "^20.19.37",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
     "pg": "^8.20.0"
@@ -80,7 +81,6 @@
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "@types/node": "^20.19.37",
     "@types/pg": "^8.18.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
