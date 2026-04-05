@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { Loader2, Wifi, WifiOff, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { publishHelperPresence } from "@/lib/realtime/client";
 import { useSession } from "@/lib/auth/session";
+import { useWebSocket } from "@/hooks/useWebsocket";
 
 type AvailabilityStatus = "online" | "offline" | "busy";
 
@@ -18,6 +18,7 @@ const statusConfig: Record<AvailabilityStatus, { label: string; color: string; i
 
 export default function HelperAvailabilityPage() {
   const { session } = useSession();
+  useWebSocket(session?.user.id || "", () => {});
   const [status, setStatus] = useState<AvailabilityStatus>("offline");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -99,7 +100,7 @@ export default function HelperAvailabilityPage() {
     <main className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Availability</h1>
-        <p className="text-sm text-muted-foreground">Switch your status so customers know when you're ready to accept jobs.</p>
+        <p className="text-sm text-muted-foreground">Switch your status so customers know when you&apos;re ready to accept jobs.</p>
       </div>
 
       {loading ? (
@@ -146,9 +147,9 @@ export default function HelperAvailabilityPage() {
           <CardTitle className="text-base">Status guide</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p><span className="font-medium text-foreground">Online</span> — You'll receive incoming job requests.</p>
-          <p><span className="font-medium text-foreground">Busy</span> — You're on a job and won't receive new requests.</p>
-          <p><span className="font-medium text-foreground">Offline</span> — You won't receive any job requests.</p>
+          <p><span className="font-medium text-foreground">Online</span> — You&apos;ll receive incoming job requests.</p>
+          <p><span className="font-medium text-foreground">Busy</span> — You&apos;re on a job and won&apos;t receive new requests.</p>
+          <p><span className="font-medium text-foreground">Offline</span> — You won&apos;t receive any job requests.</p>
         </CardContent>
       </Card>
     </main>

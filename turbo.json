@@ -1,11 +1,11 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
-  "globalEnv": ["PORT", "DATABASE_URL", "REDIS_URL"],
+  "globalEnv": ["PORT", "DATABASE_URL", "DATABASE_URL_WEB", "DATABASE_URL_REALTIME", "REDIS_URL", "NODE_ENV"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "env": ["PORT", "DATABASE_URL", "REDIS_URL"],
+      "env": ["PORT", "DATABASE_URL", "DATABASE_URL_WEB", "DATABASE_URL_REALTIME", "REDIS_URL", "NODE_ENV"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
@@ -14,11 +14,11 @@
     },
     "check-types": {
       "dependsOn": ["^check-types"],
-      "env": ["PORT", "DATABASE_URL", "REDIS_URL"]
+      "env": ["PORT", "DATABASE_URL", "DATABASE_URL_WEB", "DATABASE_URL_REALTIME", "REDIS_URL", "NODE_ENV"]
     },
     "dev": {
       "cache": false,
-      "env": ["PORT", "DATABASE_URL", "REDIS_URL"],
+      "env": ["PORT", "DATABASE_URL", "DATABASE_URL_WEB", "DATABASE_URL_REALTIME", "REDIS_URL", "NODE_ENV"],
       "persistent": true
     }
   }

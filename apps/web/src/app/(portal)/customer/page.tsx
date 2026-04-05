@@ -5,28 +5,20 @@ import Link from "next/link";
 import { useSession } from "@/lib/auth/session";
 import {
   ArrowRight,
-  CalendarClock,
   CreditCard,
-  Loader2,
   MessageSquareText,
   Search,
   Car,
-  Zap,
-  Droplets,
-  Brush,
-  UtensilsCrossed,
-  Truck,
-  HeartIcon,
-  ShieldCheck,
   MoreHorizontal,
   Sparkles,
   PlugZap,
   Wrench,
   Utensils,
   Package,
-  Heart
+  Heart,
+  PlayCircle,
 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -43,7 +35,7 @@ const categoryLabels: Record<string, string> = {
   other: "Other",
 };
 
-const ACTIVE_STATUSES = new Set(["requested", "accepted", "in_progress"]);
+const ACTIVE_STATUSES = new Set(["requested", "matched", "accepted", "in_progress"]);
 
 const CATEGORIES = [
   { id: "cleaner", label: "Cleaner", icon: Sparkles, color: "oklch(0.65 0.15 160)" },
@@ -70,6 +62,7 @@ export default function CustomerHomePage() {
   }, []);
 
   const activeBookings = bookings.filter((b) => ACTIVE_STATUSES.has(b.status));
+  const inProgressBooking = activeBookings.find((booking) => booking.status === "in_progress");
   const userName = session?.user?.name?.split(" ")[0] || "there";
 
   return (
@@ -99,6 +92,49 @@ export default function CustomerHomePage() {
       {/* Active Requests */}
       {!loading && activeBookings.length > 0 && (
         <section className="reveal-up delay-2">
+          {inProgressBooking && (
+            <div className="surface-card-strong mb-5 border border-green-300/50 bg-gradient-to-r from-green-50 via-green-50 to-emerald-50 p-5 dark:border-green-800 dark:from-green-950/30 dark:via-green-950/20 dark:to-emerald-950/20">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-green-700 dark:text-green-300">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-green-600" />
+                    </span>
+                    Live Job Running
+                  </p>
+                  <h3 className="mt-1 text-xl font-heading font-black">Your service is currently in progress</h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5"><PlayCircle className="size-4 text-green-600" /> Track helper progress</span>
+                    <span className="inline-flex items-center gap-1.5"><PlayCircle className="size-4 text-green-600" /> Keep completion OTP ready</span>
+                  </div>
+                </div>
+                <Link
+                  href={`/customer/bookings/${inProgressBooking.id}`}
+                  className={buttonVariants({ variant: "default", className: "rounded-2xl px-6" })}
+                >
+                  Open Live Job
+                </Link>
+              </div>
+            </div>
+          )}
+
+          <div className="surface-card-strong p-5 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Current Journey</p>
+              <h3 className="text-xl font-heading font-black mt-1">Active Booking Journey</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Track matching, arrival, and completion from one place.
+              </p>
+            </div>
+            <Link
+              href="/customer/active"
+              className={buttonVariants({ variant: "default", className: "rounded-2xl px-6" })}
+            >
+              Continue
+            </Link>
+          </div>
+
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-heading font-bold">Active Requests</h2>
             <Link href="/customer/bookings" className="text-primary text-sm font-semibold hover:underline">
@@ -109,8 +145,8 @@ export default function CustomerHomePage() {
             {activeBookings.map((booking) => (
               <Link
                 key={booking.id}
-                href={`/customer/bookings`}
-                className="surface-card p-5 min-w-[280px] flex flex-col gap-3 group"
+                href={`/customer/bookings/${booking.id}`}
+                className="surface-card p-5 min-w-70 flex flex-col gap-3 group"
               >
                 <div className="flex items-center justify-between">
                   <Badge className="bg-primary/10 text-primary border-none text-[10px] uppercase tracking-wider font-bold">
@@ -120,7 +156,13 @@ export default function CustomerHomePage() {
                 </div>
                 <div>
                   <p className="font-bold text-lg leading-tight truncate">
-                    Helper {booking.status === "accepted" ? "is on the way" : "Finding helper..."}
+                    {booking.status === "in_progress"
+                      ? "Service is in progress"
+                      : booking.status === "accepted"
+                        ? "Helper is on the way"
+                        : booking.status === "matched"
+                          ? "Helpers notified nearby"
+                          : "Finding helper..."}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1 truncate">
                     {booking.addressLine}
@@ -146,7 +188,7 @@ export default function CustomerHomePage() {
               className="flex flex-col items-center gap-3 transition-all duration-300 hover:scale-110 active:scale-95 group"
             >
               <div
-                className="size-16 sm:size-20 rounded-[1.5rem] flex items-center justify-center shadow-lg transition-all duration-300 group-hover:rotate-6 group-hover:shadow-2xl"
+                className="size-16 sm:size-20 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 group-hover:rotate-6 group-hover:shadow-2xl"
                 style={{ backgroundColor: `${cat.color}15`, border: `1px solid ${cat.color}30` }}
               >
                 <cat.icon className="size-8 sm:size-10" style={{ color: cat.color }} />

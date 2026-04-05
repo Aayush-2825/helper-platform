@@ -7,7 +7,7 @@
  * Validates: Requirements 3.1, 3.2, 3.3, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import fc from "fast-check";
 
 // ---------------------------------------------------------------------------

@@ -55,7 +55,6 @@ export {
   generateFilePreview,
   uploadFile,
   uploadToCloudinary,
-  uploadToS3,
   compressImage,
   FileManifest,
 } from "@/lib/storage/file-upload";

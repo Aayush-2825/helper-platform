@@ -1,13 +1,24 @@
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and, ilike } from "drizzle-orm";
+import { connection } from "next/server";
 import { db } from "@/db";
 import { helperProfile, user } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
+function isPrerenderHangError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    (error as { digest?: string }).digest === "HANGING_PROMISE_REJECTION"
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
+    await connection();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) {
       return NextResponse.json(
@@ -49,7 +60,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ helpers }, { status: 200, headers: NO_STORE_HEADERS });
   } catch (err) {
-    console.error("Nearby helpers error:", err);
+    if (!isPrerenderHangError(err)) {
+      console.error("Nearby helpers error:", err);
+    }
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500, headers: NO_STORE_HEADERS },

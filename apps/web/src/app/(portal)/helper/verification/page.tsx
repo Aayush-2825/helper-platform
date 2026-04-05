@@ -51,16 +51,22 @@ function getStatusBadgeVariant(status: "pending" | "approved" | "rejected" | "re
   }
 }
 
-function getStatusIcon(status: "pending" | "approved" | "rejected" | "resubmission_required") {
+function VerificationStatusIcon({
+  status,
+  className,
+}: {
+  status: "pending" | "approved" | "rejected" | "resubmission_required";
+  className?: string;
+}) {
   switch (status) {
     case "approved":
-      return BadgeCheck;
+      return <BadgeCheck className={className} />;
     case "rejected":
-      return XCircle;
+      return <XCircle className={className} />;
     case "resubmission_required":
-      return TriangleAlert;
+      return <TriangleAlert className={className} />;
     default:
-      return Clock3;
+      return <Clock3 className={className} />;
   }
 }
 
@@ -173,7 +179,6 @@ export default async function HelperVerificationPage() {
   ).length;
 
   const statusAlert = getVerificationAlert(profile.verificationStatus);
-  const StatusIcon = getStatusIcon(profile.verificationStatus);
   const AlertIcon = statusAlert.icon;
 
   return (
@@ -200,7 +205,7 @@ export default async function HelperVerificationPage() {
         <Card className="surface-card border-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <StatusIcon className="h-4 w-4 text-primary" />
+              <VerificationStatusIcon status={profile.verificationStatus} className="h-4 w-4 text-primary" />
               Profile status
             </CardTitle>
             <CardDescription>Current helper verification state</CardDescription>

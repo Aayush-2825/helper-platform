@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-type BookingStatus = "requested" | "accepted" | "in_progress" | "completed" | "cancelled";
+type BookingStatus = "requested" | "matched" | "accepted" | "in_progress" | "completed" | "cancelled" | "expired";
 
 const statusConfig: Record<
   BookingStatus,
@@ -9,6 +9,11 @@ const statusConfig: Record<
 > = {
   requested: {
     label: "Searching for helper…",
+    className: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
+    pulse: true,
+  },
+  matched: {
+    label: "Helpers notified",
     className: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
     pulse: true,
   },
@@ -27,6 +32,10 @@ const statusConfig: Record<
   cancelled: {
     label: "Cancelled",
     className: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800/50 dark:text-gray-400 dark:border-gray-700",
+  },
+  expired: {
+    label: "Expired",
+    className: "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-800",
   },
 };
 

@@ -109,13 +109,28 @@ export async function generateFilePreview(file: File): Promise<{
 // ============= CLOUD STORAGE INTEGRATION =============
 
 export interface CloudStorageConfig {
-  provider: "cloudinary" | "aws-s3" | "google-cloud" | "custom";
+  provider: "cloudinary";
   credentials: Record<string, string>;
 }
 
+function getCloudinaryUploadConfig() {
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_PRESET?.trim();
+
+  if (!cloudName) {
+    throw new Error("Missing required environment variable: NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME");
+  }
+
+  if (!uploadPreset) {
+    throw new Error("Missing required environment variable: NEXT_PUBLIC_CLOUDINARY_PRESET");
+  }
+
+  return { cloudName, uploadPreset };
+}
+
 /**
- * Upload file to Cloudinary
- * Requires: NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+ * Upload file to Cloudinary using an unsigned upload preset.
+ * Requires: NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, NEXT_PUBLIC_CLOUDINARY_PRESET
  */
 export async function uploadToCloudinary(
   file: File,
@@ -128,7 +143,6 @@ export async function uploadToCloudinary(
 ): Promise<{ url: string; publicId: string }> {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("upload_preset", process.env.NEXT_PUBLIC_CLOUDINARY_PRESET || "");
   formData.append("folder", `zapier/${folder}`);
 
   if (options?.publicId) {
@@ -139,9 +153,12 @@ export async function uploadToCloudinary(
     formData.append("tags", options.tags.join(","));
   }
 
+  const { cloudName, uploadPreset } = getCloudinaryUploadConfig();
+  formData.append("upload_preset", uploadPreset);
+
   try {
     const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/auto/upload`,
+      `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
       {
         method: "POST",
         body: formData,
@@ -164,58 +181,12 @@ export async function uploadToCloudinary(
 }
 
 /**
- * Upload file to AWS S3
- * Requires: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET
- */
-export async function uploadToS3(
-  file: File,
-  folder: string
-): Promise<{ url: string; key: string }> {
-  try {
-    // Get presigned URL from your backend
-    const presignedResponse = await fetch("/api/uploads/presigned-url", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fileName: file.name,
-        contentType: file.type,
-        folder,
-      }),
-    });
-
-    const { uploadUrl, key } = await presignedResponse.json();
-
-    // Upload to S3 using presigned URL
-    const uploadResponse = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Type": file.type,
-      },
-      body: file,
-    });
-
-    if (!uploadResponse.ok) {
-      throw new Error("S3 upload failed");
-    }
-
-    return {
-      url: `${process.env.NEXT_PUBLIC_AWS_S3_URL}/${key}`,
-      key,
-    };
-  } catch (error) {
-    console.error("S3 upload error:", error);
-    throw new Error("Failed to upload file to S3");
-  }
-}
-
-/**
- * Generic upload function that routes to appropriate service
+ * Generic upload function that routes through Cloudinary.
  */
 export async function uploadFile(
   file: File,
   category: keyof typeof DEFAULT_VALIDATORS,
   folder: string,
-  provider: CloudStorageConfig["provider"] = "cloudinary"
 ): Promise<{ url: string; id: string }> {
   // Validate file
   const validation = validateFile(file, category);
@@ -223,21 +194,8 @@ export async function uploadFile(
     throw new Error(validation.error);
   }
 
-  // Upload based on provider
-  switch (provider) {
-    case "cloudinary": {
-      const result = await uploadToCloudinary(file, folder, { tags: [category] });
-      return { url: result.url, id: result.publicId };
-    }
-
-    case "aws-s3": {
-      const result = await uploadToS3(file, folder);
-      return { url: result.url, id: result.key };
-    }
-
-    default:
-      throw new Error(`Unsupported upload provider: ${provider}`);
-  }
+  const result = await uploadToCloudinary(file, folder, { tags: [category] });
+  return { url: result.url, id: result.publicId };
 }
 
 // ============= FILE MANIFEST =============

@@ -1,10 +1,20 @@
 import { headers } from "next/headers";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { connection } from "next/server";
 import { db } from "@/db";
 import { bookingCandidate, helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
+
+function isPrerenderHangError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    (error as { digest?: string }).digest === "HANGING_PROMISE_REJECTION"
+  );
+}
 
 function serializeDate(value: Date | null) {
   return value ? value.toISOString() : null;
@@ -24,6 +34,7 @@ function canReceiveJobs(profile: {
 
 export async function GET() {
   try {
+    await connection();
     const session = await auth.api.getSession({
       headers: await headers(),
     });
@@ -160,7 +171,9 @@ export async function GET() {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error("Fetch incoming jobs error:", error);
+    if (!isPrerenderHangError(error)) {
+      console.error("Fetch incoming jobs error:", error);
+    }
 
     return NextResponse.json(
       { message: "Internal server error" },

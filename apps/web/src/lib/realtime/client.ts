@@ -84,12 +84,17 @@ export function publishBookingEvent(input: {
     | "in_progress"
     | "completed"
     | "matching_update";
-  data?: any;
+  data?: {
+    candidates?: Array<{ helperId: string }>;
+    [key: string]: unknown;
+  };
 }) {
   let wsEvent = "";
+  const data = input.data ?? {};
+  const hasCandidateTargets = Array.isArray(data.candidates) && data.candidates.length > 0;
 
   // 🧠 Step 1: Map DB → WS event
-  if (input.eventType === "created") {
+  if (input.eventType === "created" || (input.eventType === "matching_update" && hasCandidateTargets)) {
     wsEvent = "booking_request";
   } else {
     wsEvent = "booking_update";
@@ -100,8 +105,8 @@ export function publishBookingEvent(input: {
 
   if (wsEvent === "booking_request") {
     // ✅ SUPPORT BATCH (from matching)
-    if (input.data?.candidates?.length > 0) {
-      targetUserIds = input.data.candidates.map((c: any) => c.helperId);
+    if (Array.isArray(data.candidates) && data.candidates.length > 0) {
+      targetUserIds = data.candidates.map((candidate) => candidate.helperId);
     }
     // ✅ fallback (single helper)
     else if (input.helperId) {
@@ -120,7 +125,7 @@ export function publishBookingEvent(input: {
     data: {
       bookingId: input.bookingId,
       eventType: input.eventType,
-      ...input.data,
+      ...data,
     },
     targetUserIds,
   };
@@ -139,7 +144,7 @@ export function publishBookingEvent(input: {
       bookingId: input.bookingId,
       eventType: input.eventType,
       targetUserIds,
-      ...input.data,
+      ...data,
     });
   }
 }
@@ -167,4 +172,46 @@ export async function unsubscribeRealtimeSubscription(input: {
   resourceId?: string;
 }) {
   return postJson("/api/realtime/ops/subscriptions/unsubscribe", input);
+}
+
+export function publishPaymentUpdate(input: {
+  bookingId: string;
+  paymentId: string;
+  status: "created" | "authorized" | "captured" | "failed" | "refunded" | "partially_refunded";
+  targetUserIds: string[];
+  amount: number;
+  currency: string;
+  providerOrderId?: string;
+  providerPaymentId?: string;
+  failureCode?: string;
+  failureReason?: string;
+}) {
+  const payload = {
+    event: "payment_update",
+    data: {
+      bookingId: input.bookingId,
+      paymentId: input.paymentId,
+      status: input.status,
+      amount: input.amount,
+      currency: input.currency,
+      providerOrderId: input.providerOrderId,
+      providerPaymentId: input.providerPaymentId,
+      failureCode: input.failureCode,
+      failureReason: input.failureReason,
+      targetUserIds: input.targetUserIds,
+    },
+    targetUserIds: input.targetUserIds,
+  };
+
+  if (typeof window === "undefined") {
+    return postJson("/api/realtime/broadcast", payload).catch((err) => {
+      console.error("Failed to broadcast payment event via HTTP:", err);
+      throw err;
+    });
+  }
+
+  wsSend({
+    type: "payment_update",
+    ...payload.data,
+  });
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useWebSocket } from "@/hooks/useWebsocket";
 import { useSession } from "@/lib/auth/session";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,76 +26,99 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
   const [startOTP, setStartOTP] = useState<string | null>(null);
   const [completeOTP, setCompleteOTP] = useState<string | null>(null);
 
-  const { send } = useWebSocket(session?.user.id || "unknown", (msg) => {
-    if (msg.type === "event" && msg.event === "booking_update" && msg.data.bookingId === bookingId) {
-      console.log("🔔 Booking update received:", msg.data);
-      const newStatus = msg.data.status || msg.data.eventType;
+  const stateLabel =
+    status === "requested"
+      ? "Searching for a helper"
+      : status === "matched"
+        ? "Helpers are reviewing your request"
+        : status === "accepted"
+          ? "A helper has accepted"
+          : status === "in_progress"
+            ? "Work is in progress"
+            : status === "completed"
+              ? "Booking completed"
+              : status === "cancelled"
+                ? "Booking cancelled"
+                : "Booking status";
+
+  const stateCopy =
+    status === "requested"
+      ? searchMessage
+      : status === "matched"
+        ? "We have sent your request to matching professionals. The first eligible helper to respond will take the job."
+        : status === "accepted"
+          ? "Your helper is assigned. Keep the start OTP ready when they arrive."
+          : status === "in_progress"
+            ? "The job is active. Share the completion OTP only after the work is finished."
+            : status === "completed"
+              ? "This booking is finished and available in your history."
+              : status === "cancelled"
+                ? "This booking will no longer proceed."
+                : searchMessage;
+
+  const syncBookingState = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}`);
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setStatus(data.booking.status);
+
+      const helperRecord = data.booking.helper;
+      const helperProfileRecord = data.booking.helperProfile;
+      const nextHelperName =
+        helperRecord?.name ??
+        helperRecord?.user?.name ??
+        helperProfileRecord?.user?.name ??
+        null;
+      const nextHelperId =
+        helperRecord?.id ??
+        helperRecord?.user?.id ??
+        helperProfileRecord?.user?.id ??
+        data.booking.helperId ??
+        undefined;
+
+      setHelperName(nextHelperName);
+      setHelperId(nextHelperId);
+
+      if (data.booking.latitude && data.booking.longitude) {
+        setLocation({
+          lat: parseFloat(data.booking.latitude),
+          lng: parseFloat(data.booking.longitude),
+        });
+      }
+      if (data.booking.startCode) setStartOTP(data.booking.startCode);
+      if (data.booking.completeCode) setCompleteOTP(data.booking.completeCode);
+    } catch (err) {
+      console.error("Failed to fetch booking status:", err);
+    }
+  }, [bookingId]);
+
+  useWebSocket(session?.user.id || "unknown", (msg) => {
+    if (msg.type === "event" && msg.event === "booking_update") {
+      const data = msg.data as { bookingId?: string; status?: string; eventType?: string; message?: string } | undefined;
+      if (!data || data.bookingId !== bookingId) return;
+
+      console.log("🔔 Booking update received:", data);
+      const newStatus = data.status || data.eventType;
       if (newStatus) setStatus(newStatus);
-      
-      if (msg.data.helperName) {
-        setHelperName(msg.data.helperName);
+
+      if (data.message) {
+        setSearchMessage(data.message);
       }
-      if (msg.data.helperId) {
-          setHelperId(msg.data.helperId);
-      }
-      
-      if (newStatus === "matching_update" && msg.data.message) {
-          setSearchMessage(msg.data.message);
-      }
-      
-      if (newStatus === "accepted") {
-          // Re-fetch to get helper details if they weren't in the message
-          void fetch(`/api/bookings/${bookingId}`).then(async (res) => {
-              if (res.ok) {
-                  const data = await res.json();
-                  if (data.booking.helper) {
-                      setHelperName(data.booking.helper.user.name);
-                      setHelperId(data.booking.helper.user.id);
-                  }
-                  if (data.booking.startCode) setStartOTP(data.booking.startCode);
-                  if (data.booking.completeCode) setCompleteOTP(data.booking.completeCode);
-              }
-          });
-      }
+
+      void syncBookingState();
     }
   });
 
   useEffect(() => {
-    async function fetchBooking() {
-      try {
-        const res = await fetch(`/api/bookings/${bookingId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setStatus(data.booking.status);
-          if (data.booking.helper) {
-            setHelperName(data.booking.helper.user.name);
-            setHelperId(data.booking.helper.user.id);
-          }
-          if (data.booking.latitude && data.booking.longitude) {
-              setLocation({ 
-                  lat: parseFloat(data.booking.latitude), 
-                  lng: parseFloat(data.booking.longitude) 
-              });
-          }
-          if (data.booking.startCode) setStartOTP(data.booking.startCode);
-          if (data.booking.completeCode) setCompleteOTP(data.booking.completeCode);
-        }
-      } catch (err) {
-        console.error("Failed to fetch booking status:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchBooking();
-
-    // ✅ CLEANUP: Cancel search if user leaves during 'requested' state
-    return () => {
-        if (status === "requested") {
-            console.log("🔌 [Cleanup] Cancelling search for booking:", bookingId);
-            send({ type: "cancel_search", bookingId } as any);
-        }
+    const initialize = async () => {
+      await syncBookingState();
+      setLoading(false);
     };
-  }, [bookingId, status, send]);
+
+    void initialize();
+  }, [bookingId, syncBookingState]);
 
   if (loading) {
     return (
@@ -125,9 +148,7 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
               )} />
             </div>
             <h2 className="text-lg font-heading font-bold">
-              {status === "requested" ? "Searching for Helper" : 
-               status === "accepted" ? "Helper is on the Way" : 
-               status.charAt(0).toUpperCase() + status.slice(1)}
+              {stateLabel}
             </h2>
           </div>
           <Badge variant="outline" className="rounded-full px-3 font-bold border-primary/20 bg-primary/5">
@@ -145,9 +166,9 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-16 rounded-full border-2 border-primary/30 border-dashed animate-[spin_10s_linear_infinite]" />
               </div>
               <div className="space-y-2">
-                <p className="font-bold text-xl leading-tight">Assigning a professional...</p>
-                <p className="text-sm text-muted-foreground max-w-[240px] mx-auto">
-                  {searchMessage}
+                <p className="font-bold text-xl leading-tight">Finding the best available helper...</p>
+                <p className="text-sm text-muted-foreground max-w-60 mx-auto">
+                  {stateCopy}
                 </p>
               </div>
               <div className="flex gap-2 justify-center">
@@ -158,23 +179,57 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
             </div>
           )}
 
+          {status === "matched" && (
+            <div className="space-y-6 text-center py-4">
+              <div className="relative flex justify-center">
+                <div className="size-24 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
+                  <Loader2 className="size-12 animate-spin text-primary opacity-50" />
+                </div>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-16 rounded-full border-2 border-primary/30 border-dashed animate-[spin_10s_linear_infinite]" />
+              </div>
+              <div className="space-y-2">
+                <p className="font-bold text-xl leading-tight">Helpers are reviewing your request</p>
+                <p className="text-sm text-muted-foreground max-w-60 mx-auto">
+                  {stateCopy}
+                </p>
+              </div>
+              <div className="flex gap-2 justify-center">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className={`size-1.5 rounded-full bg-primary/30 animate-bounce delay-${i * 100}`} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {status === "accepted" && (
             <div className="space-y-6">
               {/* Helper Profile Info */}
-              <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-[1.5rem] border border-border/50">
-                <div className="size-14 rounded-2xl bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">
-                  {helperName?.[0] || "H"}
+              {helperName ? (
+                <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border border-border/50">
+                  <div className="size-14 rounded-2xl bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">
+                    {helperName[0]?.toUpperCase() || "H"}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-lg leading-tight">{helperName}</p>
+                    <p className="text-xs text-muted-foreground">Helper assigned from live booking data</p>
+                  </div>
+                  <div className="flex gap-2">
+                      <Button size="icon" variant="outline" className="rounded-full size-10 hover:bg-primary hover:text-white transition-all shadow-lg active:scale-95">
+                          <CheckCircle2 className="size-5" />
+                      </Button>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="font-bold text-lg leading-tight">{helperName || "A Professional"}</p>
-                  <p className="text-xs text-muted-foreground">Certified Helper • 4.9 ★</p>
+              ) : (
+                <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border border-border/50">
+                  <div className="size-14 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground font-bold text-xl">
+                    ?
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-lg leading-tight">Awaiting helper details</p>
+                    <p className="text-xs text-muted-foreground">The backend has not sent an assigned helper yet.</p>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                    <Button size="icon" variant="outline" className="rounded-full size-10 hover:bg-primary hover:text-white transition-all shadow-lg active:scale-95">
-                        <CheckCircle2 className="size-5" />
-                    </Button>
-                </div>
-              </div>
+              )}
 
               {/* OTP Section */}
               <div className="grid grid-cols-2 gap-4">
@@ -188,11 +243,11 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
                   </div>
               </div>
               <p className="text-[10px] text-center text-muted-foreground font-medium px-4">
-                  Provide the Start OTP to the professional to begin, and the Complete OTP only after the work is finished to your satisfaction.
+                  {stateCopy}
               </p>
 
               {location && (
-                <div className="rounded-[2rem] overflow-hidden border border-border/50 shadow-inner h-64 relative group">
+                <div className="rounded-3xl overflow-hidden border border-border/50 shadow-inner h-64 relative group">
                   <TrackingMap 
                     bookingId={bookingId} 
                     customerLocation={location}
@@ -224,7 +279,7 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
                 <p className="font-bold text-xl text-destructive leading-tight">
                     {status === "expired" ? "No Helpers Found" : "Booking Cancelled"}
                 </p>
-                <p className="text-sm text-muted-foreground max-w-[240px] mx-auto">
+                <p className="text-sm text-muted-foreground max-w-60 mx-auto">
                     {status === "expired" 
                         ? "Sorry, no helpers were available at this time. Please try again later."
                         : "This booking has been cancelled and will not proceed."}

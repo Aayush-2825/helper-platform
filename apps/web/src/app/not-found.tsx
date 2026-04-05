@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MoveLeft, Search, MapPin, Home } from "lucide-react";
+import { Search, MapPin, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
@@ -27,7 +27,7 @@ export default function NotFound() {
         <div className="space-y-4">
           <h2 className="text-4xl font-heading font-black tracking-tight">Lost in the Radar?</h2>
           <p className="text-muted-foreground font-medium text-balance">
-            We couldn't find the page you're looking for. Maybe it's moved to a new service zone.
+            We couldn&apos;t find the page you&apos;re looking for. Maybe it&apos;s moved to a new service zone.
           </p>
         </div>
 

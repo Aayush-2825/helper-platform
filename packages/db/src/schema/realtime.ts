@@ -1,48 +1,22 @@
 import {
   pgSchema,
-  pgEnum,
   text,
   timestamp,
   boolean,
   numeric,
   integer,
   index,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import {
+  bookingEventTypeEnum,
+  helperPresenceStatusEnum,
+  websocketEventTypeEnum,
+} from "./enums.js";
 const realtimeSchema = pgSchema("realtime");
-const realtimeTable = realtimeSchema.table;
-
-// Enums for real-time events
-export const bookingEventTypeEnum = pgEnum("booking_event_type", [
-  "created",
-  "accepted",
-  "rejected",
-  "in_progress",
-  "completed",
-  "cancelled",
-  "matching_timeout",
-]);
-
-export const helperPresenceStatusEnum = pgEnum("helper_presence_status", [
-  "online",
-  "offline",
-  "busy",
-  "away",
-]);
-
-export const websocketEventTypeEnum = pgEnum("websocket_event_type", [
-  "booking_request",
-  "booking_update",
-  "helper_presence",
-  "location_update",
-  "message",
-  "notification",
-  "payment_update",
-]);
 
 // Track active WebSocket connections
-export const activeConnections = realtimeTable(
+export const activeConnections = realtimeSchema.table(
   "active_connections",
   {
     id: text("id").primaryKey(),
@@ -62,7 +36,7 @@ export const activeConnections = realtimeTable(
 );
 
 // Track real-time helper presence and availability
-export const helperPresence = realtimeTable(
+export const helperPresence = realtimeSchema.table(
   "helper_presence",
   {
     id: text("id").primaryKey(),
@@ -87,7 +61,7 @@ export const helperPresence = realtimeTable(
 );
 
 // Track location updates for active jobs
-export const locationUpdates = realtimeTable(
+export const locationUpdates = realtimeSchema.table(
   "location_updates",
   {
     id: text("id").primaryKey(),
@@ -109,7 +83,7 @@ export const locationUpdates = realtimeTable(
 );
 
 // Track real-time booking events for WebSocket subscriptions
-export const bookingEvents = realtimeTable(
+export const bookingEvents = realtimeSchema.table(
   "booking_events",
   {
     id: text("id").primaryKey(),
@@ -131,7 +105,7 @@ export const bookingEvents = realtimeTable(
 );
 
 // Track WebSocket subscriptions (what events a user is interested in)
-export const subscriptions = realtimeTable(
+export const subscriptions = realtimeSchema.table(
   "subscriptions",
   {
     id: text("id").primaryKey(),
@@ -151,7 +125,7 @@ export const subscriptions = realtimeTable(
 );
 
 // Track real-time notifications queued for delivery
-export const notificationQueue = realtimeTable(
+export const notificationQueue = realtimeSchema.table(
   "notification_queue",
   {
     id: text("id").primaryKey(),
@@ -171,7 +145,7 @@ export const notificationQueue = realtimeTable(
 );
 
 // Track incoming job matching events for helpers
-export const incomingJobs = realtimeTable(
+export const incomingJobs = realtimeSchema.table(
   "incoming_jobs",
   {
     id: text("id").primaryKey(),

@@ -1,13 +1,24 @@
 import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { connection } from "next/server";
 import { db } from "@/db";
 import { helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
+function isPrerenderHangError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    (error as { digest?: string }).digest === "HANGING_PROMISE_REJECTION"
+  );
+}
+
 export async function GET() {
   try {
+    await connection();
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
@@ -23,9 +34,15 @@ export async function GET() {
         serviceCity: true,
         yearsExperience: true,
         averageRating: true,
+        totalRatings: true,
         completedJobs: true,
         bio: true,
         headline: true,
+        phoneForBookings: true,
+        verifiedPhone: true,
+        verifiedPhoneDate: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
       },
     });
 
@@ -35,7 +52,9 @@ export async function GET() {
 
     return NextResponse.json({ profile }, { status: 200, headers: NO_STORE_HEADERS });
   } catch (err) {
-    console.error("Helper profile fetch error:", err);
+    if (!isPrerenderHangError(err)) {
+      console.error("Helper profile fetch error:", err);
+    }
     return NextResponse.json({ message: "Internal server error" }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }

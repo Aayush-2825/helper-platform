@@ -1,13 +1,13 @@
+/* eslint-disable @next/next/no-img-element */
+
 "use client";
 
 import Link from "next/link";
 import {
   MapPin,
-  Search,
   Star,
   ShieldCheck,
   Zap,
-  Clock,
   ChevronRight,
   Menu,
   CheckCircle2
@@ -164,7 +164,7 @@ export default function DozoLandingPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {SERVICES.map((srv, i) => (
+              {SERVICES.map((srv) => (
                 <Link key={srv.id} href={`/customer/book?category=${srv.id}`} className="group block">
                   <div className="premium-card overflow-hidden">
                     <div className="h-56 overflow-hidden relative">

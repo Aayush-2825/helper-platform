@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRealtimeEvents } from "@/hooks/use-realtime-events";
 import { useSession } from "@/lib/auth/session";
 import { JobCard } from "@/components/JobCard";
+import { BookingJourneySummary } from "@/components/BookingJourneySummary";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Booking } from "@/components/BookingCard";
 
@@ -26,14 +27,6 @@ function LoadingSkeleton() {
     </div>
   );
 }
-
-type BookingUpdateEventData = {
-  bookingId: string;
-  eventType: "accepted" | "in_progress" | "completed" | "cancelled";
-  acceptedAt?: string;
-  startedAt?: string;
-  completedAt?: string;
-};
 
 export default function HelperJobHistoryPage() {
   const { session } = useSession();
@@ -102,34 +95,6 @@ export default function HelperJobHistoryPage() {
     });
   }, [eventMessages]);
 
-  async function handleStart(id: string) {
-    const res = await fetch(`/api/bookings/${id}/start`, { method: "POST" });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error((body as { message?: string }).message ?? "Failed to start job.");
-    }
-    const data = await res.json() as { booking: { startedAt?: string | null } };
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.id === id ? { ...b, status: "in_progress", startedAt: data.booking.startedAt ?? new Date().toISOString() } : b
-      )
-    );
-  }
-
-  async function handleComplete(id: string) {
-    const res = await fetch(`/api/bookings/${id}/complete`, { method: "POST" });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error((body as { message?: string }).message ?? "Failed to complete job.");
-    }
-    const data = await res.json() as { booking: { completedAt?: string | null } };
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.id === id ? { ...b, status: "completed", completedAt: data.booking.completedAt ?? new Date().toISOString() } : b
-      )
-    );
-  }
-
   const sortDesc = (a: Booking, b: Booking) =>
     new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
 
@@ -166,6 +131,12 @@ export default function HelperJobHistoryPage() {
 
       {!loading && !fetchError && bookings.length > 0 && (
         <>
+          <BookingJourneySummary
+            bookings={bookings}
+            activeStatuses={["accepted", "in_progress"]}
+            title="Helper workload snapshot"
+          />
+
           <section className="space-y-3">
             <h2 className="text-lg font-medium">Active Jobs</h2>
             {activeJobs.length === 0 ? (
@@ -173,12 +144,7 @@ export default function HelperJobHistoryPage() {
             ) : (
               <div className="space-y-4">
                 {activeJobs.map((booking) => (
-                  <JobCard
-                    key={booking.id}
-                    booking={booking}
-                    onStart={handleStart}
-                    onComplete={handleComplete}
-                  />
+                  <JobCard key={booking.id} booking={booking} />
                 ))}
               </div>
             )}

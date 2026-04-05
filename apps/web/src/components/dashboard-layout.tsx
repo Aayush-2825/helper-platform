@@ -15,7 +15,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
@@ -31,6 +30,7 @@ interface DashboardLayoutProps {
   title: string;
   description: string;
   requiredRoles: AppRole[];
+  accessDeniedRedirect: string;
   navLinks: NavLink[];
   children: React.ReactNode;
 }
@@ -39,6 +39,7 @@ export function DashboardLayout({
   title,
   description,
   requiredRoles,
+  accessDeniedRedirect,
   navLinks,
   children,
 }: DashboardLayoutProps) {
@@ -58,9 +59,9 @@ export function DashboardLayout({
 
     const role = normalizeRole((session.user as { role?: string }).role);
     if (!requiredRoles.includes(role)) {
-      router.replace("/dashboard");
+      router.replace(accessDeniedRedirect);
     }
-  }, [loading, requiredRoles, router, session]);
+  }, [accessDeniedRedirect, loading, requiredRoles, router, session]);
 
   if (loading) {
     return (
@@ -103,7 +104,7 @@ export function DashboardLayout({
               </div>
 
               <nav className="flex flex-col gap-1.5 reveal-up delay-1">
-                {navLinks.map((link, index) => {
+                {navLinks.map((link) => {
                   const isActive = pathname === link.href;
                   return (
                     <Link

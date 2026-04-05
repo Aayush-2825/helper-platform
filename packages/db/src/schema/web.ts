@@ -6,104 +6,27 @@ import {
   integer,
   jsonb,
   numeric,
-  pgEnum,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-export const helperVerificationStatusEnum = pgEnum(
-  "helper_verification_status",
-  ["pending", "approved", "rejected", "resubmission_required"],
-);
-
-export const helperAvailabilityStatusEnum = pgEnum(
-  "helper_availability_status",
-  ["online", "offline", "busy"],
-);
-
-export const bookingStatusEnum = pgEnum("booking_status", [
-  "requested",
-  "matched",
-  "accepted",
-  "in_progress",
-  "completed",
-  "cancelled",
-  "expired",
-  "disputed",
-]);
-
-export const bookingCandidateResponseEnum = pgEnum("booking_candidate_response", [
-  "pending",
-  "accepted",
-  "rejected",
-  "timeout",
-]);
-
-export const cancellationActorEnum = pgEnum("cancellation_actor", [
-  "customer",
-  "helper",
-  "admin",
-  "system",
-]);
-
-export const paymentMethodEnum = pgEnum("payment_method", [
-  "upi",
-  "card",
-  "wallet",
-  "cash",
-]);
-
-export const paymentStatusEnum = pgEnum("payment_status", [
-  "created",
-  "authorized",
-  "captured",
-  "failed",
-  "refunded",
-  "partially_refunded",
-]);
-
-export const payoutStatusEnum = pgEnum("payout_status", [
-  "pending",
-  "processing",
-  "paid",
-  "failed",
-  "reversed",
-]);
-
-export const disputeStatusEnum = pgEnum("dispute_status", [
-  "open",
-  "investigating",
-  "resolved",
-  "rejected",
-]);
-
-export const disputeResolutionEnum = pgEnum("dispute_resolution", [
-  "refund_full",
-  "refund_partial",
-  "no_refund",
-  "credit_note",
-  "other",
-]);
-
-export const reviewModerationStatusEnum = pgEnum("review_moderation_status", [
-  "visible",
-  "hidden",
-  "flagged",
-]);
-
-export const helperServiceCategoryEnum = pgEnum("helper_service_category", [
-  "driver",
-  "electrician",
-  "plumber",
-  "cleaner",
-  "chef",
-  "delivery_helper",
-  "caretaker",
-  "security_guard",
-  "other",
-]);
+import {
+  bookingCandidateResponseEnum,
+  bookingStatusEnum,
+  cancellationActorEnum,
+  contactMethodEnum,
+  disputeResolutionEnum,
+  disputeStatusEnum,
+  helperAvailabilityStatusEnum,
+  helperServiceCategoryEnum,
+  helperVerificationStatusEnum,
+  paymentMethodEnum,
+  paymentStatusEnum,
+  payoutStatusEnum,
+  reviewModerationStatusEnum,
+} from "./enums.js";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -299,6 +222,13 @@ export const customerProfile = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    phone: text("phone"),
+    phoneVerified: boolean("phone_verified").default(false).notNull(),
+    preferredContactMethod: contactMethodEnum("preferred_contact_method")
+      .default("call")
+      .notNull(),
+    emergencyContactName: text("emergency_contact_name"),
+    emergencyContactPhone: text("emergency_contact_phone"),
     defaultAddressLine: text("default_address_line"),
     defaultArea: text("default_area"),
     defaultCity: text("default_city"),
@@ -342,6 +272,11 @@ export const helperProfile = pgTable(
     totalRatings: integer("total_ratings").default(0).notNull(),
     completedJobs: integer("completed_jobs").default(0).notNull(),
     qualityScore: integer("quality_score").default(0).notNull(),
+    phoneForBookings: text("phone_for_bookings"),
+    verifiedPhone: text("verified_phone"),
+    verifiedPhoneDate: timestamp("verified_phone_date"),
+    emergencyContactName: text("emergency_contact_name"),
+    emergencyContactPhone: text("emergency_contact_phone"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -520,6 +455,14 @@ export const booking = pgTable(
     cancelledAt: timestamp("cancelled_at"),
     cancelledBy: cancellationActorEnum("cancelled_by"),
     cancellationReason: text("cancellation_reason"),
+    customerName: text("customer_name"),
+    customerPhone: text("customer_phone"),
+    helperName: text("helper_name"),
+    helperPhone: text("helper_phone"),
+    helperPhoneVisibleAt: timestamp("helper_phone_visible_at"),
+    preferredContactMethod: contactMethodEnum("preferred_contact_method")
+      .default("call")
+      .notNull(),
     addressLine: text("address_line").notNull(),
     area: text("area"),
     city: text("city").notNull(),

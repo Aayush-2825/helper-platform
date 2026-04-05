@@ -1,30 +1,64 @@
-# Helper Platform Monorepo
+# Helper Platform
 
-This Turborepo is organized into two runtime apps:
+Production-oriented monorepo for an on-demand helper marketplace with three role surfaces: customer, helper, and admin.
 
-- `apps/web`: Next.js application (customer/helper/admin product surfaces)
-- `apps/realtime`: Realtime WebSocket service (event transport for live booking updates)
+## MVP Status
 
-## Workspace Packages
+Current status: MVP feature-complete for core booking, matching, realtime updates, payments, payouts tracking, verification, reviews, and disputes.
 
-- `@repo/ui`: Shared UI components
-- `@repo/eslint-config`: Shared ESLint setup
-- `@repo/typescript-config`: Shared TypeScript setup
+Main launch blockers remaining are operational hardening items:
+
+- Full cross-journey integration coverage
+- End-to-end observability consistency (logs and error tracking)
+- Retry/fallback orchestration for external payment and notification failures
+
+## Monorepo Layout
+
+- apps/web: Next.js app (customer, helper, admin portals)
+- apps/realtime: WebSocket + Express realtime service
+- packages/db: Shared Drizzle schema, migrations, and DB scripts
+- packages/ui: Shared UI components
+- packages/eslint-config: Shared lint rules
+- packages/typescript-config: Shared TS config
 
 ## Quick Start
+
+Requirements:
+
+- Node.js 18+
+- pnpm 9+
+- PostgreSQL
+- Redis
+
+Install and run:
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-`pnpm dev` runs all `dev` scripts through Turborepo:
+Default local endpoints:
 
-- Web app: `http://localhost:3000`
-- Realtime service health: `http://localhost:4001`
-- Realtime websocket endpoint: `ws://localhost:4001/ws`
+- Web app: http://localhost:3000
+- Realtime health: http://localhost:4001
+- Realtime WS endpoint: ws://localhost:4001/ws
 
-## Useful Commands
+## Environment Setup
+
+Create root .env with:
+
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/helper
+DATABASE_URL_WEB=postgresql://user:password@localhost:5432/helper_web
+DATABASE_URL_REALTIME=postgresql://user:password@localhost:5432/helper_realtime
+REDIS_URL=redis://localhost:6379
+```
+
+You can use only DATABASE_URL for local development if both schemas share one database.
+
+## Common Commands
+
+Workspace:
 
 ```bash
 pnpm dev
@@ -33,19 +67,58 @@ pnpm lint
 pnpm check-types
 ```
 
-Run only the web app:
+Run one app:
 
 ```bash
 pnpm turbo dev --filter=web
-```
-
-Run only the realtime service:
-
-```bash
 pnpm turbo dev --filter=realtime
 ```
 
-## Notes
+Database:
 
-- `turbo.json` caches both Next.js outputs (`.next/`) and service outputs (`dist/`).
-- The realtime service currently broadcasts incoming websocket messages to all connected clients.
+```bash
+pnpm db:generate
+pnpm db:migrate
+pnpm db:push
+pnpm db:sync:realtime
+pnpm db:verify:realtime
+```
+
+## MVP Final Check List
+
+Functional readiness:
+
+- Booking lifecycle APIs implemented
+- Matching and candidate flow implemented
+- Helper accept/reject/start/complete flow implemented
+- Realtime booking updates implemented
+- Payments, webhook verification, and receipts implemented
+- Payout request and admin payout state handling implemented
+- Reviews and disputes implemented
+- Helper onboarding and verification queue implemented
+- Admin analytics endpoint and dashboard implemented
+
+Engineering readiness:
+
+- Monorepo build pipeline configured with Turbo
+- TypeScript strict checks enabled across apps/packages
+- Shared DB schema package integrated
+- Unit and route-level tests present in web and realtime apps
+
+Open hardening work before broad launch:
+
+- Expand integration test coverage for full role journeys
+- Complete standardized validation/error contracts on all write endpoints
+- Complete centralized error tracking rollout
+- Finalize retry strategy for payment and notification edge failures
+
+## Deployment Notes
+
+- Web and realtime services can be deployed independently.
+- Run database migrations before deploying services.
+- Run db:verify:realtime after schema repair operations.
+- Keep secrets in environment-based secret managers only.
+
+## License
+
+Private project.

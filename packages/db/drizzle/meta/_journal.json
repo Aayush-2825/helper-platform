@@ -15,6 +15,13 @@
       "when": 1774689989844,
       "tag": "0001_cute_captain_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775201130000,
+      "tag": "0002_professional_booking_contacts",
+      "breakpoints": true
     }
   ]
 }

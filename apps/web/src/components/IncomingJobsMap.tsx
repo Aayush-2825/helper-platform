@@ -9,7 +9,7 @@ import {
   MapRoute
 } from "@/components/ui/map";
 import { Card } from "@/components/ui/card";
-import { Clock, MapPin, Navigation2, Route, User } from "lucide-react";
+import { MapPin, Navigation2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type MapLibreGL from "maplibre-gl";
 import { IncomingJob } from "@/app/(portal)/helper/incoming-jobs/useIncomingJobs";
@@ -41,23 +41,25 @@ export function IncomingJobsMap({ jobs, workerLocation }: IncomingJobsMapProps) 
 
   // Fetch routes for all nearby jobs
   useEffect(() => {
-    if (!workerLocation || jobs.length === 0) return;
+    const activeWorkerLocation = workerLocation;
+    if (!activeWorkerLocation || jobs.length === 0) return;
 
     const fetchRoutes = async () => {
-      const newRoutes: Record<string, any> = {};
+      const newRoutes: Record<string, { coordinates: [number, number][]; duration: number; distance: number }> = {};
       const jobsToRoute = jobs.filter(j => j.latitude && j.longitude).slice(0, 5);
       
       for (const job of jobsToRoute) {
         try {
-          const url = `https://router.project-osrm.org/route/v1/driving/${workerLocation.lng},${workerLocation.lat};${job.longitude},${job.latitude}?overview=full&geometries=geojson`;
+          const url = `https://router.project-osrm.org/route/v1/driving/${activeWorkerLocation.lng},${activeWorkerLocation.lat};${job.longitude},${job.latitude}?overview=full&geometries=geojson`;
           const res = await fetch(url);
           if (res.ok) {
-            const data = await res.json();
-            if (data.routes && data.routes[0]) {
+            const data = await res.json() as { routes?: Array<{ geometry?: { coordinates: [number, number][] }; duration: number; distance: number }> };
+            const route = data.routes?.[0];
+            if (route?.geometry?.coordinates) {
               newRoutes[job.bookingId] = {
-                  coordinates: data.routes[0].geometry.coordinates,
-                  duration: data.routes[0].duration,
-                  distance: data.routes[0].distance
+                  coordinates: route.geometry.coordinates,
+                  duration: route.duration,
+                  distance: route.distance
               };
             }
           }
@@ -69,7 +71,7 @@ export function IncomingJobsMap({ jobs, workerLocation }: IncomingJobsMapProps) 
     };
 
     fetchRoutes();
-  }, [jobs.length, workerLocation?.lat, workerLocation?.lng]);
+  }, [jobs, workerLocation]);
 
   // Determine the map center: prefer worker location, else first job, else default
   const center =

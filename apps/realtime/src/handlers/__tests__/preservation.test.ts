@@ -7,9 +7,8 @@
  * Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
-import { EventEmitter } from "events";
 import WebSocket from "ws";
 
 // ---------------------------------------------------------------------------
@@ -20,7 +19,9 @@ import WebSocket from "ws";
  * Replicate the ping handler logic from apps/realtime/src/index.ts (unfixed).
  * We test the handler in isolation — no server startup required.
  */
-function makePingHandler(socket: { send: (msg: string) => void }) {
+type SendFn = (...args: unknown[]) => unknown;
+
+function makePingHandler(socket: { send: SendFn }) {
   return (raw: Buffer | string) => {
     try {
       const data = JSON.parse(raw.toString());
@@ -40,7 +41,7 @@ function makePingHandler(socket: { send: (msg: string) => void }) {
  * Replicate broadcastEvent from apps/realtime/src/index.ts.
  * We test it in isolation using a mock clients map.
  */
-function makeBroadcastEvent(clients: Map<string, { send: (...args: any[]) => void; readyState: number }>) {
+function makeBroadcastEvent(clients: Map<string, { send: SendFn; readyState: number }>) {
   return function broadcastEvent({
     event,
     data,
@@ -90,7 +91,7 @@ describe("Preservation — Ping/Pong (Requirement 3.2)", () => {
         }),
         ({ extra, id }) => {
           const sendMock = vi.fn();
-          const socket = { send: sendMock };
+          const socket = { send: sendMock as unknown as SendFn };
           const handler = makePingHandler(socket);
 
           const pingMsg: Record<string, unknown> = { type: "ping" };
@@ -109,7 +110,7 @@ describe("Preservation — Ping/Pong (Requirement 3.2)", () => {
 
   it("Example: bare { type: 'ping' } returns { type: 'pong' }", () => {
     const sendMock = vi.fn();
-    const handler = makePingHandler({ send: sendMock });
+    const handler = makePingHandler({ send: sendMock as unknown as SendFn });
     handler(Buffer.from(JSON.stringify({ type: "ping" })));
     expect(JSON.parse(sendMock.mock.calls[0]![0])).toEqual({ type: "pong" });
   });
@@ -136,9 +137,9 @@ describe("Preservation — broadcastEvent targetUserIds (Requirement 3.6)", () =
         fc.string({ minLength: 1 }),
         (allUserIds, targetOffset, eventName) => {
           // Build a clients map — all users are OPEN
-          const clients = new Map<string, { send: ReturnType<typeof vi.fn>; readyState: number }>();
+          const clients = new Map<string, { send: SendFn; readyState: number }>();
           for (const uid of allUserIds) {
-            clients.set(uid, { send: vi.fn(), readyState: WebSocket.OPEN });
+            clients.set(uid, { send: vi.fn() as unknown as SendFn, readyState: WebSocket.OPEN });
           }
 
           // Ensure at least 1 target and at least 1 non-target
@@ -147,7 +148,7 @@ describe("Preservation — broadcastEvent targetUserIds (Requirement 3.6)", () =
           const targetUserIds = allUserIds.slice(0, targetCount);
           const nonTargets = allUserIds.slice(targetCount);
 
-          const broadcastEvent = makeBroadcastEvent(clients as any);
+          const broadcastEvent = makeBroadcastEvent(clients);
           broadcastEvent({ event: eventName, data: {}, targetUserIds });
 
           // Every target should have received exactly one message
@@ -189,12 +190,12 @@ describe("Preservation — broadcastEvent broadcasts to all (Requirement 3.7)", 
         fc.uniqueArray(fc.string({ minLength: 1, maxLength: 10 }), { minLength: 1, maxLength: 8 }),
         fc.string({ minLength: 1 }),
         (allUserIds, eventName) => {
-          const clients = new Map<string, { send: ReturnType<typeof vi.fn>; readyState: number }>();
+          const clients = new Map<string, { send: SendFn; readyState: number }>();
           for (const uid of allUserIds) {
-            clients.set(uid, { send: vi.fn(), readyState: WebSocket.OPEN });
+            clients.set(uid, { send: vi.fn() as unknown as SendFn, readyState: WebSocket.OPEN });
           }
 
-          const broadcastEvent = makeBroadcastEvent(clients as any);
+          const broadcastEvent = makeBroadcastEvent(clients);
           broadcastEvent({ event: eventName, data: {} });
 
           for (const uid of allUserIds) {

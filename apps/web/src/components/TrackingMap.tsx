@@ -6,12 +6,12 @@ import {
   MapControls, 
   MapMarker, 
   MarkerContent, 
-  MarkerPopup,
   MapRoute
 } from "@/components/ui/map";
-import { Clock, MapPin, Navigation, Route, Loader2, AlertCircle } from "lucide-react";
+import { Clock, MapPin, Navigation, Loader2, AlertCircle, Route } from "lucide-react";
 import type MapLibreGL from "maplibre-gl";
 import { useRealtimeEvents } from "@/hooks/use-realtime-events";
+import { useSession } from "@/lib/auth/session";
 
 interface TrackingMapProps {
   bookingId: string;
@@ -39,13 +39,23 @@ function formatDistance(meters: number): string {
   return `${(meters / 1000).toFixed(1)} km`;
 }
 
+type RealtimeLocationUpdate = {
+  bookingId?: string;
+  helperUserId?: string;
+  latitude?: number | string;
+  longitude?: number | string;
+};
+
 export function TrackingMap({ bookingId, customerLocation, helperId, status }: TrackingMapProps) {
+  const { session } = useSession();
+  const userId = session?.user?.id;
   const [helperLocation, setHelperLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [routeInfo, setRouteInfo] = useState<RouteData | null>(null);
   const [isRouteLoading, setIsRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const mapRef = useRef<MapLibreGL.Map | null>(null);
+  const routeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const addDebug = (msg: string) => {
     console.log(`[TrackingMap] ${msg}`);
@@ -54,26 +64,35 @@ export function TrackingMap({ bookingId, customerLocation, helperId, status }: T
 
   // 📡 Listen for live location updates from the helper
   const { eventMessages } = useRealtimeEvents({
+    userId,
     eventTypes: ["location_update", "helper_presence"],
   });
 
   useEffect(() => {
     if (!eventMessages.length) return;
-    for (const msg of eventMessages) {
-      if (msg.type === "event" && msg.event === "location_update") {
-        const d = msg.data as any;
-        if (d.bookingId === bookingId && d.latitude && d.longitude) {
-          const newLoc = { lat: parseFloat(d.latitude), lng: parseFloat(d.longitude) };
-          addDebug(`Location update: ${newLoc.lat.toFixed(4)}, ${newLoc.lng.toFixed(4)}`);
-          setHelperLocation(newLoc);
-        }
-      } else if (msg.type === "event" && msg.event === "helper_presence") {
-          const d = msg.data as any;
-          if (d.helperUserId === helperId && d.latitude && d.longitude) {
-              const newLoc = { lat: parseFloat(d.latitude), lng: parseFloat(d.longitude) };
-              addDebug(`Presence update: ${newLoc.lat.toFixed(4)}, ${newLoc.lng.toFixed(4)}`);
-              setHelperLocation(newLoc);
-          }
+    const msg = eventMessages[0];
+    if (msg.type === "event" && msg.event === "location_update") {
+      const d = msg.data as RealtimeLocationUpdate | undefined;
+      if (!d) return;
+      if (
+        d.bookingId === bookingId &&
+        (!helperId || d.helperUserId === helperId) &&
+        d.latitude != null &&
+        d.longitude != null
+      ) {
+        const newLoc = { lat: Number(d.latitude), lng: Number(d.longitude) };
+        if (Number.isNaN(newLoc.lat) || Number.isNaN(newLoc.lng)) return;
+        addDebug(`Location update: ${newLoc.lat.toFixed(4)}, ${newLoc.lng.toFixed(4)}`);
+        setHelperLocation(newLoc);
+      }
+    } else if (msg.type === "event" && msg.event === "helper_presence") {
+      const d = msg.data as RealtimeLocationUpdate | undefined;
+      if (!d) return;
+      if (d.helperUserId === helperId && d.latitude != null && d.longitude != null) {
+        const newLoc = { lat: Number(d.latitude), lng: Number(d.longitude) };
+        if (Number.isNaN(newLoc.lat) || Number.isNaN(newLoc.lng)) return;
+        addDebug(`Presence update: ${newLoc.lat.toFixed(4)}, ${newLoc.lng.toFixed(4)}`);
+        setHelperLocation(newLoc);
       }
     }
   }, [eventMessages, bookingId, helperId]);
@@ -86,8 +105,11 @@ export function TrackingMap({ bookingId, customerLocation, helperId, status }: T
       return;
     }
 
-    // Fetch route immediately on mount or when locations change
-    let abortController = new AbortController();
+    if (routeDebounceRef.current) {
+      clearTimeout(routeDebounceRef.current);
+    }
+
+    const abortController = new AbortController();
     setIsRouteLoading(true);
     setRouteError(null);
 
@@ -115,8 +137,8 @@ export function TrackingMap({ bookingId, customerLocation, helperId, status }: T
           addDebug(`Route error: ${errorMsg}`);
           setRouteError(errorMsg);
         }
-      } catch (err: any) {
-        if (err.name !== "AbortError") {
+      } catch (err) {
+        if (err instanceof Error && err.name !== "AbortError") {
           addDebug(`Fetch error: ${err.message}`);
           setRouteError(err.message || "Failed to fetch route");
         }
@@ -125,7 +147,9 @@ export function TrackingMap({ bookingId, customerLocation, helperId, status }: T
       }
     };
 
-    fetchRoute();
+    routeDebounceRef.current = setTimeout(() => {
+      void fetchRoute();
+    }, 700);
 
     // Optionally, refresh route every 30s (heartbeat) if job is in progress
     let interval: NodeJS.Timeout | undefined;
@@ -137,6 +161,10 @@ export function TrackingMap({ bookingId, customerLocation, helperId, status }: T
 
     return () => {
       abortController.abort();
+      if (routeDebounceRef.current) {
+        clearTimeout(routeDebounceRef.current);
+        routeDebounceRef.current = null;
+      }
       if (interval) clearInterval(interval);
     };
   }, [
@@ -172,7 +200,7 @@ export function TrackingMap({ bookingId, customerLocation, helperId, status }: T
   const toMapCoords = (loc: { lat: number; lng: number }): [number, number] => [loc.lng, loc.lat];
 
   return (
-    <div className="h-[300px] w-full bg-muted rounded-lg overflow-hidden border mt-2 relative">
+    <div className="h-75 w-full bg-muted rounded-lg overflow-hidden border mt-2 relative">
       <Map
         ref={mapRef}
         center={toMapCoords(customerLocation)}
@@ -203,12 +231,6 @@ export function TrackingMap({ bookingId, customerLocation, helperId, status }: T
               <MapPin className="size-4 text-white" />
             </div>
           </MarkerContent>
-          <MarkerPopup>
-            <p className="text-xs font-semibold">📍 You are here</p>
-            <p className="text-[10px] text-muted-foreground">
-              {customerLocation.lat.toFixed(4)}, {customerLocation.lng.toFixed(4)}
-            </p>
-          </MarkerPopup>
         </MapMarker>
 
         {/* 👤 Helper Location Marker - ALWAYS SHOW if available */}
@@ -223,19 +245,13 @@ export function TrackingMap({ bookingId, customerLocation, helperId, status }: T
                 <Navigation className="size-4 text-white fill-white" />
               </div>
             </MarkerContent>
-            <MarkerPopup>
-              <p className="text-xs font-semibold">🚗 Helper</p>
-              <p className="text-[10px] text-muted-foreground">
-                {helperLocation.lat.toFixed(4)}, {helperLocation.lng.toFixed(4)}
-              </p>
-            </MarkerPopup>
           </MapMarker>
         )}
       </Map>
 
       {/* Debug Panel (toggle with ?debug=true in URL if needed) */}
       {process.env.NODE_ENV === "development" && debugInfo.length > 0 && (
-        <div className="absolute bottom-2 right-2 max-w-[200px] bg-black/80 text-[10px] text-green-400 font-mono p-2 rounded border border-green-500/30 max-h-24 overflow-y-auto">
+        <div className="absolute bottom-2 right-2 max-w-50 bg-black/80 text-[10px] text-green-400 font-mono p-2 rounded border border-green-500/30 max-h-24 overflow-y-auto">
           {debugInfo.map((line, i) => <div key={i}>{line}</div>)}
         </div>
       )}

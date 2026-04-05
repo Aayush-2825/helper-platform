@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRealtimeEvents } from "@/hooks/use-realtime-events";
 import { useSession } from "@/lib/auth/session";
+import { openRazorpayCheckout } from "@/lib/payments/checkout";
 import { StatusBadge } from "@/components/StatusBadge";
+import { BookingStatusTimeline, type BookingTimelineEvent } from "@/components/BookingStatusTimeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -14,59 +16,258 @@ import {
   Clock, 
   IndianRupee, 
   User, 
+  Phone,
   ArrowLeft, 
   CheckCircle2, 
   XCircle,
-  Play
+  Play,
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+
+type BookingStatus =
+  | "requested"
+  | "matched"
+  | "accepted"
+  | "in_progress"
+  | "completed"
+  | "cancelled"
+  | "expired"
+  | "disputed";
+
+type BookingDetailsRecord = {
+  id: string;
+  status: BookingStatus;
+  requestedAt: string;
+  acceptedAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  category?: { name?: string | null } | null;
+  customer?: { name?: string | null } | null;
+  helper?: { name?: string | null } | null;
+  addressLine: string;
+  area?: string | null;
+  city: string;
+  state?: string | null;
+  postalCode?: string | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
+  quotedAmount: number;
+  scheduledFor?: string | null;
+  notes?: string | null;
+  startCode?: string | null;
+  completeCode?: string | null;
+  helperName?: string | null;
+  helperPhone?: string | null;
+  helperPhoneVisibleAt?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  preferredContactMethod?: "call" | "sms" | "whatsapp" | "in_app" | null;
+  canCustomerViewHelperPhone?: boolean;
+  statusEvents?: BookingTimelineEvent[];
+};
+
+type PaymentStatus = "created" | "authorized" | "captured" | "failed" | "refunded" | "partially_refunded";
+
+type PaymentTransaction = {
+  id: string;
+  bookingId: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  createdAt: string;
+  failureReason?: string | null;
+};
+
+type RealtimeBookingUpdate = {
+  bookingId?: string;
+  status?: string;
+};
 
 interface BookingDetailsProps {
   bookingId: string;
   role: "customer" | "helper";
 }
 
+function formatElapsed(value: Date | string) {
+  const start = typeof value === "string" ? new Date(value) : value;
+  const diffMs = Math.max(0, Date.now() - start.getTime());
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  return `${minutes}m`;
+}
+
 export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
-  const [booking, setBooking] = useState<any>(null);
+  const { session } = useSession();
+  const userId = session?.user?.id;
+  const [booking, setBooking] = useState<BookingDetailsRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpError, setOtpError] = useState<string | null>(null);
+  const [payment, setPayment] = useState<PaymentTransaction | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentActionLoading, setPaymentActionLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [, setElapsedNow] = useState(Date.now());
+  const lastProcessedEventKey = useRef<string | null>(null);
+  const disableAutoRefresh = useRef(false);
 
-  const fetchBooking = async () => {
+  const fetchBooking = useCallback(async () => {
     try {
       const res = await fetch(`/api/bookings/${bookingId}`);
+      if (res.status === 401) {
+        disableAutoRefresh.current = true;
+        setError("Session expired. Please sign in again.");
+        return;
+      }
       if (!res.ok) throw new Error("Failed to fetch booking");
-      const data = await res.json();
+      disableAutoRefresh.current = false;
+      const data = (await res.json()) as { booking: BookingDetailsRecord };
       setBooking(data.booking);
-    } catch (err: any) {
-      setError(err.message);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch booking");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchBooking();
   }, [bookingId]);
 
+  useEffect(() => {
+    void fetchBooking();
+  }, [fetchBooking]);
+
+  const fetchPayment = useCallback(async () => {
+    if (!booking || booking.status !== "completed") {
+      setPayment(null);
+      return;
+    }
+
+    setPaymentLoading(true);
+    try {
+      const res = await fetch(`/api/payments?bookingId=${bookingId}&limit=1`, { credentials: "include" });
+      if (!res.ok) {
+        setPayment(null);
+        return;
+      }
+      const data = (await res.json()) as { payments?: PaymentTransaction[] };
+      const latest = (data.payments ?? [])[0] ?? null;
+      setPayment(latest);
+    } finally {
+      setPaymentLoading(false);
+    }
+  }, [booking, bookingId]);
+
+  useEffect(() => {
+    void fetchPayment();
+  }, [fetchPayment]);
+
   const { eventMessages } = useRealtimeEvents({
-    eventTypes: ["booking_update", "location_update"],
+    userId,
+    eventTypes: ["booking_update", "location_update", "payment_update"],
   });
 
   useEffect(() => {
-    if (!eventMessages.length) return;
-    for (const msg of eventMessages) {
-      const data = msg.data as any;
-      if (msg.type === "event" && msg.event === "booking_update" && data?.bookingId === bookingId) {
-        fetchBooking(); // Refresh data on update
-      }
+    if (!eventMessages.length || disableAutoRefresh.current) {
+      return;
     }
-  }, [eventMessages, bookingId]);
+
+    const latest = eventMessages[0];
+    if (latest.type !== "event") {
+      return;
+    }
+
+    const data = latest.data as RealtimeBookingUpdate | undefined;
+    if (data?.bookingId !== bookingId) {
+      return;
+    }
+
+    const nextEventKey = `${latest.event}:${latest.occurredAt ?? "na"}:${data?.bookingId ?? "na"}:${data?.status ?? "na"}`;
+    if (lastProcessedEventKey.current === nextEventKey) {
+      return;
+    }
+    lastProcessedEventKey.current = nextEventKey;
+
+    if (latest.event === "booking_update") {
+      void fetchBooking();
+    }
+
+    if (latest.event === "payment_update") {
+      void fetchPayment();
+    }
+  }, [eventMessages, bookingId, fetchBooking, fetchPayment]);
+
+  const handleCustomerPayment = async () => {
+    if (!booking || booking.status !== "completed") {
+      return;
+    }
+
+    setPaymentError(null);
+    setPaymentActionLoading(true);
+
+    try {
+      const createRes = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ bookingId, method: "upi" }),
+      });
+
+      const createData = (await createRes.json().catch(() => ({}))) as {
+        message?: string;
+        razorpay?: { keyId: string; orderId: string; amount: number; currency: string };
+      };
+
+      if (!createRes.ok || !createData.razorpay) {
+        throw new Error(createData.message ?? "Failed to create payment order.");
+      }
+
+      const checkoutResult = await openRazorpayCheckout({
+        keyId: createData.razorpay.keyId,
+        orderId: createData.razorpay.orderId,
+        amount: createData.razorpay.amount,
+        currency: createData.razorpay.currency,
+        bookingId,
+        customerName: session?.user?.name,
+        customerEmail: session?.user?.email,
+      });
+
+      const verifyRes = await fetch("/api/payments/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          razorpayOrderId: checkoutResult.razorpay_order_id,
+          razorpayPaymentId: checkoutResult.razorpay_payment_id,
+          razorpaySignature: checkoutResult.razorpay_signature,
+        }),
+      });
+
+      const verifyData = (await verifyRes.json().catch(() => ({}))) as { message?: string };
+      if (!verifyRes.ok) {
+        throw new Error(verifyData.message ?? "Payment verification failed.");
+      }
+
+      await fetchPayment();
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : "Payment failed.");
+    } finally {
+      setPaymentActionLoading(false);
+    }
+  };
 
   const handleAction = async (action: "start" | "complete" | "cancel") => {
+    if (actionLoading) return;
+
     if ((action === "start" || action === "complete") && role === "helper") {
       if (!otp || otp.length < 4) {
         setOtpError(`Please enter the 4-digit OTP to ${action === "start" ? "start" : "complete"} the job.`);
@@ -74,10 +275,31 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
       }
       setOtpError(null);
     }
-    if (!confirm(`Are you sure you want to ${action} this booking?`)) return;
+    let cancellationReason: string | undefined;
+    if (action === "cancel" && role === "customer") {
+      const promptMessage = isSearching
+        ? "Optional reason for stopping helper search"
+        : "Reason for cancellation (optional)";
+      cancellationReason = window.prompt(promptMessage)?.trim() || undefined;
+    }
+    if (action === "cancel" && role === "customer") {
+      const confirmationMessage = isSearching
+        ? "Stop searching for helpers for this booking?"
+        : "Are you sure you want to cancel this booking?";
+
+      if (!confirm(confirmationMessage)) return;
+    } else if (!confirm(`Are you sure you want to ${action} this booking?`)) {
+      return;
+    }
     setActionLoading(true);
     try {
-      const body = (action === "start" || action === "complete") && role === "helper" ? JSON.stringify({ otp }) : undefined;
+      let body: string | undefined;
+      if ((action === "start" || action === "complete") && role === "helper") {
+        body = JSON.stringify({ otp });
+      }
+      if (action === "cancel" && role === "customer") {
+        body = JSON.stringify({ reason: cancellationReason });
+      }
       const res = await fetch(`/api/bookings/${bookingId}/${action}`, {
         method: "POST",
         headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -89,21 +311,43 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
       }
       setOtp("");
       await fetchBooking();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : `Failed to ${action} booking`);
     } finally {
       setActionLoading(false);
     }
   };
+
+  const bookingIsInProgress = booking?.status === "in_progress";
+  const bookingStartedAt = booking?.startedAt;
+
+  useEffect(() => {
+    if (!(bookingIsInProgress && bookingStartedAt)) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setElapsedNow(Date.now());
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [bookingIsInProgress, bookingStartedAt]);
 
   if (loading) return <div className="flex items-center justify-center p-20"><Loader2 className="animate-spin text-primary" /></div>;
   if (error || !booking) return <div className="p-8 text-center text-destructive">{error || "Booking not found"}</div>;
 
   const isAccepted = booking.status === "accepted";
   const isInProgress = booking.status === "in_progress";
-  const isRequested = booking.status === "requested";
+  const isSearching = booking.status === "requested" || booking.status === "matched";
+  const showCustomerLiveGuide = role === "customer" && (isAccepted || isInProgress);
+  const inProgressElapsed = isInProgress && booking.startedAt ? formatElapsed(booking.startedAt) : null;
+  const hasMapCoordinates = booking.latitude != null && booking.longitude != null;
+  const mapDestination = hasMapCoordinates
+    ? `${encodeURIComponent(String(booking.latitude))},${encodeURIComponent(String(booking.longitude))}`
+    : null;
+  const canCustomerPay = role === "customer" && booking.status === "completed" && payment?.status !== "captured";
+  const paymentStatusLabel = payment ? payment.status.replaceAll("_", " ") : "pending";
 
-  const showMap = isAccepted || isInProgress;
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-24 mt-4 px-4 sm:px-0">
       {isAccepted && role === "customer" && booking.startCode && (
@@ -125,9 +369,39 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
       {isInProgress && (
         <div className="flex items-center gap-3 p-4 mb-2 rounded-lg bg-green-50 border border-green-200 shadow-sm animate-pulse">
           <Play className="size-5 text-green-600" />
-          <span className="font-semibold text-green-700 text-base">Job in Progress</span>
+          <span className="font-semibold text-green-700 text-base">
+            Job in Progress{inProgressElapsed ? ` • ${inProgressElapsed}` : ""}
+          </span>
         </div>
       )}
+
+      {showCustomerLiveGuide && (
+        <Card className="border-blue-200 bg-blue-50/70 shadow-sm dark:border-blue-900/50 dark:bg-blue-950/20">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-sm font-semibold text-blue-900 dark:text-blue-200">
+              {isInProgress ? "Live Job Guidance" : "Before The Job Starts"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 p-4 pt-0 text-sm text-blue-900/90 dark:text-blue-200/90">
+            {isAccepted && (
+              <>
+                <p>1. The helper is on the way. Keep your phone reachable.</p>
+                <p>2. Share the start OTP only after the helper arrives at your location.</p>
+                <p>3. Once started, you will receive a completion OTP for job closure.</p>
+              </>
+            )}
+            {isInProgress && (
+              <>
+                <p>1. Service is currently running.</p>
+                {inProgressElapsed && <p>2. Elapsed time: {inProgressElapsed}.</p>}
+                <p>3. Share the completion OTP only when all work is finished.</p>
+                <p>4. Use cancellation only for genuine issues, or raise support if needed.</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-center gap-4">
         <Link href={role === "customer" ? "/customer/bookings" : "/helper/job-history"}>
           <Button variant="ghost" size="icon" className="rounded-full">
@@ -144,7 +418,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
       </div>
 
       {/* Navigation Button instead of Tracking Map */}
-      {(isAccepted || isInProgress) && (
+      {(isAccepted || isInProgress) && mapDestination && (
         <Card className="overflow-hidden shadow-md border-primary/20 bg-card">
           <CardHeader className="p-4 border-b bg-muted/30">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -154,7 +428,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center gap-4 py-8">
             <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(booking.latitude)},${encodeURIComponent(booking.longitude)}`}
+              href={`https://www.google.com/maps/dir/?api=1&destination=${mapDestination}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{ textDecoration: "none" }}
@@ -180,7 +454,13 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
               <MapPin className="size-4 text-primary mt-1 shrink-0" />
               <div>
                 <p className="text-sm font-medium">Pickup/Service Address</p>
-                <p className="text-sm text-muted-foreground leading-relaxed">{booking.addressLine}, {booking.city}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {booking.addressLine}
+                  {booking.area ? `, ${booking.area}` : ""}
+                  {booking.city ? `, ${booking.city}` : ""}
+                  {booking.state ? `, ${booking.state}` : ""}
+                  {booking.postalCode ? ` - ${booking.postalCode}` : ""}
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -197,8 +477,85 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
                 <p className="text-lg font-bold">₹{booking.quotedAmount.toLocaleString("en-IN")}</p>
               </div>
             </div>
+            {booking.scheduledFor && (
+              <div className="flex items-start gap-3">
+                <Clock className="size-4 text-primary mt-1 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">Scheduled For</p>
+                  <p className="text-sm text-muted-foreground">{new Date(booking.scheduledFor).toLocaleString("en-IN")}</p>
+                </div>
+              </div>
+            )}
+            {booking.notes && (
+              <div className="rounded-lg border p-3 bg-muted/20">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Task Notes</p>
+                <p className="text-sm mt-1 leading-relaxed">{booking.notes}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {booking.status === "completed" && (
+          <Card className="shadow-sm md:col-span-2">
+            <CardHeader className="p-4 border-b">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Payment</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3">
+              {paymentError && (
+                <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive flex items-center gap-2">
+                  <AlertCircle className="size-4" />
+                  {paymentError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Amount</p>
+                  <p className="text-2xl font-semibold">₹{(payment?.amount ?? booking.quotedAmount).toLocaleString("en-IN")}</p>
+                </div>
+                <Badge className={
+                  payment?.status === "captured"
+                    ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400"
+                    : "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300"
+                }>
+                  {paymentLoading ? "checking" : paymentStatusLabel}
+                </Badge>
+              </div>
+
+              {payment?.status === "failed" && payment.failureReason && (
+                <p className="text-xs text-destructive">Last payment attempt failed: {payment.failureReason}</p>
+              )}
+
+              {canCustomerPay && (
+                <Button
+                  className="w-full sm:w-auto"
+                  disabled={paymentActionLoading}
+                  onClick={() => void handleCustomerPayment()}
+                >
+                  {paymentActionLoading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin mr-2" /> Processing
+                    </>
+                  ) : (
+                    "Pay now"
+                  )}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="md:col-span-2">
+          <BookingStatusTimeline
+            status={booking.status}
+            requestedAt={booking.requestedAt}
+            acceptedAt={booking.acceptedAt}
+            startedAt={booking.startedAt}
+            completedAt={booking.completedAt}
+            cancelledAt={booking.cancelledAt}
+            events={booking.statusEvents}
+          />
+        </div>
 
         <Card className="shadow-sm">
           <CardHeader className="p-4 border-b">
@@ -209,13 +566,29 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
           <CardContent className="p-4">
             {role === "customer" ? (
               booking.helper ? (
-                <div className="flex items-center gap-4">
-                  <div className="size-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-                    <User className="size-6 text-primary" />
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4">
+                    <div className="size-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                      <User className="size-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">{booking.helperName || booking.helper.name}</p>
+                      <p className="text-xs text-muted-foreground">Verified Professional</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold">{booking.helper.name}</p>
-                    <p className="text-xs text-muted-foreground">Verified Professional</p>
+
+                  <div className="rounded-lg border p-3 bg-muted/20">
+                    <div className="flex items-center gap-2">
+                      <Phone className="size-4 text-muted-foreground" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Helper Contact</p>
+                    </div>
+                    {booking.helperPhone ? (
+                      <p className="text-sm font-semibold mt-1">{booking.helperPhone}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Helper phone becomes visible once the professional starts the job.
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -225,13 +598,23 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
                 </div>
               )
             ) : (
-              <div className="flex items-center gap-4">
-                <div className="size-12 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center">
-                  <User className="size-6 text-green-600" />
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <div className="size-12 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center">
+                    <User className="size-6 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">{booking.customerName || booking.customer?.name || "Customer"}</p>
+                    <p className="text-xs text-muted-foreground">Customer</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-bold">{booking.customer.name}</p>
-                  <p className="text-xs text-muted-foreground">Customer</p>
+
+                <div className="rounded-lg border p-3 bg-muted/20 space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contact Preferences</p>
+                  <p className="text-sm font-medium">Phone: {booking.customerPhone || "Not provided"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Preferred method: {(booking.preferredContactMethod || "call").replace("_", " ")}
+                  </p>
                 </div>
               </div>
             )}
@@ -281,7 +664,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
             </div>
           )}
 
-          {role === "customer" && (isRequested || isAccepted) && (
+          {role === "customer" && (isSearching || isAccepted) && (
             <Button 
                 variant="outline" 
                 className="flex-1 gap-2 h-12 text-base text-destructive border-destructive hover:bg-destructive/5" 
@@ -289,7 +672,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
                 disabled={actionLoading}
                 onClick={() => handleAction("cancel")}
             >
-              <XCircle className="size-5" /> Cancel Booking
+              <XCircle className="size-5" /> {isSearching ? "Stop Search" : "Cancel Booking"}
             </Button>
           )}
           

@@ -14,7 +14,7 @@ const categoryLabels: Record<string, string> = {
   other: "Other",
 };
 
-type BookingStatus = "requested" | "accepted" | "in_progress" | "completed" | "cancelled";
+type BookingStatus = "requested" | "matched" | "accepted" | "in_progress" | "completed" | "cancelled" | "expired";
 
 export type Booking = {
   id: string;
@@ -40,8 +40,23 @@ function formatDateTime(value: Date | string): string {
   });
 }
 
+function formatElapsed(value: Date | string): string {
+  const start = typeof value === "string" ? new Date(value) : value;
+  const diffMs = Math.max(0, Date.now() - start.getTime());
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  return `${minutes}m`;
+}
+
 export function BookingCard({ booking }: { booking: Booking }) {
   const status = booking.status as BookingStatus;
+  const isInProgress = status === "in_progress";
   const showAcceptedAt =
     status === "accepted" || status === "in_progress" || status === "completed";
   const showStartedAt = status === "in_progress" || status === "completed";
@@ -64,6 +79,15 @@ export function BookingCard({ booking }: { booking: Booking }) {
 
           <div className="text-sm font-medium">₹{booking.quotedAmount.toLocaleString("en-IN")}</div>
 
+          {isInProgress && (
+            <div className="rounded-lg border border-green-300/60 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300">
+              <p className="font-semibold">Service in progress right now.</p>
+              <p className="mt-0.5 opacity-90">
+                Keep this booking open. Share the completion OTP only when the helper finishes.
+              </p>
+            </div>
+          )}
+
           <div className="text-xs text-muted-foreground">
             Requested: {formatDateTime(booking.requestedAt)}
           </div>
@@ -77,6 +101,12 @@ export function BookingCard({ booking }: { booking: Booking }) {
           {showStartedAt && booking.startedAt && (
             <div className="text-xs text-muted-foreground">
               Started: {formatDateTime(booking.startedAt)}
+            </div>
+          )}
+
+          {isInProgress && booking.startedAt && (
+            <div className="text-xs font-semibold text-green-700 dark:text-green-300">
+              Elapsed: {formatElapsed(booking.startedAt)}
             </div>
           )}
 

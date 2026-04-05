@@ -18,12 +18,6 @@ import {
   serviceSubcategory,
 } from "./schema";
 
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-function id() {
-  return crypto.randomUUID();
-}
-
 function daysAgo(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);

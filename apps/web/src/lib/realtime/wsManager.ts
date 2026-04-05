@@ -1,11 +1,15 @@
 // Singleton send reference — set by useWebSocket on mount
-let _send: ((msg: object) => void) | null = null;
+let _send: ((msg: object) => boolean) | null = null;
 const _queue: object[] = [];
 
-export function registerWsSend(fn: (msg: object) => void) {
+export function registerWsSend(fn: (msg: object) => boolean) {
   _send = fn;
-  while (_queue.length > 0) {
-    _send(_queue.shift()!);
+  const pending = _queue.splice(0, _queue.length);
+  for (const msg of pending) {
+    const delivered = _send(msg);
+    if (!delivered) {
+      _queue.push(msg);
+    }
   }
 }
 
@@ -14,5 +18,8 @@ export function wsSend(msg: object) {
     _queue.push(msg);
     return;
   }
-  _send(msg);
+  const delivered = _send(msg);
+  if (!delivered) {
+    _queue.push(msg);
+  }
 }

@@ -1,7 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
+
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Star, ShieldCheck, Clock, CheckCircle2, MapPin, BriefcaseBusiness, AlertCircle } from "lucide-react";
+import { ArrowLeft, Star, ShieldCheck, Clock, CheckCircle2, BriefcaseBusiness } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -126,7 +128,7 @@ export default function HelperProfilePage({ params }: { params: { id: string } }
                             <Star key={i} className={`size-3.5 ${i < r.rating ? "fill-amber-500 text-amber-500" : "fill-muted text-muted"}`} />
                          ))}
                       </div>
-                      <p className="text-sm text-foreground/80 leading-relaxed font-medium">"{r.text}"</p>
+                      <p className="text-sm text-foreground/80 leading-relaxed font-medium">&ldquo;{r.text}&rdquo;</p>
                    </CardContent>
                 </Card>
              ))}

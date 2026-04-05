@@ -1,16 +1,21 @@
 import { headers } from "next/headers";
-import { eq, and } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { booking } from "@/db/schema";
+import { booking, bookingStatusEvent } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
-import { NO_STORE_HEADERS } from "@/lib/http/cache";
+import {
+  isCustomerCancellableBookingStatus,
+  isTerminalBookingStatus,
+} from "@/lib/bookings/lifecycle";
+import { apiError, apiSuccess, getRequestId, logApiError } from "@/lib/http/responses";
 import { publishBookingEvent } from "@/lib/realtime/client";
 
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const requestId = getRequestId(request.headers);
+
   try {
     const { id: bookingId } = await context.params;
     const body = await request.json().catch(() => ({}));
@@ -21,10 +26,12 @@ export async function POST(
     });
 
     if (!session?.user) {
-      return NextResponse.json(
-        { message: "Unauthorized" },
-        { status: 401, headers: NO_STORE_HEADERS },
-      );
+      return apiError({
+        requestId,
+        message: "Unauthorized",
+        code: "AUTH_UNAUTHORIZED",
+        status: 401,
+      });
     }
 
     const existingBooking = await db.query.booking.findFirst({
@@ -33,25 +40,40 @@ export async function POST(
     });
 
     if (!existingBooking) {
-      return NextResponse.json(
-        { message: "Booking not found." },
-        { status: 404, headers: NO_STORE_HEADERS },
-      );
+      return apiError({
+        requestId,
+        message: "Booking not found.",
+        code: "BOOKING_NOT_FOUND",
+        status: 404,
+      });
     }
 
     // Security: Only customer can cancel their own 'requested' or 'accepted' booking
     if (existingBooking.customerId !== session.user.id) {
-       return NextResponse.json(
-        { message: "You are not authorized to cancel this booking." },
-        { status: 403, headers: NO_STORE_HEADERS },
-      );
+       return apiError({
+        requestId,
+        message: "You are not authorized to cancel this booking.",
+        code: "BOOKING_CANCEL_FORBIDDEN",
+        status: 403,
+      });
     }
 
-    if (existingBooking.status === "completed" || existingBooking.status === "cancelled" || existingBooking.status === "expired") {
-       return NextResponse.json(
-        { message: `Cannot cancel a booking that is already ${existingBooking.status}.` },
-        { status: 400, headers: NO_STORE_HEADERS },
-      );
+    if (isTerminalBookingStatus(existingBooking.status)) {
+       return apiError({
+        requestId,
+        message: `Cannot cancel a booking that is already ${existingBooking.status}.`,
+        code: "BOOKING_ALREADY_TERMINAL",
+        status: 400,
+      });
+    }
+
+    if (!isCustomerCancellableBookingStatus(existingBooking.status)) {
+      return apiError({
+        requestId,
+        message: `Cancellation is not allowed once a booking is ${existingBooking.status}.`,
+        code: "BOOKING_CANCEL_WINDOW_CLOSED",
+        status: 409,
+      });
     }
 
     const now = new Date();
@@ -67,8 +89,20 @@ export async function POST(
       .where(eq(booking.id, bookingId))
       .returning();
 
+    await db.insert(bookingStatusEvent).values({
+      id: crypto.randomUUID(),
+      bookingId,
+      status: "cancelled",
+      actorUserId: session.user.id,
+      note: "Customer cancelled booking",
+      metadata: {
+        cancelledBy: "customer",
+        reason,
+      },
+    });
+
     // Notify realtime
-    publishBookingEvent({
+    await publishBookingEvent({
       bookingId,
       customerId: session.user.id,
       helperId: existingBooking.helperId ?? undefined,
@@ -79,18 +113,20 @@ export async function POST(
       },
     });
 
-    return NextResponse.json(
+    return apiSuccess(
       {
         message: "Booking cancelled successfully.",
         booking: updatedBooking,
       },
-      { status: 200, headers: NO_STORE_HEADERS },
+      { requestId, status: 200 },
     );
   } catch (err) {
-    console.error("Cancel booking error:", err);
-    return NextResponse.json(
-      { message: "Internal server error" },
-      { status: 500, headers: NO_STORE_HEADERS },
-    );
+    logApiError("Cancel booking error", err, { requestId });
+    return apiError({
+      requestId,
+      message: "Internal server error",
+      code: "INTERNAL_SERVER_ERROR",
+      status: 500,
+    });
   }
 }

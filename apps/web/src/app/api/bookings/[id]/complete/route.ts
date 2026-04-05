@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { booking, helperProfile } from "@/db/schema";
+import { booking, bookingStatusEvent, helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { publishBookingEvent } from "@/lib/realtime/client";
@@ -98,7 +98,18 @@ export async function POST(
       );
     }
 
-    publishBookingEvent({
+    await db.insert(bookingStatusEvent).values({
+      id: crypto.randomUUID(),
+      bookingId,
+      status: "completed",
+      actorUserId: session.user.id,
+      note: "Helper completed booking",
+      metadata: {
+        completedAt: updatedRows[0].completedAt?.toISOString(),
+      },
+    });
+
+    await publishBookingEvent({
       bookingId,
       customerId: existingBooking.customerId,
       helperId: session.user.id,
