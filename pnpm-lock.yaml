@@ -120,6 +120,9 @@ importers:
       '@repo/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@tailwindcss/postcss':
+        specifier: ^4
+        version: 4.2.2
       '@tanstack/react-query':
         specifier: ^5.96.2
         version: 5.96.2(react@19.2.3)
@@ -190,9 +193,6 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
-      '@tailwindcss/postcss':
-        specifier: ^4
-        version: 4.2.2
       '@types/node':
         specifier: ^20
         version: 20.19.37
