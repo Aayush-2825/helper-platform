@@ -7,7 +7,7 @@ import cors from "cors";
 import { routeMessage } from "./handlers/index.js";
 import { webDb } from "./db/index.js";
 import { booking } from "./db/schema.js";
-import { and, eq, lt } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import { env } from "./config/env.js";
 import { ValidationError } from "./utils/validation.js";
 import {
@@ -19,6 +19,29 @@ const PORT = env.PORT;
 
 const app = express();
 
+const healthCheck = async (_req: express.Request, res: express.Response) => {
+  try {
+    await webDb.execute(sql`SELECT 1`);
+
+    return res.status(200).json({
+      status: "ok",
+      service: "realtime",
+      database: "up",
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.round(process.uptime()),
+    });
+  } catch (error) {
+    console.error("[Health] Realtime health check failed:", error);
+
+    return res.status(503).json({
+      status: "degraded",
+      service: "realtime",
+      database: "down",
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 app.use(
   cors({
     origin: env.CORS_ORIGIN,
@@ -28,6 +51,8 @@ app.use(
 );
 
 app.use(express.json());
+app.get("/health", healthCheck);
+app.get("/api/realtime/health", healthCheck);
 app.use("/api/helpers", router);
 app.use("/api/realtime", realtimeRouter);
 

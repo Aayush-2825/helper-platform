@@ -10,6 +10,7 @@ pnpm dev
 
 The service listens on `http://localhost:3001` by default.
 
+- Health check: `GET /health` or `GET /api/realtime/health`
 - WebSocket endpoint (recommended): `ws://localhost:3001/api/realtime/ws?userId=<user-id>`
 - Broadcast endpoint: `POST /api/realtime/broadcast`
 - Nearby helper HTTP endpoint: `GET /api/helpers/nearby`
