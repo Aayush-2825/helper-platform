@@ -12,7 +12,7 @@ if (!databaseUrl) {
 }
 
 export default defineConfig({
-  schema: "./src/schema/realtime.ts",
+  schema: ["./src/schema/enums.ts", "./src/schema/realtime.ts"],
   out: "./drizzle/realtime",
   dialect: "postgresql",
   dbCredentials: {

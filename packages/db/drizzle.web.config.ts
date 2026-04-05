@@ -12,7 +12,7 @@ if (!databaseUrl) {
 }
 
 export default defineConfig({
-  schema: "./src/schema/web.ts",
+  schema: ["./src/schema/enums.ts", "./src/schema/web.ts"],
   out: "./drizzle/web",
   dialect: "postgresql",
   dbCredentials: {
