@@ -6,6 +6,7 @@ import {
   BookUser,
   BriefcaseBusiness,
   HandCoins,
+  Wallet,
   Scale,
 } from "lucide-react";
 import { Button, } from "@/components/ui/button";
@@ -47,6 +48,12 @@ const adminActions = [
     description: "Resolve user-helper conflicts and escalations.",
     href: "/admin/disputes",
     icon: Scale,
+  },
+  {
+    title: "Payouts",
+    description: "Track helper withdrawals, settlements, and failures.",
+    href: "/admin/payouts",
+    icon: Wallet,
   },
   {
     title: "Analytics",

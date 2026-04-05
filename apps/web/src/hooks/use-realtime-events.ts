@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  getRealtimeWsUrl,
   type RealtimeOpEventType,
 } from "@/lib/realtime/client";
+import { useWebSocket } from "./useWebsocket";
 
 type SocketConnectedMessage = {
   type: "connected";
@@ -45,57 +45,38 @@ function createConnectionId() {
 export function useRealtimeEvents(options?: Options) {
   const maxEvents = options?.maxEvents ?? 100;
   const userId = options?.userId;
-  const userRole = options?.userRole;
   const eventTypes = options?.eventTypes;
   const [connectionId] = useState(() => createConnectionId());
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<RealtimeMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const socketRef = useRef<WebSocket | null>(null);
 
-  useEffect(() => {
-    const wsUrl = new URL(getRealtimeWsUrl());
-    wsUrl.searchParams.set("connectionId", connectionId);
-    if (userId) {
-      wsUrl.searchParams.set("userId", userId);
-    }
-    if (userRole) {
-      wsUrl.searchParams.set("userRole", userRole);
-    }
+  useWebSocket(
+    userId ?? "unknown",
+    (parsed) => {
+      setMessages((previous) => {
+        const next = [parsed as RealtimeMessage, ...previous];
+        return next.slice(0, maxEvents);
+      });
 
-    const socket = new WebSocket(wsUrl.toString());
-    socketRef.current = socket;
-
-    socket.onopen = () => {
-      setConnected(true);
-      setError(null);
-    };
-
-    socket.onclose = () => {
-      setConnected(false);
-    };
-
-    socket.onerror = () => {
-      setError("WebSocket connection failed");
-    };
-
-    socket.onmessage = (event: MessageEvent<string>) => {
-      try {
-        const parsed = JSON.parse(event.data) as RealtimeMessage;
-        setMessages((previous) => {
-          const next = [parsed, ...previous];
-          return next.slice(0, maxEvents);
-        });
-      } catch {
-        // Ignore non-JSON websocket payloads.
+      if (parsed.type === "connected") {
+        setConnected(true);
+        setError(null);
       }
-    };
-
-    return () => {
-      socket.close();
-      socketRef.current = null;
-    };
-  }, [connectionId, maxEvents, userId, userRole]);
+    },
+    {
+      onOpen: () => {
+        setConnected(true);
+        setError(null);
+      },
+      onClose: () => {
+        setConnected(false);
+      },
+      onError: () => {
+        setError("WebSocket connection failed");
+      },
+    },
+  );
 
   const eventMessages = useMemo(
     () =>

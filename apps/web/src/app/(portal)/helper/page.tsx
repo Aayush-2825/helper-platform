@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   ArrowRight, CalendarRange, Coins, RadioTower, ShieldCheck,
-  Clock, CheckCircle2, TrendingUp, Wifi,
+  Clock, TrendingUp, Wifi,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useSession } from "@/lib/auth/session";
 import { COMMISSION_RATE } from "@/lib/constants";
@@ -20,6 +20,12 @@ type Booking = {
   quotedAmount: number;
   finalAmount?: number | null;
   categoryId: string;
+};
+
+type HelperProfileSummary = {
+  availabilityStatus?: string;
+  averageRating?: string | number | null;
+  totalRatings?: number;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -65,6 +71,7 @@ export default function HelperHomePage() {
   const { session } = useSession();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isOnline, setIsOnline] = useState(false);
+  const [helperProfile, setHelperProfile] = useState<HelperProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -74,6 +81,7 @@ export default function HelperHomePage() {
       fetch("/api/helper/profile", { credentials: "include" }).then(r => r.json())
     ]).then(([bookingData, profileData]) => {
       setBookings(bookingData.bookings ?? []);
+      setHelperProfile(profileData.profile ?? null);
       setIsOnline(profileData.profile?.availabilityStatus === "online");
     }).catch(() => {})
     .finally(() => setLoading(false));
@@ -82,7 +90,21 @@ export default function HelperHomePage() {
   const activeJobs = bookings.filter((b) => b.status === "accepted" || b.status === "in_progress");
   const completedJobs = bookings.filter((b) => b.status === "completed");
   const totalNet = completedJobs.reduce((sum, b) => sum + Math.round((b.finalAmount ?? b.quotedAmount) * (1 - COMMISSION_RATE)), 0);
+  const averageRating = Number(helperProfile?.averageRating ?? 0);
+  const totalRatings = helperProfile?.totalRatings ?? 0;
+  const ratingLabel = totalRatings > 0 ? `${averageRating.toFixed(1)} ★` : "No ratings yet";
   const userName = session?.user?.name?.split(" ")[0] || "Partner";
+  const hasActiveJobs = activeJobs.length > 0;
+  const nextStepHref = hasActiveJobs
+    ? "/helper/active"
+    : isOnline
+      ? "/helper/incoming-jobs"
+      : "/helper/availability";
+  const nextStepLabel = hasActiveJobs
+    ? "Resume active job"
+    : isOnline
+      ? "Review incoming jobs"
+      : "Set availability online";
 
   const toggleAvailability = async () => {
     const newStatus = isOnline ? "offline" : "online";
@@ -113,10 +135,11 @@ export default function HelperHomePage() {
           </p>
         </div>
         
-        <div className="flex items-center gap-4 bg-card/40 border border-border/50 p-2 rounded-[2rem] shadow-xl backdrop-blur-xl">
+        <div className="flex items-center gap-4 bg-card/40 border border-border/50 p-2 rounded-3xl shadow-xl backdrop-blur-xl">
            <span className="text-sm font-bold ml-4 mr-2">{isOnline ? "Go Offline" : "Go Online"}</span>
            <Button 
              onClick={toggleAvailability}
+             disabled={loading}
              className={cn(
                "size-14 rounded-full shadow-2xl transition-all duration-500 flex items-center justify-center p-0",
                isOnline ? "bg-green-500 hover:bg-green-600 scale-110" : "bg-muted-foreground/20 hover:bg-muted-foreground/30"
@@ -133,7 +156,7 @@ export default function HelperHomePage() {
           <div className="absolute -right-4 -top-4 size-32 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all" />
           <CardHeader>
             <CardTitle className="flex items-center gap-3 text-lg font-bold text-muted-foreground">
-              <TrendingUp className="size-5 text-primary" /> Today's Earning
+              <TrendingUp className="size-5 text-primary" /> Today&apos;s Earning
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -156,14 +179,40 @@ export default function HelperHomePage() {
               </div>
               <div className="bg-muted/30 p-4 rounded-2xl space-y-1">
                  <p className="text-xs text-muted-foreground font-bold uppercase">Rating</p>
-                 <p className="text-2xl font-black">4.9 ★</p>
+                  <p className="text-2xl font-black">{ratingLabel}</p>
+                  <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{totalRatings} reviews</p>
               </div>
            </CardContent>
         </Card>
       </section>
 
-      {/* Active Jobs Section */}
       <section className="reveal-up delay-2">
+        <Card className="surface-card-strong border-none p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="space-y-2">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Operational Flow</p>
+              <h2 className="text-2xl font-heading font-black">Your Next Step</h2>
+              <p className="text-sm text-muted-foreground">
+                {hasActiveJobs
+                  ? "You have an active assignment. Continue from one place with OTP and status controls."
+                  : isOnline
+                    ? "You are online. Check and accept matching requests quickly to maximize conversion."
+                    : "Go online first so new bookings can reach you in real-time."}
+              </p>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{isOnline ? "Online" : "Offline"}</Badge>
+                <Badge variant="outline">{activeJobs.length} active</Badge>
+              </div>
+            </div>
+            <Link href={nextStepHref} className={buttonVariants({ variant: "default", className: "rounded-2xl px-6" })}>
+              {nextStepLabel}
+            </Link>
+          </div>
+        </Card>
+      </section>
+
+      {/* Active Jobs Section */}
+      <section className="reveal-up delay-3">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-heading font-bold">Ongoing Tasks</h2>
           <Link href="/helper/job-history" className="text-primary text-sm font-semibold hover:underline">
@@ -174,8 +223,8 @@ export default function HelperHomePage() {
         {activeJobs.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2">
             {activeJobs.map((b) => (
-              <Card key={b.id} className="surface-card border-none p-1 transition-all hover:translate-y-[-4px] active:scale-95 group">
-                <Link href="/helper/incoming-jobs" className="p-5 flex flex-col gap-4">
+              <Card key={b.id} className="surface-card border-none p-1 transition-all hover:-translate-y-1 active:scale-95 group">
+                <Link href={`/helper/bookings/${b.id}`} className="p-5 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <Badge className="bg-primary/10 text-primary border-none rounded-lg px-2 py-1 font-bold text-[10px]">
                       {CATEGORY_LABELS[b.categoryId] || b.categoryId}
@@ -194,7 +243,7 @@ export default function HelperHomePage() {
             ))}
           </div>
         ) : (
-          <div className="bg-muted/20 border border-dashed border-border/50 rounded-[2rem] p-12 text-center space-y-4">
+          <div className="bg-muted/20 border border-dashed border-border/50 rounded-3xl p-12 text-center space-y-4">
              <div className="size-16 rounded-full bg-muted/40 flex items-center justify-center mx-auto">
                 <Clock className="size-8 text-muted-foreground" />
              </div>
@@ -207,7 +256,7 @@ export default function HelperHomePage() {
       </section>
 
       {/* Helper Quick Links */}
-      <section className="grid sm:grid-cols-3 gap-6 reveal-up delay-3">
+      <section className="grid sm:grid-cols-3 gap-6 reveal-up delay-4">
         {helperActions.filter(a => a.href !== "/helper/availability").map((action) => (
           <Link 
             key={action.href} 

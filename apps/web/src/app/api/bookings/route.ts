@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { db } from "@/db";
-import { booking } from "@/db/schema";
+import { booking, user } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
 import { startMatching } from "@/services/matching/matching";
 import { headers } from "next/headers";
+import { randomInt } from "node:crypto";
 
 function emptyToNull(value?: string | null) {
   return value && value.trim() !== "" ? value : null;
@@ -28,10 +29,20 @@ const createBookingSchema = z.object({
 
   notes: z.string().optional(),
 
-  quotedAmount: z.number().int().positive(),
+  quotedAmount: z.number().int().positive().max(1_000_000),
   finalAmount: z.number().int().optional(),
+  customerPhone: z
+    .string()
+    .regex(/^\+?[0-9]{10,15}$/)
+    .optional(),
+  preferredContactMethod: z
+    .enum(["call", "sms", "whatsapp", "in_app"])
+    .default("call"),
 
-  scheduledFor: z.string().datetime().optional(),
+  scheduledFor: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().trim().min(1).optional(),
+  ),
 });
 
 export async function POST(request: NextRequest) {
@@ -59,9 +70,25 @@ export async function POST(request: NextRequest) {
 
     const data = parsed.data;
 
-    // Generate 4-digit OTPs
-    const startCode = Math.floor(1000 + Math.random() * 9000).toString();
-    const completeCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const scheduledFor = data.scheduledFor ? new Date(data.scheduledFor) : null;
+
+    if (scheduledFor && Number.isNaN(scheduledFor.getTime())) {
+      return NextResponse.json(
+        { message: "Invalid scheduledFor value." },
+        { status: 400, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    // Generate 4-digit OTPs with cryptographically secure randomness.
+    const startCode = randomInt(1000, 10000).toString();
+    const completeCode = randomInt(1000, 10000).toString();
+
+    const customerRecord = await db.query.user.findFirst({
+      where: eq(user.id, session.user.id),
+      columns: {
+        phone: true,
+      },
+    });
 
     // ✅ Insert booking
     const [newBooking] = await db
@@ -71,6 +98,9 @@ export async function POST(request: NextRequest) {
 
         customerId: session.user.id,
         categoryId: data.categoryID,
+        customerName: emptyToNull(session.user.name),
+        customerPhone: emptyToNull(data.customerPhone ?? customerRecord?.phone),
+        preferredContactMethod: data.preferredContactMethod,
 
         subcategoryId: emptyToNull(data.subcategoryID),
 
@@ -92,6 +122,7 @@ export async function POST(request: NextRequest) {
         finalAmount: data.finalAmount ?? null,
 
         currency: "INR",
+        scheduledFor,
 
         startCode,
         completeCode,
@@ -113,13 +144,13 @@ export async function POST(request: NextRequest) {
     console.error("Booking Error:", error);
 
     return NextResponse.json(
-      { message: "Internal server error", error: (error as Error).message },
+      { message: "Internal server error" },
       { status: 500, headers: NO_STORE_HEADERS },
     );
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
@@ -129,12 +160,18 @@ export async function GET() {
       );
     }
 
+    const searchParams = request.nextUrl.searchParams;
+    const limit = Math.min(Math.max(Number(searchParams.get("limit") ?? "100"), 1), 200);
+    const offset = Math.max(Number(searchParams.get("offset") ?? "0"), 0);
+
     if (session.user.role === "helper") {
       const bookings = await db
         .select()
         .from(booking)
         .where(eq(booking.helperId, session.user.id))
-        .orderBy(desc(booking.requestedAt));
+        .orderBy(desc(booking.requestedAt))
+        .limit(limit)
+        .offset(offset);
 
       return NextResponse.json(
         { message: "Bookings fetched successfully", bookings },
@@ -147,7 +184,9 @@ export async function GET() {
         .select()
         .from(booking)
         .where(eq(booking.customerId, session.user.id))
-        .orderBy(desc(booking.requestedAt));
+        .orderBy(desc(booking.requestedAt))
+        .limit(limit)
+        .offset(offset);
 
       return NextResponse.json(
         { message: "Bookings fetched successfully", bookings },
@@ -159,7 +198,9 @@ export async function GET() {
       const bookings = await db
         .select()
         .from(booking)
-        .orderBy(desc(booking.requestedAt));
+        .orderBy(desc(booking.requestedAt))
+        .limit(limit)
+        .offset(offset);
 
       return NextResponse.json(
         { message: "Bookings fetched successfully", bookings },

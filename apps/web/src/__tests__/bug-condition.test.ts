@@ -7,7 +7,7 @@
  * Validates: Requirements 1.1, 1.6, 1.8, 1.15
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 
 // ---------------------------------------------------------------------------
@@ -38,7 +38,10 @@ describe("Bug 1 — WS Message Drop Before Socket Ready", () => {
     mod.wsSend({ type: "ping" });
 
     // Now register the send function
-    mod.registerWsSend((msg) => received.push(msg));
+    mod.registerWsSend((msg) => {
+      received.push(msg);
+      return true;
+    });
 
     // The message should have been queued and flushed on registration
     // EXPECTED FAIL on unfixed code: received is [] instead of [{ type: "ping" }]
@@ -70,7 +73,10 @@ describe("Bug 1 — WS Message Drop Before Socket Ready", () => {
           wsSend(msg);
 
           // Register
-          registerWsSend((m) => received.push(m));
+          registerWsSend((m) => {
+            received.push(m);
+            return true;
+          });
 
           // Must have been delivered
           return received.some((r) => JSON.stringify(r) === JSON.stringify(msg));

@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Map,
+  Map as MapComponent,
   MapControls,
   MapMarker,
   MarkerContent,
@@ -9,33 +9,26 @@ import {
   MarkerTooltip,
 } from "@/components/ui/map";
 import { Card } from "@/components/ui/card";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { MapPin, Navigation, Search, Star, X, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { BookingForm } from "@/components/BookingForm";
+import { useCallback, useEffect, useRef, useState, memo } from "react";
+import { MapPin, Search, Star, X, Users } from "lucide-react";
+import { BookingForm, type LiveHelper } from "@/components/BookingForm";
 import { BookingStatus } from "@/components/BookingStatus";
 import { useRealtimeEvents } from "@/hooks/use-realtime-events";
 import type MapLibreGL from "maplibre-gl";
 
-type NearbyHelper = {
-  id: string;
-  userId: string;
-  name: string;
-  category: string;
+type NearbyHelper = LiveHelper & {
   lat: number | null;
   lng: number | null;
-  rating: string | number;
-  completedJobs: number;
-  availability: "online" | "offline" | "busy";
 };
-
-type ApiHelper = Omit<NearbyHelper, "lat" | "lng"> & { serviceCity?: string | null };
 
 type GeocodedLocation = {
   lat: number;
   lng: number;
   addressLine: string;
+  area: string;
   city: string;
+  state: string;
+  postalCode: string;
 };
 
 type NominatimResult = {
@@ -45,9 +38,12 @@ type NominatimResult = {
   address?: {
     road?: string;
     suburb?: string;
+    neighbourhood?: string;
     city?: string;
     town?: string;
     village?: string;
+    state?: string;
+    postcode?: string;
     state_district?: string;
     county?: string;
   };
@@ -87,11 +83,14 @@ function LocationSearchBar({ onSelect }: { onSelect: (loc: GeocodedLocation) => 
   function handleSelect(r: NominatimResult) {
     const addr = r.address ?? {};
     const road = addr.road ?? addr.suburb ?? "";
+    const area = addr.suburb ?? addr.neighbourhood ?? "";
     const city = addr.city ?? addr.town ?? addr.village ?? addr.state_district ?? addr.county ?? "";
+    const state = addr.state ?? "";
+    const postalCode = (addr.postcode ?? "").replace(/[^0-9]/g, "").slice(0, 6);
     const short = r.display_name.split(",").slice(0, 3).join(",");
     setQuery(short);
     setResults([]);
-    onSelect({ lat: parseFloat(r.lat), lng: parseFloat(r.lon), addressLine: road || short, city });
+    onSelect({ lat: parseFloat(r.lat), lng: parseFloat(r.lon), addressLine: road || short, area, city, state, postalCode });
   }
 
   return (
@@ -140,7 +139,7 @@ function LocationSearchBar({ onSelect }: { onSelect: (loc: GeocodedLocation) => 
 // Helper to reverse-geocode coordinates to get a city name
 // ---------------------------------------------------------------------------
 
-async function reverseGeocode(lat: number, lng: number): Promise<{ addressLine: string; city: string }> {
+async function reverseGeocode(lat: number, lng: number): Promise<{ addressLine: string; area: string; city: string; state: string; postalCode: string }> {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
@@ -149,31 +148,153 @@ async function reverseGeocode(lat: number, lng: number): Promise<{ addressLine: 
     const data = await res.json() as NominatimResult;
     const addr = data?.address ?? {};
     const road = addr.road ?? addr.suburb ?? "";
+    const area = addr.suburb ?? addr.neighbourhood ?? "";
     const city = addr.city ?? addr.town ?? addr.village ?? addr.state_district ?? addr.county ?? "";
+    const state = addr.state ?? "";
+    const postalCode = (addr.postcode ?? "").replace(/[^0-9]/g, "").slice(0, 6);
     const short = data.display_name.split(",").slice(0, 3).join(",");
-    return { addressLine: road || short, city };
+    return { addressLine: road || short, area, city, state, postalCode };
   } catch {
-    return { addressLine: "", city: "" };
+    return { addressLine: "", area: "", city: "", state: "", postalCode: "" };
   }
 }
+
+function HelpersInAreaBadge({
+  count,
+  city,
+}: {
+  count: number;
+  city: string;
+}) {
+  if (count === 0) return null;
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border text-sm">
+      <Users className="size-4 text-muted-foreground" />
+      <span className="text-muted-foreground">
+        <span className="font-semibold text-foreground">{count}</span>{" "}
+        helper{count > 1 ? "s" : ""} registered in{" "}
+        <span className="font-medium text-foreground">{city || "this area"}</span>{" "}
+        (not sharing live location)
+      </span>
+    </div>
+  );
+}
+
+function ServiceLocationMarker({
+  lat,
+  lng,
+  onDragEnd,
+}: {
+  lat: number;
+  lng: number;
+  onDragEnd: (coords: { lat: number; lng: number }) => void;
+}) {
+  return (
+    <MapMarker
+      draggable
+      longitude={lng}
+      latitude={lat}
+      onDragEnd={({ lng: nextLng, lat: nextLat }) => onDragEnd({ lng: nextLng, lat: nextLat })}
+    >
+      <MarkerContent>
+        <div className="cursor-move">
+          <MapPin className="fill-black stroke-white dark:fill-white" size={28} />
+        </div>
+      </MarkerContent>
+      <MarkerPopup>
+        <div className="space-y-1">
+          <p className="font-medium text-foreground">Service Location</p>
+          <p className="text-xs text-muted-foreground">
+            {lat.toFixed(4)}, {lng.toFixed(4)}
+          </p>
+          <p className="text-xs text-muted-foreground">Drag to adjust</p>
+        </div>
+      </MarkerPopup>
+    </MapMarker>
+  );
+}
+
+function HelperMarkerItem({ helper }: { helper: NearbyHelper }) {
+  return (
+    <MapMarker key={helper.id} longitude={helper.lng!} latitude={helper.lat!}>
+      <MarkerContent>
+        <div className="relative flex flex-col items-center">
+          <div
+            className={`size-4 rounded-full border-2 border-white shadow-lg cursor-pointer hover:scale-125 transition-transform ${
+              helper.availability === "online"
+                ? "bg-green-500"
+                : helper.availability === "busy"
+                  ? "bg-yellow-500"
+                  : "bg-gray-400"
+            }`}
+          />
+          <span className="mt-0.5 whitespace-nowrap text-[10px] font-semibold text-foreground drop-shadow-sm bg-background/80 rounded px-1">
+            {helper.name !== "Helper" ? helper.name.split(" ")[0] : "Helper"}
+          </span>
+        </div>
+      </MarkerContent>
+      <MarkerTooltip>
+        <div className="space-y-1">
+          <p className="font-medium">{helper.name}</p>
+          <p className="text-[10px] uppercase tracking-wide opacity-70">
+            {helper.category.replace(/_/g, " ")}
+          </p>
+          {Number(helper.rating) > 0 && (
+            <div className="flex items-center gap-1">
+              <Star className="size-3 fill-amber-400 text-amber-400" />
+              <span>{Number(helper.rating).toFixed(1)}</span>
+              <span className="opacity-70">({helper.completedJobs} jobs)</span>
+            </div>
+          )}
+          <span
+            className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+              helper.availability === "online"
+                ? "bg-green-500/20 text-green-300"
+                : helper.availability === "busy"
+                  ? "bg-yellow-500/20 text-yellow-300"
+                  : "bg-gray-500/20 text-gray-400"
+            }`}
+          >
+            {helper.availability.charAt(0).toUpperCase() + helper.availability.slice(1)}
+          </span>
+        </div>
+      </MarkerTooltip>
+    </MapMarker>
+  );
+}
+
+const HelperMarkersLayer = memo(function HelperMarkersLayer({ helpers }: { helpers: NearbyHelper[] }) {
+  return (
+    <>
+      {helpers.map((helper) => (
+        <HelperMarkerItem key={helper.id} helper={helper} />
+      ))}
+    </>
+  );
+});
 
 
 // ---------------------------------------------------------------------------
 // Main map component
 // ---------------------------------------------------------------------------
 
-export function MyMap() {
+export function MyMap({ userId }: { userId?: string }) {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 28.6139, lng: 77.209 });
   const [draggableMarker, setDraggableMarker] = useState({ lng: 77.209, lat: 28.6139 });
   const [nearbyHelpers, setNearbyHelpers] = useState<NearbyHelper[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [prefillAddress, setPrefillAddress] = useState({ addressLine: "", city: "" });
+  const selectedCategory = "";
+  const [prefillAddress, setPrefillAddress] = useState({ addressLine: "", area: "", city: "", state: "", postalCode: "" });
   const [currentBookingId, setCurrentBookingId] = useState<string | null>(null);
   const formRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreGL.Map | null>(null);
   // Track the city we last fetched helpers for
   const [fetchCity, setFetchCity] = useState<string>("");
+
+  // Track helper updates to batch/debounce them
+  const helperUpdatesRef = useRef<Record<string, NearbyHelper>>({});
+  const batchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // On mount, get the user's position and reverse-geocode for city
   useEffect(() => {
@@ -184,9 +305,9 @@ export function MyMap() {
         setLocation({ lat, lng });
         setMapCenter({ lat, lng });
         setDraggableMarker({ lat, lng });
-        const { addressLine, city } = await reverseGeocode(lat, lng);
+        const { addressLine, area, city, state, postalCode } = await reverseGeocode(lat, lng);
         setFetchCity(city);
-        setPrefillAddress({ addressLine, city });
+        setPrefillAddress({ addressLine, area, city, state, postalCode });
       },
       async () => {
         // Default to New Delhi if geolocation denied
@@ -197,111 +318,138 @@ export function MyMap() {
     );
   }, []);
 
-  // Fetch helpers filtered by city
-  useEffect(() => {
-    if (!fetchCity) return;
-    const params = new URLSearchParams({ city: fetchCity });
-    fetch(`/api/helpers/nearby?${params.toString()}`, { credentials: "include" })
-      .then((r) => r.json() as Promise<{ helpers?: ApiHelper[] }>)
-      .then((data) => {
-        const helpers = data.helpers ?? [];
-        // Only set lat/lng to null — real coords come from WS events
-        setNearbyHelpers(
-          helpers.map((h) => ({
-            ...h,
-            lat: null,
-            lng: null,
-          })),
-        );
-      })
-      .catch(() => {});
-  }, [fetchCity]);
-
   // Listen to both helper_presence (online/offline + coords) and location_update (in-job GPS)
   const { eventMessages } = useRealtimeEvents({
+    userId,
     eventTypes: ["helper_presence", "location_update"],
   });
 
+  const scheduleBatchUpdate = useCallback(() => {
+    // Clear existing timeout
+    if (batchTimeoutRef.current) {
+      clearTimeout(batchTimeoutRef.current);
+    }
+
+    // Schedule a batched update in the next animation frame
+    batchTimeoutRef.current = setTimeout(() => {
+      setNearbyHelpers((prev) => {
+        const newHelpers = [...prev];
+        const existingMap = new Map(newHelpers.map((h) => [h.userId, h]));
+
+        // Apply all pending updates
+        Object.entries(helperUpdatesRef.current).forEach(([uid, updated]) => {
+          existingMap.set(uid, updated);
+        });
+
+        // Clear pending updates
+        helperUpdatesRef.current = {};
+
+        return Array.from(existingMap.values());
+      });
+    }, 16); // ~60fps batch interval
+  }, []);
+
+  // Process events with batching to prevent excessive re-renders
   useEffect(() => {
     if (!eventMessages.length) return;
-    for (const msg of eventMessages) {
-      if (msg.type !== "event") continue;
+    const msg = eventMessages[0]; // Only process the latest event
+    if (msg.type !== "event") return;
 
-      if (msg.event === "helper_presence") {
-        const d = msg.data as
-          | { helperUserId?: string; status?: string; latitude?: number; longitude?: number }
-          | undefined;
-        if (!d?.helperUserId) continue;
-        const uid: string = d.helperUserId;
+    if (msg.event === "helper_presence") {
+      const d = msg.data as
+        | { helperUserId?: string; status?: string; latitude?: number | string; longitude?: number | string }
+        | undefined;
+      if (!d?.helperUserId) return;
+      const uid: string = d.helperUserId;
+      const latitude = d.latitude != null ? Number(d.latitude) : null;
+      const longitude = d.longitude != null ? Number(d.longitude) : null;
+      const hasValidCoords =
+        latitude != null &&
+        longitude != null &&
+        !Number.isNaN(latitude) &&
+        !Number.isNaN(longitude);
 
-        setNearbyHelpers((prev) => {
-          if (d.status === "offline") {
-            return prev.filter((h) => h.userId !== uid);
-          }
-          const exists = prev.find((h) => h.userId === uid);
-          if (exists) {
-            return prev.map((h) =>
-              h.userId === uid
-                ? {
-                    ...h,
-                    availability: (d.status ?? h.availability) as NearbyHelper["availability"],
-                    ...(d.latitude != null ? { lat: d.latitude } : {}),
-                    ...(d.longitude != null ? { lng: d.longitude } : {}),
-                  }
-                : h,
-            );
-          }
-          if (d.latitude != null && d.longitude != null) {
-            const newHelper: NearbyHelper = {
-              id: uid,
-              userId: uid,
-              name: "Helper",
-              category: "other",
-              lat: d.latitude,
-              lng: d.longitude,
-              rating: 0,
-              completedJobs: 0,
-              availability: (d.status ?? "online") as NearbyHelper["availability"],
-            };
-            return [...prev, newHelper];
-          }
-          return prev;
-        });
+      // Update the tracking object instead of state immediately
+      if (d.status === "offline") {
+        delete helperUpdatesRef.current[uid];
+      } else {
+        const existing = helperUpdatesRef.current[uid];
+        helperUpdatesRef.current[uid] = {
+          ...(existing || {
+            id: uid,
+            userId: uid,
+            name: "Helper",
+            category: "other",
+            rating: 0,
+            completedJobs: 0,
+            serviceCity: null,
+            distanceKm: null,
+            latitude: null,
+            longitude: null,
+            lat: null,
+            lng: null,
+          }),
+          availability: (d.status ?? "online") as NearbyHelper["availability"],
+          ...(hasValidCoords ? { lat: latitude!, lng: longitude!, latitude: latitude!, longitude: longitude! } : {}),
+        };
       }
 
-      if (msg.event === "location_update") {
-        const d = msg.data as
-          | { helperUserId?: string; latitude?: number; longitude?: number }
-          | undefined;
-        if (!d?.helperUserId || d.latitude == null || d.longitude == null) continue;
-        const uid: string = d.helperUserId;
-        setNearbyHelpers((prev) =>
-          prev.map((h) =>
-            h.userId === uid ? { ...h, lat: d.latitude!, lng: d.longitude! } : h,
-          ),
-        );
-      }
+      // Batch the update
+      scheduleBatchUpdate();
+      return;
     }
-  }, [eventMessages]);
+
+    if (msg.event === "location_update") {
+      const d = msg.data as
+        | { helperUserId?: string; latitude?: number | string; longitude?: number | string }
+        | undefined;
+      const latitude = d?.latitude != null ? Number(d.latitude) : Number.NaN;
+      const longitude = d?.longitude != null ? Number(d.longitude) : Number.NaN;
+      if (!d?.helperUserId || Number.isNaN(latitude) || Number.isNaN(longitude)) return;
+      const uid: string = d.helperUserId;
+
+      // Update the tracking object instead of state immediately
+      if (helperUpdatesRef.current[uid]) {
+        helperUpdatesRef.current[uid] = {
+          ...helperUpdatesRef.current[uid],
+          lat: latitude,
+          lng: longitude,
+          latitude,
+          longitude,
+        };
+      }
+
+      // Batch the update
+      scheduleBatchUpdate();
+    }
+  }, [eventMessages, scheduleBatchUpdate]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (batchTimeoutRef.current) {
+        clearTimeout(batchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   function handleLocationSelect(loc: GeocodedLocation) {
     setMapCenter({ lat: loc.lat, lng: loc.lng });
     setDraggableMarker({ lat: loc.lat, lng: loc.lng });
-    setPrefillAddress({ addressLine: loc.addressLine, city: loc.city });
+    setPrefillAddress({
+      addressLine: loc.addressLine,
+      area: loc.area,
+      city: loc.city,
+      state: loc.state,
+      postalCode: loc.postalCode,
+    });
     setFetchCity(loc.city); // re-fetch helpers for this city
     mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 14, duration: 1200 });
   }
 
-  function handleBookHelper(category: string) {
-    setSelectedCategory(category);
-    setTimeout(() => {
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
-  }
-
   if (!location) {
     return (
-      <div className="h-[420px] rounded-2xl bg-muted animate-pulse flex items-center justify-center">
+      <div className="h-105 rounded-2xl bg-muted animate-pulse flex items-center justify-center">
         <p className="text-sm text-muted-foreground">Locating you...</p>
       </div>
     );
@@ -315,21 +463,10 @@ export function MyMap() {
     <div className="space-y-3">
       <LocationSearchBar onSelect={handleLocationSelect} />
 
-      {/* Helpers-in-area badge (those without live GPS) */}
-      {helpersWithoutCoords.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border text-sm">
-          <Users className="size-4 text-muted-foreground" />
-          <span className="text-muted-foreground">
-            <span className="font-semibold text-foreground">{helpersWithoutCoords.length}</span>{" "}
-            helper{helpersWithoutCoords.length > 1 ? "s" : ""} registered in{" "}
-            <span className="font-medium text-foreground">{fetchCity || "this area"}</span>
-            {" "}(not sharing live location)
-          </span>
-        </div>
-      )}
+      <HelpersInAreaBadge count={helpersWithoutCoords.length} city={fetchCity} />
 
-      <Card className="h-[420px] p-0 overflow-hidden">
-        <Map
+      <Card className="h-105 p-0 overflow-hidden">
+        <MapComponent
           ref={mapRef}
           center={[mapCenter.lng, mapCenter.lat]}
           zoom={14}
@@ -345,85 +482,22 @@ export function MyMap() {
             showLocate
             showFullscreen
             onLocate={async (coords) => {
-              const lat = coords.latitude;
-              const lng = coords.longitude;
+              const { latitude: lat, longitude: lng } = coords;
               setDraggableMarker({ lat, lng });
-              const { addressLine, city } = await reverseGeocode(lat, lng);
+              const { addressLine, area, city, state, postalCode } = await reverseGeocode(lat, lng);
               setFetchCity(city);
-              setPrefillAddress({ addressLine, city });
+              setPrefillAddress({ addressLine, area, city, state, postalCode });
             }}
           />
 
-          <MapMarker
-            draggable
-            longitude={draggableMarker.lng}
-            latitude={draggableMarker.lat}
-            onDragEnd={(lngLat) => setDraggableMarker({ lng: lngLat.lng, lat: lngLat.lat })}
-          >
-            <MarkerContent>
-              <div className="cursor-move">
-                <MapPin className="fill-black stroke-white dark:fill-white" size={28} />
-              </div>
-            </MarkerContent>
-            <MarkerPopup>
-              <div className="space-y-1">
-                <p className="font-medium text-foreground">Service Location</p>
-                <p className="text-xs text-muted-foreground">
-                  {draggableMarker.lat.toFixed(4)}, {draggableMarker.lng.toFixed(4)}
-                </p>
-                <p className="text-xs text-muted-foreground">Drag to adjust</p>
-              </div>
-            </MarkerPopup>
-          </MapMarker>
+          <ServiceLocationMarker
+            lat={draggableMarker.lat}
+            lng={draggableMarker.lng}
+            onDragEnd={setDraggableMarker}
+          />
 
-          {/* Only render markers for helpers with real GPS coordinates */}
-          {helpersWithCoords.map((helper) => (
-            <MapMarker key={helper.id} longitude={helper.lng!} latitude={helper.lat!}>
-              <MarkerContent>
-                <div className="relative flex flex-col items-center">
-                  <div
-                    className={`size-4 rounded-full border-2 border-white shadow-lg cursor-pointer hover:scale-125 transition-transform ${
-                      helper.availability === "online"
-                        ? "bg-green-500"
-                        : helper.availability === "busy"
-                          ? "bg-yellow-500"
-                          : "bg-gray-400"
-                    }`}
-                  />
-                  <span className="mt-0.5 whitespace-nowrap text-[10px] font-semibold text-foreground drop-shadow-sm bg-background/80 rounded px-1">
-                    {helper.name !== "Helper" ? helper.name.split(" ")[0] : "Helper"}
-                  </span>
-                </div>
-              </MarkerContent>
-              <MarkerTooltip>
-                <div className="space-y-1">
-                  <p className="font-medium">{helper.name}</p>
-                  <p className="text-[10px] uppercase tracking-wide opacity-70">
-                    {helper.category.replace(/_/g, " ")}
-                  </p>
-                  {Number(helper.rating) > 0 && (
-                    <div className="flex items-center gap-1">
-                      <Star className="size-3 fill-amber-400 text-amber-400" />
-                      <span>{Number(helper.rating).toFixed(1)}</span>
-                      <span className="opacity-70">({helper.completedJobs} jobs)</span>
-                    </div>
-                  )}
-                  <span
-                    className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                      helper.availability === "online"
-                        ? "bg-green-500/20 text-green-300"
-                        : helper.availability === "busy"
-                          ? "bg-yellow-500/20 text-yellow-300"
-                          : "bg-gray-500/20 text-gray-400"
-                    }`}
-                  >
-                    {helper.availability.charAt(0).toUpperCase() + helper.availability.slice(1)}
-                  </span>
-                </div>
-              </MarkerTooltip>
-            </MapMarker>
-          ))}
-        </Map>
+          <HelperMarkersLayer helpers={helpersWithCoords} />
+        </MapComponent>
       </Card>
 
       {currentBookingId ? (
@@ -435,10 +509,26 @@ export function MyMap() {
         <BookingForm
           latitude={draggableMarker.lat}
           longitude={draggableMarker.lng}
+          userId={userId}
           defaultCategory={selectedCategory}
           defaultAddressLine={prefillAddress.addressLine}
+          defaultArea={prefillAddress.area}
           defaultCity={prefillAddress.city || fetchCity}
+          defaultState={prefillAddress.state}
+          defaultPostalCode={prefillAddress.postalCode}
           formRef={formRef}
+          onHelpersFound={(helpers) => {
+            setNearbyHelpers(
+              helpers.map((helper) => ({
+                ...helper,
+                lat: helper.latitude ?? null,
+                lng: helper.longitude ?? null,
+              })),
+            );
+          }}
+          onHelpersSearching={() => {
+            setNearbyHelpers((prev) => prev);
+          }}
           onSuccess={(id) => {
             setCurrentBookingId(id);
           }}

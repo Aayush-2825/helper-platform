@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { AlertCircle, RefreshCcw, Home, ShieldAlert } from "lucide-react";
+import { RefreshCcw, Home, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Error({
@@ -33,7 +33,7 @@ export default function Error({
         <div className="space-y-4">
           <h2 className="text-4xl font-heading font-black tracking-tight">Protocol Error</h2>
           <p className="text-muted-foreground font-medium text-balance">
-            Systems encountered an unexpected interruption. We've logged the incident and our maintenance crew is on it.
+            Systems encountered an unexpected interruption. We&apos;ve logged the incident and our maintenance crew is on it.
           </p>
         </div>
 

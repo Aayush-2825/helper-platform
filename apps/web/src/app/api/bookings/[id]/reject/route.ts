@@ -8,12 +8,16 @@ import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { publishBookingEvent } from "@/lib/realtime/client";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: bookingId } = await context.params;
     const now = new Date();
+    const body = await request.json().catch(() => ({}));
+    const reason = typeof body.reason === "string" && body.reason.trim().length > 0
+      ? body.reason.trim()
+      : "Helper rejected booking request";
 
     const session = await auth.api.getSession({
       headers: await headers(),
@@ -52,7 +56,7 @@ export async function POST(
       });
 
       if (candidate) {
-        if (existingBooking.status !== "requested") {
+        if (!["requested", "matched"].includes(existingBooking.status)) {
           return NextResponse.json(
             { message: "Booking is not in requested state." },
             { status: 400, headers: NO_STORE_HEADERS }
@@ -96,6 +100,7 @@ export async function POST(
           eventType: "rejected",
           data: {
             candidateId: candidate.id,
+            reason,
           },
         });
 

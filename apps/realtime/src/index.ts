@@ -8,8 +8,14 @@ import { routeMessage } from "./handlers/index.js";
 import { webDb } from "./db/index.js";
 import { booking } from "./db/schema.js";
 import { and, eq, lt } from "drizzle-orm";
+import { env } from "./config/env.js";
+import { ValidationError } from "./utils/validation.js";
+import {
+  flushQueuedNotificationsForUser,
+  persistOutboundEvent,
+} from "./services/event-persistence.service.js";
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = env.PORT;
 
 const app = express();
 
@@ -29,28 +35,69 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 /**
- * 🔥 Map<userId, socket>
+ * 🔥 Map<userId, sockets>
  */
-const clients = new Map<string, WebSocket>();
+const clients = new Map<string, Set<WebSocket>>();
 
 // =========================
 // ✅ UTIL FUNCTIONS
 // =========================
 
 function sendToUser(userId: string, message: object) {
-  const client = clients.get(userId);
+  const userSockets = clients.get(userId);
 
-  if (client && client.readyState === WebSocket.OPEN) {
-    client.send(JSON.stringify(message));
+  if (!userSockets || userSockets.size === 0) {
+    return;
+  }
+
+  const payload = JSON.stringify(message);
+
+  userSockets.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(payload);
+    }
+  });
+
+  // Clean up closed sockets opportunistically.
+  userSockets.forEach((client) => {
+    if (client.readyState !== WebSocket.OPEN) {
+      userSockets.delete(client);
+    }
+  });
+
+  if (userSockets.size === 0) {
+    clients.delete(userId);
   }
 }
 
 function broadcastToAll(message: object) {
-  clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify(message));
+  const payload = JSON.stringify(message);
+
+  clients.forEach((userSockets, userId) => {
+    userSockets.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+      }
+    });
+
+    userSockets.forEach((client) => {
+      if (client.readyState !== WebSocket.OPEN) {
+        userSockets.delete(client);
+      }
+    });
+
+    if (userSockets.size === 0) {
+      clients.delete(userId);
     }
   });
+}
+
+function getTotalActiveSockets() {
+  let total = 0;
+  clients.forEach((userSockets) => {
+    total += userSockets.size;
+  });
+  return total;
 }
 
 // =========================
@@ -63,7 +110,7 @@ export function broadcastEvent({
   targetUserIds,
 }: {
   event: string;
-  data: any;
+  data: Record<string, unknown>;
   targetUserIds?: string[];
 }) {
   const message = {
@@ -73,6 +120,8 @@ export function broadcastEvent({
   };
 
   console.log("📡 Broadcasting:", event, targetUserIds ?? "ALL");
+
+  void persistOutboundEvent({ event, data, targetUserIds });
 
   if (targetUserIds && targetUserIds.length > 0) {
     targetUserIds.forEach((userId) => {
@@ -97,15 +146,13 @@ wss.on("connection", (socket: WebSocket, request) => {
     return;
   }
 
-  // ⚠️ Handle duplicate connections (same user)
-  if (clients.has(userId)) {
-    console.log(`[WS] Replacing existing connection for ${userId}`);
-    clients.get(userId)?.close();
-  }
+  const existingSockets = clients.get(userId) ?? new Set<WebSocket>();
+  existingSockets.add(socket);
+  clients.set(userId, existingSockets);
 
-  clients.set(userId, socket);
-
-  console.log(`[WS] ${userId} connected. Total: ${clients.size}`);
+  console.log(
+    `[WS] ${userId} connected. Users: ${clients.size}, sockets: ${getTotalActiveSockets()}`,
+  );
 
   // ✅ Connection ack
   socket.send(
@@ -115,6 +162,12 @@ wss.on("connection", (socket: WebSocket, request) => {
       timestamp: new Date().toISOString(),
     }),
   );
+
+  void flushQueuedNotificationsForUser(userId, (queuedMessage) => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(queuedMessage));
+    }
+  });
 
   // =========================
   // 📩 MESSAGE HANDLER
@@ -130,9 +183,29 @@ wss.on("connection", (socket: WebSocket, request) => {
         return;
       }
 
-      routeMessage(userId, data);
+      // 🛡️ Wrap handler in try-catch to prevent crashes
+      try {
+        routeMessage(userId, data);
+      } catch (handlerErr) {
+        console.error(`[WS] Handler error for ${userId} (${data.type}):`, handlerErr);
+        const isValidationError = handlerErr instanceof ValidationError;
+        socket.send(
+          JSON.stringify({
+            type: "error",
+            message: isValidationError ? handlerErr.message : "Failed to process message",
+            code: isValidationError ? handlerErr.code : "HANDLER_ERROR",
+            requestType: data.type,
+          })
+        );
+      }
     } catch (err) {
-      console.warn("[WS] Invalid message", err);
+      console.warn("[WS] Invalid message JSON", err);
+      socket.send(
+        JSON.stringify({
+          type: "error",
+          message: "Invalid message format",
+        })
+      );
     }
   });
 
@@ -141,35 +214,16 @@ wss.on("connection", (socket: WebSocket, request) => {
   // =========================
 
   socket.on("close", async () => {
-    clients.delete(userId);
-    console.log(`[WS] ${userId} disconnected. Total: ${clients.size}`);
-
-    // ✅ NEW: Auto-cancel 'requested' bookings on disconnect
-    try {
-      const now = new Date();
-      const nowTs = now.getTime();
-      const cancelledCount = await webDb
-        .update(booking)
-        .set({ status: "cancelled", cancelledAt: nowTs, cancelledBy: "customer" })
-        .where(
-          and(
-            eq(booking.customerId, userId),
-            eq(booking.status, "requested")
-          )
-        )
-        .returning({ id: booking.id, cancelledAt: booking.cancelledAt });
-
-      if (cancelledCount.length > 0) {
-        console.log(`🔌 [Auto-Cancel] Cancelled ${cancelledCount.length} bookings for disconnected user ${userId}`);
-        cancelledCount.forEach((b) => {
-          if (typeof b.cancelledAt !== "number") {
-            console.warn("[Auto-Cancel] cancelledAt is not a number:", b.cancelledAt);
-          }
-        });
+    const userSockets = clients.get(userId);
+    if (userSockets) {
+      userSockets.delete(socket);
+      if (userSockets.size === 0) {
+        clients.delete(userId);
       }
-    } catch (err) {
-      console.error("[WS-Close] Auto-cancel failed:", err);
     }
+    console.log(
+      `[WS] ${userId} disconnected. Users: ${clients.size}, sockets: ${getTotalActiveSockets()}`,
+    );
   });
 
   socket.on("error", (err) => {
@@ -180,6 +234,51 @@ wss.on("connection", (socket: WebSocket, request) => {
 // =========================
 // 🚀 START SERVER
 // =========================
+
+const stopSignals = ["SIGTERM", "SIGINT"];
+
+let isShuttingDown = false;
+
+const gracefulShutdown = async (signal: string) => {
+  if (isShuttingDown) {
+    console.log(`[Server] Shutdown already in progress (${signal}), forcing exit...`);
+    process.exit(1);
+  }
+
+  isShuttingDown = true;
+  console.log(`[Server] Received ${signal}, starting graceful shutdown...`);
+
+  // Close all WebSocket connections
+  wss.clients.forEach((client) => {
+    client.close(1001, "Server shutting down");
+  });
+
+  // Close HTTP server
+  server.close(() => {
+    console.log("[Server] HTTP server closed");
+    process.exit(0);
+  });
+
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error("[Server] Forced shutdown after 10s timeout");
+    process.exit(1);
+  }, 10000);
+};
+
+stopSignals.forEach((signal) => {
+  process.on(signal, () => gracefulShutdown(signal));
+});
+
+// Handle uncaught exceptions
+process.on("uncaughtException", (err) => {
+  console.error("[Server] Uncaught exception:", err);
+  gracefulShutdown("UNCAUGHT_EXCEPTION");
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[Server] Unhandled rejection at:", promise, "reason:", reason);
+});
 
 // =========================
 // 🕒 BOOKING EXPIRATION JOB (runs every 30s)
@@ -220,5 +319,8 @@ setInterval(async () => {
 }, 30000);
 
 server.listen(PORT, () => {
-  console.log(`[Server] Express + WS running on port ${PORT}`);
+  console.log(`[Server] ✅ Express + WS running on port ${PORT}`);
+  console.log(`[Server] 📡 WebSocket server ready`);
+  console.log(`[Server] 🔄 Auto-expiration job started (30s interval)`);
+  console.log(`[Server] 🛡️ Graceful shutdown configured`);
 });

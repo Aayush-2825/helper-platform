@@ -1,14 +1,29 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
-  CheckCircle2, Navigation2, MessageSquare, Phone, 
-  MapPin, Clock, Loader2, ArrowRight 
+  CheckCircle2, Navigation2, Phone, 
+  MapPin, Loader2, ArrowRight 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type ActiveBooking = {
+  status: "requested" | "accepted" | "in_progress" | "completed" | "cancelled";
+  latitude?: number | null;
+  longitude?: number | null;
+  addressLine?: string | null;
+  city?: string | null;
+  state?: string | null;
+  customer?: {
+    user?: {
+      name?: string | null;
+    } | null;
+    emailVerified?: boolean | null;
+  } | null;
+};
 
 interface CurrentJobPanelProps {
   bookingId: string;
@@ -16,7 +31,7 @@ interface CurrentJobPanelProps {
 }
 
 export function CurrentJobPanel({ bookingId, onJobCompleted }: CurrentJobPanelProps) {
-  const [booking, setBooking] = useState<any>(null);
+  const [booking, setBooking] = useState<ActiveBooking | null>(null);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -145,7 +160,9 @@ export function CurrentJobPanel({ bookingId, onJobCompleted }: CurrentJobPanelPr
                   </div>
                   <div className="flex-1">
                      <p className="font-bold text-sm leading-tight">{booking.customer?.user?.name || "Customer"}</p>
-                     <p className="text-[10px] font-bold text-muted-foreground uppercase">Verified User (4.8 ★)</p>
+                     <p className="text-[10px] font-bold text-muted-foreground uppercase">
+                       {booking.customer?.emailVerified ? "Verified User" : "Customer"}
+                     </p>
                   </div>
                   <div className="flex gap-2">
                      <Button size="icon" variant="ghost" className="rounded-full size-10 bg-muted/50 hover:bg-primary hover:text-white transition-all shadow-lg active:scale-95">

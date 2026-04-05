@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "../db/index.js";
 import { sql } from "drizzle-orm";
 import { helperPresence } from "../db/schema.js";
+import { randomUUID } from "crypto";
 
 const router: Router = Router();
 
@@ -85,6 +86,7 @@ router.post("/helper-presence", async (req, res) => {
     await db
       .insert(helperPresence)
       .values({
+        id: randomUUID(),
         helperUserId,
         status,
         latitude,

@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { booking, helperProfile } from "@/db/schema";
+import { booking, bookingStatusEvent, helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { publishBookingEvent } from "@/lib/realtime/client";
@@ -87,6 +87,7 @@ export async function POST(
       .set({
         status: "in_progress",
         startedAt: now,
+        helperPhoneVisibleAt: now,
         updatedAt: now,
       })
       .where(and(eq(booking.id, bookingId), eq(booking.status, "accepted")))
@@ -99,7 +100,18 @@ export async function POST(
       );
     }
 
-    publishBookingEvent({
+    await db.insert(bookingStatusEvent).values({
+      id: crypto.randomUUID(),
+      bookingId,
+      status: "in_progress",
+      actorUserId: session.user.id,
+      note: "Helper started booking",
+      metadata: {
+        startedAt: updatedRows[0].startedAt?.toISOString(),
+      },
+    });
+
+    await publishBookingEvent({
       bookingId,
       customerId: existingBooking.customerId,
       helperId: session.user.id,

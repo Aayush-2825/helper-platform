@@ -2,24 +2,47 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Calendar, User, Search } from "lucide-react";
+import { Home, Calendar, User, Search, Inbox, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSession } from "@/lib/auth/session";
+import { normalizeRole } from "@/lib/auth/roles";
 
-const navItems = [
+const customerNavItems = [
   { label: "Home", href: "/customer", icon: Home },
   { label: "Book", href: "/customer/book", icon: Search },
   { label: "Bookings", href: "/customer/bookings", icon: Calendar },
   { label: "Profile", href: "/account/settings", icon: User },
 ];
 
+const helperNavItems = [
+  { label: "Home", href: "/helper", icon: Home },
+  { label: "Jobs", href: "/helper/incoming-jobs", icon: Inbox },
+  { label: "History", href: "/helper/job-history", icon: Calendar },
+  { label: "Wallet", href: "/helper/earnings", icon: Wallet },
+  { label: "Profile", href: "/account/settings", icon: User },
+];
+
+function isRouteActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function BottomNav() {
   const pathname = usePathname();
+  const { session } = useSession();
+
+  if (pathname.startsWith("/admin") || pathname.startsWith("/auth")) {
+    return null;
+  }
+
+  const role = normalizeRole((session?.user as { role?: string } | undefined)?.role);
+  const isHelperContext = role === "helper" || pathname.startsWith("/helper");
+  const navItems = isHelperContext ? helperNavItems : customerNavItems;
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md lg:hidden">
       <nav className="surface-card flex items-center justify-between px-6 py-3 border border-white/20 shadow-2xl">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = isRouteActive(pathname, item.href);
           return (
             <Link
               key={item.href}

@@ -429,12 +429,6 @@ export async function updateVerificationStatus(
  * NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
  * NEXT_PUBLIC_CLOUDINARY_PRESET=your_upload_preset
  * 
- * # Or for AWS S3
- * NEXT_PUBLIC_AWS_S3_URL=https://your-bucket.s3.amazonaws.com
- * AWS_ACCESS_KEY_ID=your_access_key
- * AWS_SECRET_ACCESS_KEY=your_secret_key
- * AWS_S3_BUCKET=your_bucket_name
- * 
  * # Encryption
  * ENCRYPTION_KEY=your-32-character-encryption-key-here
  * 

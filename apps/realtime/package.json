@@ -11,9 +11,6 @@
     "check-types": "tsc --noEmit",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio",
     "crud": "tsx src/crud-example.ts"
   },
   "dependencies": {

@@ -14,6 +14,7 @@ export type IncomingJob = {
   distanceKm?: number;
   customerName?: string;
   expiresAt?: string;
+  expiresInSeconds?: number;
   latitude?: number;
   longitude?: number;
 };
@@ -32,5 +33,9 @@ export function useIncomingJobs() {
     setJobs((prev) => prev.filter((j) => j.bookingId !== bookingId));
   }, []);
 
-  return { jobs, addJob, removeJob };
+  const replaceJobs = useCallback((nextJobs: IncomingJob[]) => {
+    setJobs(nextJobs);
+  }, []);
+
+  return { jobs, addJob, removeJob, replaceJobs };
 }

@@ -12,8 +12,7 @@
  * Validates: Requirements 1.5, 1.6
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { EventEmitter } from "events";
+import { describe, it, expect, vi } from "vitest";
 
 // Mock the handlers/index module — routeMessage is a stub (empty) on unfixed code
 vi.mock("../index.js", () => ({
@@ -54,8 +53,9 @@ describe("Bug Condition — Server Drops Non-Ping WebSocket Messages", () => {
 
     // Simulate the message handler as it exists in the FIXED code
     const userId = "u1";
-    const socket = new EventEmitter() as any;
-    socket.send = vi.fn();
+    const socket = {
+      send: vi.fn(),
+    };
 
     // Replicate the FIXED message handler from index.ts
     const fixedMessageHandler = (raw: Buffer | string) => {

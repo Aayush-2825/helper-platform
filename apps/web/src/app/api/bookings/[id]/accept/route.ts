@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { booking, bookingCandidate, helperProfile } from "@/db/schema";
+import { booking, bookingCandidate, bookingStatusEvent, helperProfile, user } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { publishBookingEvent } from "@/lib/realtime/client";
@@ -110,53 +110,90 @@ export async function POST(
       );
     }
 
-    if (existingBooking.status !== "requested") {
+    if (!["requested", "matched"].includes(existingBooking.status)) {
       return NextResponse.json(
         { message: "Booking is not in requested state." },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    const updatedRows = await db
-      .update(booking)
-      .set({
-        status: "accepted",
-        helperId: session.user.id,
-        helperProfileId: profile.id,
-        acceptedAt: now,
-        updatedAt: now,
-      })
-      .where(and(eq(booking.id, bookingId), eq(booking.status, "requested")))
-      .returning();
-
-    if (updatedRows.length === 0) {
+    if (existingBooking.acceptanceDeadline && existingBooking.acceptanceDeadline <= now) {
       return NextResponse.json(
-        { message: "Booking not found or not in requested state." },
+        { message: "Booking acceptance window has expired." },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    await db
-      .update(bookingCandidate)
-      .set({
-        response: "accepted",
-        respondedAt: now,
-      })
-      .where(eq(bookingCandidate.id, candidate.id));
+    const helperUser = await db.query.user.findFirst({
+      where: eq(user.id, session.user.id),
+      columns: {
+        name: true,
+        phone: true,
+      },
+    });
 
-    await db
-      .update(bookingCandidate)
-      .set({
-        response: "timeout",
-        respondedAt: now,
-      })
-      .where(
-        and(
-          eq(bookingCandidate.bookingId, bookingId),
-          ne(bookingCandidate.id, candidate.id),
-          eq(bookingCandidate.response, "pending")
-        )
+    const updatedRows = await db.transaction(async (tx) => {
+      const rows = await tx
+        .update(booking)
+        .set({
+          status: "accepted",
+          helperId: session.user.id,
+          helperProfileId: profile.id,
+          helperName: helperUser?.name ?? null,
+          helperPhone: helperUser?.phone ?? null,
+          helperPhoneVisibleAt: null,
+          acceptedAt: now,
+          updatedAt: now,
+        })
+        .where(and(eq(booking.id, bookingId), inArray(booking.status, ["requested", "matched"])))
+        .returning();
+
+      if (rows.length === 0) {
+        return rows;
+      }
+
+      await tx
+        .update(bookingCandidate)
+        .set({
+          response: "accepted",
+          respondedAt: now,
+        })
+        .where(eq(bookingCandidate.id, candidate.id));
+
+      await tx
+        .update(bookingCandidate)
+        .set({
+          response: "timeout",
+          respondedAt: now,
+        })
+        .where(
+          and(
+            eq(bookingCandidate.bookingId, bookingId),
+            ne(bookingCandidate.id, candidate.id),
+            eq(bookingCandidate.response, "pending")
+          )
+        );
+
+      await tx.insert(bookingStatusEvent).values({
+        id: crypto.randomUUID(),
+        bookingId,
+        status: "accepted",
+        actorUserId: session.user.id,
+        note: "Helper accepted booking",
+        metadata: {
+          candidateId: candidate.id,
+        },
+      });
+
+      return rows;
+    });
+
+    if (updatedRows.length === 0) {
+      return NextResponse.json(
+        { message: "Booking not found or no longer available for acceptance." },
+        { status: 400, headers: NO_STORE_HEADERS }
       );
+    }
 
     await publishBookingEvent({
       bookingId,

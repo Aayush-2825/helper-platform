@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, RadioTower, XCircle } from "lucide-react";
@@ -35,10 +35,12 @@ function JobCard({
   job,
   removeJob,
   onJobAccepted,
+  onJobExpired,
 }: {
   job: IncomingJob;
   removeJob: (bookingId: string) => void;
   onJobAccepted?: (bookingId: string) => void;
+  onJobExpired?: (bookingId: string) => void;
 }) {
   const [secondsLeft, setSecondsLeft] = useState(() => getSecondsRemaining(job.expiresAt));
   const [actionState, setActionState] = useState<ActionState>("idle");
@@ -54,9 +56,21 @@ function JobCard({
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [job.expiresAt]);
 
+  useEffect(() => {
+    if (secondsLeft === 0 && job.expiresAt) {
+      onJobExpired?.(job.bookingId);
+    }
+  }, [job.bookingId, job.expiresAt, onJobExpired, secondsLeft]);
+
   const isExpired = secondsLeft === 0;
   const isActing = actionState !== "idle";
-  const timerPercentage = job.expiresAt ? (secondsLeft / 60) * 100 : 100;
+  const timerPercentage = job.expiresAt ? Math.min(100, Math.max(0, (secondsLeft / 60) * 100)) : 100;
+
+  const acceptLabel = isExpired
+    ? "Expired"
+    : actionState === "accepting"
+      ? "Accepting..."
+      : "Accept Now";
 
   async function handleAccept() {
     setActionState("accepting");
@@ -77,8 +91,31 @@ function JobCard({
     }
   }
 
+  async function handleReject() {
+    setActionState("rejecting");
+    setRejectError(null);
+    try {
+      const reason = "Helper rejected from incoming queue";
+      const res = await fetch(`/api/bookings/${job.bookingId}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (res.ok) {
+        removeJob(job.bookingId);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setRejectError(body?.error || body?.message || "Failed to reject");
+        setActionState("idle");
+      }
+    } catch {
+      setRejectError("Network error");
+      setActionState("idle");
+    }
+  }
+
   return (
-    <div className={cn("reveal-up", isExpired && "opacity-50 grayscale pointer-events-none")}>
+    <div className={cn("reveal-up", isExpired && "opacity-50 grayscale") }>
       <Card className="surface-card-strong border-none overflow-hidden group active:scale-[0.98] transition-all">
         <div className="p-5 flex flex-col gap-4">
           <div className="flex justify-between items-start gap-4">
@@ -91,8 +128,8 @@ function JobCard({
                    <span className="text-[10px] font-bold text-muted-foreground uppercase">{job.distanceKm}km away</span>
                 )}
               </div>
-              <p className="font-heading font-black text-xl leading-tight">New Request</p>
-              <p className="text-xs text-muted-foreground font-medium truncate max-w-[200px]">{job.addressLine}</p>
+              <p className="font-heading font-black text-xl leading-tight">{isExpired ? "Request expired" : "New Request"}</p>
+              <p className="text-xs text-muted-foreground font-medium truncate max-w-50">{job.addressLine}</p>
             </div>
 
             <div className="relative size-14 flex items-center justify-center">
@@ -100,13 +137,13 @@ function JobCard({
                   <circle cx="28" cy="28" r="24" className="fill-none stroke-muted/20 stroke-2" />
                   <circle 
                     cx="28" cy="28" r="24" 
-                    className={cn("fill-none stroke-[3] transition-all duration-1000", secondsLeft < 10 ? "stroke-destructive" : "stroke-primary")}
+                    className={cn("fill-none stroke-3 transition-all duration-1000", secondsLeft < 10 ? "stroke-destructive" : "stroke-primary")}
                     strokeDasharray={150.8}
                     strokeDashoffset={150.8 - (150.8 * timerPercentage) / 100}
                   />
                </svg>
                <span className={cn("absolute font-black text-xs", secondsLeft < 10 ? "text-destructive" : "text-primary")}>
-                  {secondsLeft}s
+                {Number.isFinite(secondsLeft) ? `${secondsLeft}s` : "--"}
                </span>
             </div>
           </div>
@@ -114,29 +151,33 @@ function JobCard({
           <div className="flex items-center justify-between border-t border-border/30 pt-4">
             <div className="flex flex-col">
                <span className="text-[10px] font-bold text-muted-foreground uppercase">Estimated Earning</span>
-               <span className="text-2xl font-black tracking-tighter text-primary">₹{job.quotedAmount}</span>
+               <span className="text-2xl font-black tracking-tighter text-primary">₹{job.quotedAmount.toLocaleString("en-IN")}</span>
             </div>
             <div className="flex gap-2">
                <Button 
                  variant="ghost" 
                  size="icon" 
                  className="rounded-2xl size-12 bg-muted/50 hover:bg-destructive/10 hover:text-destructive group/btn"
-                 onClick={() => removeJob(job.bookingId)}
+                disabled={isActing || isExpired}
+                onClick={handleReject}
                >
-                  <XCircle className="size-5" />
+                {actionState === "rejecting" ? <Loader2 className="size-5 animate-spin" /> : <XCircle className="size-5" />}
                </Button>
                <Button 
                 className="rounded-2xl h-12 px-6 font-black shadow-lg shadow-primary/20 active:scale-95"
                 disabled={isActing || isExpired}
                 onClick={handleAccept}
                >
-                 {actionState === "accepting" ? <Loader2 className="size-5 animate-spin" /> : "Accept Now"}
+                 {actionState === "accepting" ? <Loader2 className="size-5 animate-spin" /> : acceptLabel}
                </Button>
             </div>
           </div>
 
           {(acceptError || rejectError) && (
             <p className="text-[10px] font-bold text-destructive animate-shake">{acceptError || rejectError}</p>
+          )}
+          {isExpired && (
+            <p className="text-[10px] font-bold text-muted-foreground">This offer expired and was removed from your queue.</p>
           )}
         </div>
       </Card>
@@ -156,7 +197,7 @@ export function IncomingJobsPanel({
   if (jobs.length === 0) {
     return (
       <div className="reveal-up">
-        <div className="surface-card border-none bg-muted/10 p-12 text-center space-y-4 rounded-[2rem]">
+        <div className="surface-card border-none bg-muted/10 p-12 text-center space-y-4 rounded-3xl">
           <div className="relative size-20 mx-auto">
              <div className="absolute inset-0 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
              <div className="absolute inset-4 rounded-full bg-primary/10 flex items-center justify-center">
@@ -180,6 +221,7 @@ export function IncomingJobsPanel({
           job={job} 
           removeJob={removeJob} 
           onJobAccepted={onJobAccepted}
+          onJobExpired={removeJob}
         />
       ))}
     </div>

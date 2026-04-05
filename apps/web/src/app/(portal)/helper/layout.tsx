@@ -10,16 +10,18 @@ import {
   DollarSign,
   Clock,
   CheckCircle2,
+  Activity,
 } from "lucide-react";
 import { useHelperLocation } from "@/hooks/useHelperLocation";
 import { useSession } from "@/lib/auth/session";
 
 const helperLinks = [
   { href: "/helper", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { href: "/helper/incoming-jobs", label: "Incoming Jobs", icon: <Inbox className="h-4 w-4" /> },
-  { href: "/helper/job-history", label: "Job History", icon: <History className="h-4 w-4" /> },
-  { href: "/helper/earnings", label: "Earnings", icon: <DollarSign className="h-4 w-4" /> },
   { href: "/helper/availability", label: "Availability", icon: <Clock className="h-4 w-4" /> },
+  { href: "/helper/active", label: "Active Job", icon: <Activity className="h-4 w-4" /> },
+  { href: "/helper/incoming-jobs", label: "Incoming Jobs", icon: <Inbox className="h-4 w-4" /> },
+  { href: "/helper/job-history", label: "Active & History", icon: <History className="h-4 w-4" /> },
+  { href: "/helper/earnings", label: "Earnings", icon: <DollarSign className="h-4 w-4" /> },
   { href: "/helper/verification", label: "Verification", icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
 
@@ -50,8 +52,9 @@ export default function HelperLayout({ children }: { children: React.ReactNode }
   return (
     <RoleSectionLayout
       title="Helper Portal"
-      description="Accept jobs, update availability, and manage earnings."
+      description="Go online, accept jobs, complete tasks, and track payouts."
       requiredRoles={["helper", "admin"]}
+      accessDeniedRedirect="/helper"
       navLinks={helperLinks}
     >
       {children}

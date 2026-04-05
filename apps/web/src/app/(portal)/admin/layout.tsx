@@ -8,6 +8,7 @@ import {
   CreditCard,
   TriangleAlert,
   BarChart3,
+  Wallet,
 } from "lucide-react";
 
 const adminLinks = [
@@ -18,6 +19,7 @@ const adminLinks = [
   { href: "/admin/bookings", label: "Bookings", icon: <Briefcase className="h-4 w-4" /> },
   { href: "/admin/payments", label: "Payments", icon: <CreditCard className="h-4 w-4" /> },
   { href: "/admin/disputes", label: "Disputes", icon: <TriangleAlert className="h-4 w-4" /> },
+  { href: "/admin/payouts", label: "Payouts", icon: <Wallet className="h-4 w-4" /> },
   { href: "/admin/analytics", label: "Analytics", icon: <BarChart3 className="h-4 w-4" /> },
 ];
 
@@ -27,6 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       title="Admin Console"
       description="Verify helpers, monitor operations, and resolve disputes."
       requiredRoles={["admin"]}
+      accessDeniedRedirect="/dashboard"
       navLinks={adminLinks}
     >
       {children}

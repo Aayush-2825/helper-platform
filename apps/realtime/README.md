@@ -8,28 +8,24 @@ Run the service in watch mode:
 pnpm dev
 ```
 
-The service listens on `http://localhost:4001` by default.
+The service listens on `http://localhost:3001` by default.
 
-- Health endpoint: `GET /`
-- Health aliases: `GET /health`, `GET /health/live`, `GET /health/ready`, `GET /api/realtime/health`
-- Websocket endpoints: `ws://localhost:4001/ws` and `ws://localhost:4001/api/realtime/ws`
-- Event publish endpoints: `POST /events` and `POST /api/realtime/events`
-- Realtime operations endpoints: `POST /api/realtime/ops/helper-presence`, `POST /api/realtime/ops/location-updates`, `POST /api/realtime/ops/booking-events`, `POST /api/realtime/ops/subscriptions`, `POST /api/realtime/ops/notification-queue`, `POST /api/realtime/ops/incoming-jobs`
+- WebSocket endpoint (recommended): `ws://localhost:3001/api/realtime/ws?userId=<user-id>`
+- Broadcast endpoint: `POST /api/realtime/broadcast`
+- Nearby helper HTTP endpoint: `GET /api/helpers/nearby`
 
 Publish event example:
 
 ```bash
-curl -X POST http://localhost:4001/api/realtime/events \
+curl -X POST http://localhost:3001/api/realtime/broadcast \
 	-H "Content-Type: application/json" \
-	-d '{"event":"booking.accepted","data":{"bookingId":"bk_123"}}'
+	-d '{"event":"booking_update","data":{"bookingId":"bk_123","eventType":"accepted"},"targetUserIds":["cus_1","hlp_2"]}'
 ```
 
-Helper presence example:
+Booking request WebSocket message example:
 
 ```bash
-curl -X POST http://localhost:4001/api/realtime/ops/helper-presence \
-	-H "Content-Type: application/json" \
-	-d '{"helperUserId":"hlp_9","status":"online","latitude":12.9123,"longitude":77.6421,"availableSlots":2}'
+{"type":"booking_request","bookingId":"9baf9e6a-8f81-48e8-a11f-0f520251ca82","targetUserIds":["hlp_2"]}
 ```
 
 Set `PORT` to override the default:
@@ -49,12 +45,29 @@ This compiles TypeScript into `dist/` and starts the service with Node.js.
 
 ## Message Model
 
-Incoming websocket messages are broadcast to all connected clients with this envelope:
+Server outbound events are delivered with this envelope:
 
 ```json
 {
-	"type": "broadcast",
-	"payload": "<raw-message>",
-	"timestamp": "2026-03-22T10:00:00.000Z"
+	"type": "event",
+	"event": "booking_update",
+	"data": {
+		"bookingId": "bk_123",
+		"eventType": "accepted"
+	}
 }
 ```
+
+Supported inbound message types:
+
+- `booking_request`
+- `booking_update`
+- `helper_search`
+- `booking_accept`
+- `booking_reject`
+- `booking_start`
+- `booking_cancel` (legacy alias: `cancel_search`)
+- `helper_presence`
+- `location_update`
+- `notification`
+- `payment_update`

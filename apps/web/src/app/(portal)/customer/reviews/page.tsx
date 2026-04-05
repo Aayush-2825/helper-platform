@@ -27,6 +27,14 @@ type SubmittedReview = {
   comment: string;
 };
 
+type PersistedReview = {
+  id: string;
+  bookingId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+};
+
 function StarRating({
   value,
   onChange,
@@ -124,7 +132,7 @@ function ReviewCard({
         <div className="space-y-1.5">
           <StarRating value={submitted.rating} readonly />
           {submitted.comment && (
-            <p className="text-sm text-muted-foreground italic">"{submitted.comment}"</p>
+            <p className="text-sm text-muted-foreground italic">&ldquo;{submitted.comment}&rdquo;</p>
           )}
           <p className="text-xs text-green-600 font-medium">Review submitted</p>
         </div>
@@ -170,10 +178,33 @@ export default function CustomerReviewsPage() {
   const [reviews, setReviews] = useState<Record<string, SubmittedReview>>({});
 
   useEffect(() => {
-    fetch("/api/bookings", { credentials: "include" })
-      .then((res) => res.json() as Promise<{ bookings?: Booking[] }>)
-      .then((data) => setBookings(data.bookings ?? []))
-      .catch(() => setBookings([]))
+    Promise.all([
+      fetch("/api/bookings", { credentials: "include" }).then((res) =>
+        res.json() as Promise<{ bookings?: Booking[] }>,
+      ),
+      fetch("/api/reviews", { credentials: "include" }).then((res) =>
+        res.json() as Promise<{ reviews?: PersistedReview[] }>,
+      ),
+    ])
+      .then(([bookingData, reviewData]) => {
+        setBookings(bookingData.bookings ?? []);
+
+        const mapped = Object.fromEntries(
+          (reviewData.reviews ?? []).map((entry) => [
+            entry.bookingId,
+            {
+              rating: entry.rating,
+              comment: entry.comment ?? "",
+            },
+          ]),
+        ) as Record<string, SubmittedReview>;
+
+        setReviews(mapped);
+      })
+      .catch(() => {
+        setBookings([]);
+        setReviews({});
+      })
       .finally(() => setLoading(false));
   }, []);
 

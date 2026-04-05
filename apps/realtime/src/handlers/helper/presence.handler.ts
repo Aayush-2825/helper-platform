@@ -1,10 +1,19 @@
 import { broadcastEvent } from "../../index.js";
 import { db, webDb } from "../../db/index.js";
-import { helperPresence, booking, helperProfile } from "../../db/schema.js";
-import { and, eq, inArray } from "drizzle-orm";
+import { helperPresence, bookingCandidate, helperProfile } from "../../db/schema.js";
+import { and, eq } from "drizzle-orm";
 
-export async function presenceHandler(_userId: string, data: any) {
-  const { helperUserId, status, latitude, longitude, availableSlots } = data;
+type PresenceStatus = "online" | "offline" | "busy" | "away";
+
+export async function presenceHandler(_userId: string, data: unknown) {
+  const payload = data as Record<string, unknown>;
+  const helperUserId = typeof payload.helperUserId === "string" ? payload.helperUserId : null;
+  const status = typeof payload.status === "string" && ["online", "offline", "busy", "away"].includes(payload.status)
+    ? (payload.status as PresenceStatus)
+    : null;
+  const latitude = typeof payload.latitude === "number" ? payload.latitude : null;
+  const longitude = typeof payload.longitude === "number" ? payload.longitude : null;
+  const availableSlots = typeof payload.availableSlots === "number" ? payload.availableSlots : null;
 
   // Persist to DB so the matching service can find this helper via /api/helpers/nearby
   if (helperUserId && status) {
@@ -15,8 +24,8 @@ export async function presenceHandler(_userId: string, data: any) {
           id: `presence-${helperUserId}`,
           helperUserId,
           status,
-          latitude: latitude ?? null,
-          longitude: longitude ?? null,
+          latitude: latitude != null ? String(latitude) : null,
+          longitude: longitude != null ? String(longitude) : null,
           availableSlots: availableSlots ?? null,
           lastHeartbeat: new Date(),
         })
@@ -24,8 +33,8 @@ export async function presenceHandler(_userId: string, data: any) {
           target: helperPresence.helperUserId,
           set: {
             status,
-            latitude: latitude ?? null,
-            longitude: longitude ?? null,
+            latitude: latitude != null ? String(latitude) : null,
+            longitude: longitude != null ? String(longitude) : null,
             availableSlots: availableSlots ?? null,
             lastHeartbeat: new Date(),
           },
@@ -43,7 +52,7 @@ export async function presenceHandler(_userId: string, data: any) {
   });
 
   // ✅ NEW: If helper goes online, sync pending jobs
-  if (status === "online") {
+  if (status === "online" && helperUserId) {
     try {
       // 1. Get helper profile to know their category
       const profile = await webDb.query.helperProfile.findFirst({
@@ -52,35 +61,68 @@ export async function presenceHandler(_userId: string, data: any) {
       });
 
       if (profile) {
-        // 2. Find 'requested' bookings in their category
-        // TODO: Add distance filter if needed, but for MVP let's show all in category
-        const pendingBookings = await webDb.query.booking.findMany({
+        // 2. Only sync bookings where this helper already has a pending candidate
+        // so helper can accept immediately and first-accept-wins logic stays valid.
+        const pendingCandidates = await webDb.query.bookingCandidate.findMany({
           where: and(
-            eq(booking.status, "requested"),
-            eq(booking.categoryId, profile.primaryCategory as any)
+            eq(bookingCandidate.helperProfileId, profile.id),
+            eq(bookingCandidate.response, "pending"),
           ),
-          orderBy: (b: any, { desc }: any) => [desc(b.requestedAt)],
-          limit: 10
+          with: {
+            booking: {
+              columns: {
+                id: true,
+                status: true,
+                categoryId: true,
+                addressLine: true,
+                city: true,
+                quotedAmount: true,
+                acceptanceDeadline: true,
+              },
+              with: {
+                customer: {
+                  columns: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+          limit: 10,
         });
 
-        if (pendingBookings.length > 0) {
-          console.log(`📡 [Job-Sync] Notifying helper ${helperUserId} about ${pendingBookings.length} pending jobs`);
-          
-          for (const b of pendingBookings) {
-            // Re-use logic from matching.ts or notify directly
+        const validCandidates = pendingCandidates.filter(
+          (candidate) =>
+            candidate.booking.status === "requested" &&
+            (!candidate.expiresAt || candidate.expiresAt > new Date()),
+        );
+
+        if (validCandidates.length > 0) {
+          console.log(`📡 [Job-Sync] Notifying helper ${helperUserId} about ${validCandidates.length} pending candidate jobs`);
+
+          for (const candidate of validCandidates) {
+            const b = candidate.booking;
             broadcastEvent({
               event: "booking_request",
               data: {
                 bookingId: b.id,
-                eventType: "created", // So the UI treats it as a new request
+                eventType: "created",
                 categoryId: b.categoryId,
                 addressLine: b.addressLine,
                 city: b.city,
                 quotedAmount: b.quotedAmount,
-                expiresAt: b.acceptanceDeadline?.toISOString(),
-                // Distance could be calculated here or in the UI
+                customerId: b.customer.id,
+                customerName: b.customer.name,
+                expiresAt: candidate.expiresAt?.toISOString() ?? b.acceptanceDeadline?.toISOString(),
+                candidates: [
+                  {
+                    helperId: helperUserId,
+                    candidateId: candidate.id,
+                  },
+                ],
               },
-              targetUserIds: [helperUserId]
+              targetUserIds: [helperUserId],
             });
           }
         }
