@@ -1,5 +1,4 @@
-import { access, mkdir, writeFile } from "fs/promises";
-import path from "path";
+import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
@@ -361,26 +360,63 @@ function validateOnboardingPayload(data: OnboardingPayload) {
   return errors;
 }
 
-async function pathExists(target: string) {
-  try {
-    await access(target);
-    return true;
-  } catch {
-    return false;
-  }
-}
+function getCloudinaryServerConfig() {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+  const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
+  const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
 
-async function getPublicDirectory() {
-  const repoPublicDirectory = path.join(process.cwd(), "apps", "web", "public");
-  if (await pathExists(repoPublicDirectory)) {
-    return repoPublicDirectory;
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error(
+      "Missing Cloudinary server env. Required: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET"
+    );
   }
 
-  return path.join(process.cwd(), "public");
+  return { cloudName, apiKey, apiSecret };
 }
 
-function sanitizeFileName(fileName: string) {
-  return fileName.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/-+/g, "-");
+function buildCloudinarySignature(
+  params: Record<string, string | number>,
+  apiSecret: string
+) {
+  const payload = Object.keys(params)
+    .sort()
+    .map((key) => `${key}=${params[key]}`)
+    .join("&");
+
+  return createHash("sha1")
+    .update(`${payload}${apiSecret}`)
+    .digest("hex");
+}
+
+async function uploadToCloudinary(upload: File, folderSegments: string[]) {
+  const { cloudName, apiKey, apiSecret } = getCloudinaryServerConfig();
+  const folder = `helper-platform/${folderSegments.join("/")}`;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = buildCloudinarySignature({ folder, timestamp }, apiSecret);
+
+  const formData = new FormData();
+  formData.append("file", upload);
+  formData.append("folder", folder);
+  formData.append("api_key", apiKey);
+  formData.append("timestamp", String(timestamp));
+  formData.append("signature", signature);
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Cloudinary upload failed: ${details}`);
+  }
+
+  const data = (await response.json()) as { secure_url?: string };
+  if (!data.secure_url) {
+    throw new Error("Cloudinary upload failed: secure_url missing in response");
+  }
+
+  return data.secure_url;
 }
 
 async function persistUpload(upload: UploadValue, folderSegments: string[]) {
@@ -392,16 +428,7 @@ async function persistUpload(upload: UploadValue, folderSegments: string[]) {
     return null;
   }
 
-  const publicDirectory = await getPublicDirectory();
-  const relativeDirectory = path.join("uploads", ...folderSegments);
-  const absoluteDirectory = path.join(publicDirectory, relativeDirectory);
-  const storedFileName = `${Date.now()}-${crypto.randomUUID()}-${sanitizeFileName(upload.name)}`;
-  const absolutePath = path.join(absoluteDirectory, storedFileName);
-
-  await mkdir(absoluteDirectory, { recursive: true });
-  await writeFile(absolutePath, Buffer.from(await upload.arrayBuffer()));
-
-  return `/${path.join(relativeDirectory, storedFileName).replace(/\\/g, "/")}`;
+  return uploadToCloudinary(upload, folderSegments);
 }
 
 function normalizePrimaryCategory(category: string | undefined) {
