@@ -26,6 +26,9 @@ importers:
       '@repo/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.15.3
       compression:
         specifier: ^1.8.1
         version: 1.8.1
@@ -75,9 +78,6 @@ importers:
       '@types/morgan':
         specifier: ^1.9.10
         version: 1.9.10
-      '@types/node':
-        specifier: ^22.15.3
-        version: 22.15.3
       '@types/pg':
         specifier: ^8.18.0
         version: 8.20.0
@@ -232,6 +232,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@types/node':
+        specifier: ^20.19.37
+        version: 20.19.37
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
@@ -248,9 +251,6 @@ importers:
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
-      '@types/node':
-        specifier: ^20.19.37
-        version: 20.19.37
       '@types/pg':
         specifier: ^8.18.0
         version: 8.20.0
