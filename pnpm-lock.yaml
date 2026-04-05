@@ -235,6 +235,9 @@ importers:
       '@types/node':
         specifier: ^20.19.37
         version: 20.19.37
+      '@types/pg':
+        specifier: ^8.18.0
+        version: 8.20.0
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
@@ -254,9 +257,6 @@ importers:
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
-      '@types/pg':
-        specifier: ^8.18.0
-        version: 8.20.0
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
