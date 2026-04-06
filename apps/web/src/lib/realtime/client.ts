@@ -19,6 +19,13 @@ function trimTrailingSlash(value: string): string {
 }
 
 export function getRealtimeHttpBaseUrl(): string {
+  if (typeof window === "undefined") {
+    const serverConfigured = process.env.REALTIME_BASE_URL;
+    if (serverConfigured && serverConfigured.trim().length > 0) {
+      return trimTrailingSlash(serverConfigured.trim());
+    }
+  }
+
   const configured = process.env.NEXT_PUBLIC_REALTIME_HTTP_BASE_URL;
   if (configured && configured.trim().length > 0) {
     return trimTrailingSlash(configured.trim());

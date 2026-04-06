@@ -35,6 +35,12 @@ Set `PORT` to override the default:
 PORT=4010 pnpm dev
 ```
 
+Set `CORS_ORIGIN` for allowed browser origins (comma-separated):
+
+```bash
+CORS_ORIGIN="http://localhost:3000,https://helper-platform-web.vercel.app"
+```
+
 ## Build
 
 ```bash
