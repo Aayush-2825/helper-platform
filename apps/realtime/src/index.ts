@@ -1,6 +1,8 @@
 import express from "express";
 import http from "http";
 import WebSocket, { WebSocketServer } from "ws";
+import type { IncomingMessage } from "http";
+import type { Duplex } from "stream";
 import router from "./routes/helpers.js";
 import realtimeRouter from "./routes/realtime.js";
 import cors from "cors";
@@ -18,6 +20,27 @@ import {
 const PORT = env.PORT;
 
 const app = express();
+
+function normalizeOrigin(origin: string): string {
+  return origin.trim().replace(/\/$/, "");
+}
+
+function isAllowedOrigin(origin?: string | null): boolean {
+  if (!origin || origin.trim().length === 0) {
+    return false;
+  }
+
+  const normalizedOrigin = normalizeOrigin(origin);
+  return env.CORS_ALLOWED_ORIGINS.some(
+    (allowedOrigin) => normalizeOrigin(allowedOrigin) === normalizedOrigin,
+  );
+}
+
+function rejectSocketUpgrade(request: IncomingMessage, socket: Duplex): void {
+  socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+  socket.destroy();
+  console.warn(`[WS] Rejected connection from origin: ${request.headers.origin ?? "unknown"}`);
+}
 
 const healthCheck = async (_req: express.Request, res: express.Response) => {
   try {
@@ -44,7 +67,14 @@ const healthCheck = async (_req: express.Request, res: express.Response) => {
 
 app.use(
   cors({
-    origin: env.CORS_ORIGIN,
+    origin(origin, callback) {
+      if (!origin || isAllowedOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin not allowed by CORS: ${origin}`));
+    },
     methods: ["GET", "POST"],
     credentials: true,
   }),
@@ -58,6 +88,12 @@ app.use("/api/realtime", realtimeRouter);
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+
+server.on("upgrade", (request, socket) => {
+  if (!isAllowedOrigin(request.headers.origin)) {
+    rejectSocketUpgrade(request, socket);
+  }
+});
 
 /**
  * 🔥 Map<userId, sockets>
@@ -162,6 +198,12 @@ export function broadcastEvent({
 // =========================
 
 wss.on("connection", (socket: WebSocket, request) => {
+  if (!isAllowedOrigin(request.headers.origin)) {
+    console.warn(`[WS] Origin rejected after handshake: ${request.headers.origin ?? "unknown"}`);
+    socket.close(1008, "Origin not allowed");
+    return;
+  }
+
   const url = new URL(request.url || "", "http://localhost");
   const userId = url.searchParams.get("userId");
 
