@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Clock, Zap } from "lucide-react";
 
@@ -85,7 +86,7 @@ export default function BlogPage() {
     <div className="min-h-screen bg-background text-foreground">
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl h-16">
         <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
-          <Link href="/"><img src="/dozo-logo.svg" alt="DOZO" className="h-8 w-auto" /></Link>
+          <Link href="/"><Image src="/dozo-logo.svg" alt="DOZO" className="h-8 w-auto" width={128} height={32} /></Link>
           <Link href="/" className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors">← Back to Home</Link>
         </div>
       </nav>
@@ -117,9 +118,9 @@ export default function BlogPage() {
 
           {/* Featured Post */}
           <Link href={`/blog/${FEATURED.slug}`} className="group block">
-            <div className="grid lg:grid-cols-2 gap-10 bg-background border border-border rounded-[20px] overflow-hidden hover:shadow-xl hover:border-foreground/20 transition-all">
-              <div className="aspect-[4/3] overflow-hidden">
-                <img src={FEATURED.image} alt={FEATURED.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            <div className="grid lg:grid-cols-2 gap-10 bg-background border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:border-foreground/20 transition-all">
+              <div className="relative aspect-4/3 overflow-hidden">
+                <Image src={FEATURED.image} alt={FEATURED.title} fill sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
               </div>
               <div className="p-8 lg:py-12 flex flex-col justify-center space-y-5">
                 <div className="flex items-center gap-3">
@@ -129,7 +130,7 @@ export default function BlogPage() {
                 <h2 className="text-3xl font-black leading-tight group-hover:text-primary transition-colors">{FEATURED.title}</h2>
                 <p className="text-muted-foreground font-medium leading-relaxed">{FEATURED.excerpt}</p>
                 <div className="flex items-center gap-4 pt-2">
-                  <img src={FEATURED.author.avatar} alt={FEATURED.author.name} className="size-9 rounded-full border border-border" />
+                  <Image src={FEATURED.author.avatar} alt={FEATURED.author.name} width={36} height={36} className="size-9 rounded-full border border-border" />
                   <div>
                     <p className="text-sm font-bold">{FEATURED.author.name}</p>
                     <p className="text-xs text-muted-foreground font-medium">{FEATURED.author.role}</p>
@@ -148,16 +149,16 @@ export default function BlogPage() {
           {/* Post Grid */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {POSTS.map((post) => (
-              <Link href={`/blog/${post.slug}`} key={post.slug} className="group bg-background border border-border rounded-[16px] overflow-hidden hover:shadow-xl hover:border-foreground/20 transition-all flex flex-col">
-                <div className="aspect-[16/9] overflow-hidden">
-                  <img src={post.image} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <Link href={`/blog/${post.slug}`} key={post.slug} className="group bg-background border border-border rounded-xl overflow-hidden hover:shadow-xl hover:border-foreground/20 transition-all flex flex-col">
+                <div className="relative aspect-video overflow-hidden">
+                  <Image src={post.image} alt={post.title} fill sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
                 <div className="p-6 flex flex-col flex-1 space-y-3">
                   <span className={`self-start px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wide rounded-full border ${CAT_COLORS[post.category] ?? "bg-muted text-muted-foreground border-border"}`}>{post.category}</span>
                   <h3 className="font-bold text-[17px] leading-snug group-hover:text-primary transition-colors flex-1">{post.title}</h3>
                   <p className="text-sm text-muted-foreground font-medium leading-relaxed line-clamp-2">{post.excerpt}</p>
                   <div className="flex items-center gap-3 pt-3 border-t border-border/60">
-                    <img src={post.author.avatar} alt={post.author.name} className="size-7 rounded-full border border-border" />
+                    <Image src={post.author.avatar} alt={post.author.name} width={28} height={28} className="size-7 rounded-full border border-border" />
                     <span className="text-xs font-bold text-muted-foreground flex-1">{post.author.name}</span>
                     <span className="flex items-center gap-1 text-xs text-muted-foreground font-medium"><Clock className="size-3" />{post.readTime}</span>
                   </div>

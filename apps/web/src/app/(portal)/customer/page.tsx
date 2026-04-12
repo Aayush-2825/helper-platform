@@ -9,21 +9,15 @@ import {
   MessageSquareText,
   Search,
   Car,
-  MoreHorizontal,
   Sparkles,
   PlugZap,
   Wrench,
   Utensils,
   Package,
-  Heart,
-  PlayCircle,
   History,
-  TrendingUp,
   MapPin
 } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { Booking } from "@/components/BookingCard";
 
@@ -82,7 +76,7 @@ export default function CustomerHomePage() {
           <input
             type="text"
             placeholder="Search for cleaners, electricians, etc."
-            className="w-full pl-12 pr-4 py-4 rounded-[8px] bg-muted/50 border-none focus:outline-none focus:ring-1 focus:ring-foreground text-[15px] font-medium transition-shadow"
+            className="w-full pl-12 pr-4 py-4 rounded-lg bg-muted/50 border-none focus:outline-none focus:ring-1 focus:ring-foreground text-[15px] font-medium transition-shadow"
           />
         </div>
       </section>
@@ -116,7 +110,7 @@ export default function CustomerHomePage() {
                       </div>
                       <Link
                         href={`/customer/bookings/${inProgressBooking.id}`}
-                        className="bg-foreground text-background px-6 py-3 rounded-[8px] font-bold text-center hover:bg-foreground/90 transition-colors text-[15px]"
+                        className="bg-foreground text-background px-6 py-3 rounded-lg font-bold text-center hover:bg-foreground/90 transition-colors text-[15px]"
                       >
                         Track
                       </Link>
@@ -128,7 +122,7 @@ export default function CustomerHomePage() {
                   <Link
                     key={booking.id}
                     href={`/customer/bookings/${booking.id}`}
-                    className="bg-card border border-border p-5 rounded-[12px] flex flex-col gap-3 group block hover:border-foreground/30 transition-colors"
+                    className="bg-card border border-border p-5 rounded-[12px] flex flex-col gap-3 group hover:border-foreground/30 transition-colors"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -154,7 +148,7 @@ export default function CustomerHomePage() {
               <div className="bg-background border border-dashed border-border rounded-[12px] p-8 mt-2 text-center flex flex-col items-center">
                 <Package className="size-8 text-muted-foreground mb-3" />
                 <h3 className="font-bold text-[15px]">No active jobs</h3>
-                <p className="text-muted-foreground text-sm mt-1">You don't have any requests right now.</p>
+                <p className="text-muted-foreground text-sm mt-1">You don&apos;t have any requests right now.</p>
               </div>
             )}
           </section>
@@ -188,7 +182,7 @@ export default function CustomerHomePage() {
                <CreditCard className="size-4" />
             </div>
             <h2 className="text-4xl font-black mt-1 tracking-tight text-foreground">₹1,240.00</h2>
-            <Link href="/customer/payments" className="mt-6 flex items-center justify-center gap-2 w-full bg-accent text-white hover:bg-accent/90 font-bold py-3 rounded-[8px] transition-colors text-sm">
+            <Link href="/customer/payments" className="mt-6 flex items-center justify-center gap-2 w-full bg-accent text-white hover:bg-accent/90 font-bold py-3 rounded-lg transition-colors text-sm">
               Manage Funds
             </Link>
           </div>
@@ -223,7 +217,7 @@ export default function CustomerHomePage() {
                 <h3 className="font-bold text-[15px]">Need Help?</h3>
              </div>
              <p className="text-sm text-muted-foreground font-medium mb-4">Contact support or browse our help center.</p>
-             <Button variant="outline" className="w-full justify-between font-bold h-10 rounded-[8px] bg-background">
+             <Button variant="outline" className="w-full justify-between font-bold h-10 rounded-lg bg-background">
                Help Center <ArrowRight className="size-4" />
              </Button>
           </div>

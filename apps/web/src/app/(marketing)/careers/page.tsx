@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Briefcase, MapPin, Clock, Zap, Users, TrendingUp, Heart } from "lucide-react";
 
@@ -38,7 +39,7 @@ export default function CareersPage() {
     <div className="min-h-screen bg-background text-foreground">
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl h-16">
         <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
-          <Link href="/"><img src="/dozo-logo.svg" alt="DOZO" className="h-8 w-auto" /></Link>
+          <Link href="/"><Image src="/dozo-logo.svg" alt="DOZO" className="h-8 w-auto" width={128} height={32} /></Link>
           <Link href="/" className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors">← Back to Home</Link>
         </div>
       </nav>
@@ -74,7 +75,7 @@ export default function CareersPage() {
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {PERKS.map((p) => (
-                <div key={p.title} className="bg-background rounded-[16px] border border-border p-6 space-y-4 hover:shadow-md transition">
+                <div key={p.title} className="bg-background rounded-xl border border-border p-6 space-y-4 hover:shadow-md transition">
                   <div className="size-12 rounded-[12px] bg-orange-50 border border-orange-100 flex items-center justify-center">
                     <p.icon className="size-5 text-orange-500" strokeWidth={2.5} />
                   </div>

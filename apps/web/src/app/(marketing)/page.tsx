@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import {
   MapPin, Star, ShieldCheck, Menu, CheckCircle2, Lock, ArrowRight,
   Zap, Users, Clock, Phone, BadgeCheck, Award, TrendingUp, X
@@ -93,22 +94,19 @@ export default function DozoLandingPage() {
     <div className="min-h-screen bg-background text-foreground font-sans overflow-x-hidden selection:bg-primary/20">
 
       {/* 1. NAVBAR */}
-      <nav className="fixed top-0 inset-x-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl h-[66px]">
+      <nav className="fixed top-0 inset-x-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl h-16.5">
         <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <img
+            <Image
               src="/dozo-logo.svg"
               alt="DOZO"
               className="h-9 w-auto"
-              onError={(e) => {
-                const img = e.target as HTMLImageElement;
-                img.style.display = "none";
-                const span = img.nextSibling as HTMLElement;
-                if (span) span.style.display = "block";
-              }}
+              width={144}
+              height={36}
+              priority
             />
-            <span className="font-black text-2xl tracking-tight hidden">Dozo</span>
+            <span className="font-black text-2xl tracking-tight">Dozo</span>
           </Link>
 
           {/* Desktop Nav */}
@@ -123,7 +121,7 @@ export default function DozoLandingPage() {
 
             <Link href="/helper" className="hidden lg:block font-bold text-sm text-muted-foreground hover:text-primary transition-colors mr-1">Become a Helper</Link>
             <Link href="/auth/signin" className="hidden sm:block font-bold text-sm hover:text-primary transition">Log in</Link>
-            <Button className="bg-foreground text-background hover:bg-foreground/90 font-bold px-5 py-2.5 rounded-[8px] transition-all text-sm h-auto">
+            <Button className="bg-foreground text-background hover:bg-foreground/90 font-bold px-5 py-2.5 rounded-lg transition-all text-sm h-auto">
               Sign Up Free
             </Button>
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -197,9 +195,16 @@ export default function DozoLandingPage() {
 
             {/* Hero Visual */}
             <div className="hidden lg:block relative">
-              <div className="relative w-full aspect-[4/3] rounded-[24px] overflow-hidden border border-border shadow-2xl">
-                <img src="/images/services/dozo_home_cleaning_pro_1775929072455.png" alt="DOZO professional cleaner" className="object-cover w-full h-full" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+              <div className="relative w-full aspect-4/3 rounded-3xl overflow-hidden border border-border shadow-2xl">
+                <Image
+                  src="/images/services/dozo_home_cleaning_pro_1775929072455.png"
+                  alt="DOZO professional cleaner"
+                  fill
+                  sizes="(min-width: 1024px) 50vw, 100vw"
+                  className="object-cover"
+                  priority
+                />
+                <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent" />
                 {/* Dynamic Cycling Helper Card */}
                 <div
                   className="absolute bottom-5 left-5 right-5 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[14px] p-4 shadow-xl transition-all duration-400"
@@ -214,14 +219,20 @@ export default function DozoLandingPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="relative shrink-0">
-                      <img src={helper.avatar} alt={helper.name} className="size-11 rounded-full object-cover border-2 border-white/40" />
+                      <Image
+                        src={helper.avatar}
+                        alt={helper.name}
+                        width={44}
+                        height={44}
+                        className="size-11 rounded-full object-cover border-2 border-white/40"
+                      />
                       <div className="absolute -bottom-0.5 -right-0.5 size-4 bg-emerald-400 rounded-full border-2 border-white/30" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-bold text-sm truncate">{helper.name}</p>
                       <p className="text-white/60 text-xs font-medium">{helper.skill} · ⭐ {helper.rating} · {helper.jobs} jobs</p>
                     </div>
-                    <div className="flex items-center gap-1.5 bg-white text-zinc-900 font-bold text-xs px-3 py-2 rounded-[8px] shrink-0">
+                    <div className="flex items-center gap-1.5 bg-white text-zinc-900 font-bold text-xs px-3 py-2 rounded-lg shrink-0">
                       <CheckCircle2 className="size-3.5 text-emerald-600" />
                       Confirmed
                     </div>
@@ -252,7 +263,7 @@ export default function DozoLandingPage() {
           <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6">
             {HERO_STATS.map((s) => (
               <div key={s.label} className="flex items-center gap-4">
-                <div className="size-10 rounded-[10px] bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0">
+                <div className="size-10 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0">
                   <s.icon className="size-5 text-orange-500" strokeWidth={2} />
                 </div>
                 <div>
@@ -301,14 +312,14 @@ export default function DozoLandingPage() {
                 Your safety is our<br />non-negotiable.
               </h2>
               <p className="text-lg text-muted-foreground font-medium leading-relaxed">
-                We've built every layer of DOZO with safety first — from helper onboarding to payment processing.
+                We&apos;ve built every layer of DOZO with safety first — from helper onboarding to payment processing.
               </p>
             </div>
 
             {/* Features Grid */}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {TRUST_FEATURES.map((f) => (
-                <div key={f.title} className="bg-background rounded-[16px] border border-border p-7 space-y-5 hover:shadow-md hover:-translate-y-0.5 transition-all">
+                <div key={f.title} className="bg-background rounded-xl border border-border p-7 space-y-5 hover:shadow-md hover:-translate-y-0.5 transition-all">
                   <div className={`size-12 rounded-[12px] border flex items-center justify-center ${f.color}`}>
                     <f.icon className="size-5" strokeWidth={2.5} />
                   </div>
@@ -321,7 +332,7 @@ export default function DozoLandingPage() {
             </div>
 
             {/* Bottom CTA */}
-            <div className="bg-foreground text-background rounded-[20px] p-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="bg-foreground text-background rounded-2xl p-10 flex flex-col md:flex-row items-center justify-between gap-6">
               <div>
                 <h3 className="text-2xl font-black mb-2">Ready to experience DOZO?</h3>
                 <p className="text-background/60 font-medium">Join 2M+ customers who trust DOZO for their everyday needs.</p>
@@ -338,9 +349,15 @@ export default function DozoLandingPage() {
           <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-16">
               <div className="col-span-2 space-y-4 pr-8">
-                <img src="/dozo-logo.svg" alt="DOZO" className="h-9 w-auto" />
+                <Image
+                  src="/dozo-logo.svg"
+                  alt="DOZO"
+                  className="h-9 w-auto"
+                  width={144}
+                  height={36}
+                />
                 <p className="text-muted-foreground font-medium text-sm leading-relaxed">
-                  Help in 10 Minutes. India's most trusted on-demand service marketplace — connecting skilled helpers with people who need them.
+                  Help in 10 Minutes. India&apos;s most trusted on-demand service marketplace — connecting skilled helpers with people who need them.
                 </p>
                 <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
                   <span className="flex items-center gap-1.5"><ShieldCheck className="size-3.5 text-emerald-500" />ISO 27001</span>
