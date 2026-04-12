@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" fill="none">
+  <!-- Map Pin Outline -->
+  <path d="M36 6C22.7 6 12 16.7 12 30C12 48 36 74 36 74C36 74 60 48 60 30C60 16.7 49.3 6 36 6Z" fill="none" stroke="#1a2e4a" stroke-width="4.5"/>
+  <!-- Running Figure (orange) -->
+  <circle cx="36" cy="20" r="4.5" fill="#f97316"/>
+  <path d="M30 27 Q36 23 42 27 L45 36 Q39 33 36 35 L33 44 L28 38 L30 27Z" fill="#f97316"/>
+  <path d="M33 44 L29 52" stroke="#f97316" stroke-width="3" stroke-linecap="round"/>
+  <path d="M36 35 L40 50" stroke="#f97316" stroke-width="3" stroke-linecap="round"/>
+  <!-- Lightning Bolt (orange) -->
+  <path d="M32 46 L28 56 L36 52 L32 62 L42 50 L34 54 Z" fill="#f97316"/>
+  <!-- "Dozo" Text -->
+  <text x="76" y="52" font-family="'Inter', 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="40" fill="#1a2e4a" letter-spacing="-1">Dozo</text>
+</svg>
