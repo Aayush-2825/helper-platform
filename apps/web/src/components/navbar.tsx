@@ -14,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface NavbarProps {
   title: string;
@@ -55,7 +54,6 @@ export function Navbar({ title }: NavbarProps) {
 
         {/* Right Section - User Menu */}
         <div className="flex items-center gap-2">
-          <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button variant="ghost" className="relative h-10 w-10 rounded-full" />}
