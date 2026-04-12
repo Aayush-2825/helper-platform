@@ -3,16 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  ArrowRight, CalendarRange, Coins, RadioTower, ShieldCheck,
-  Clock, TrendingUp, Wifi,
+  ArrowRight, Coins, ShieldCheck,
+  TrendingUp, Wifi, BellRing, Navigation, CheckCircle2, XCircle
 } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useSession } from "@/lib/auth/session";
 import { COMMISSION_RATE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 type Booking = {
   id: string;
@@ -20,6 +18,7 @@ type Booking = {
   quotedAmount: number;
   finalAmount?: number | null;
   categoryId: string;
+  addressLine?: string;
 };
 
 type HelperProfileSummary = {
@@ -29,53 +28,20 @@ type HelperProfileSummary = {
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
-  cleaner: "Cleaner", electrician: "Electrician", plumber: "Plumber",
-  driver: "Driver", chef: "Chef", delivery_helper: "Delivery Helper",
-  caretaker: "Caretaker", other: "Other",
+  cleaner: "Cleaning", electrician: "Electrician", plumber: "Plumbing",
+  driver: "Driving", chef: "Chef", delivery_helper: "Delivery",
+  caretaker: "Caretaking", other: "Other",
 };
-
-const helperActions = [
-  {
-    title: "Incoming Jobs",
-    description: "Accept or reject nearby requests in real time.",
-    href: "/helper/incoming-jobs",
-    icon: RadioTower,
-  },
-  {
-    title: "Job History",
-    description: "Review active, completed, and canceled assignments.",
-    href: "/helper/job-history",
-    icon: CalendarRange,
-  },
-  {
-    title: "Earnings",
-    description: "Track payouts and settlement summaries.",
-    href: "/helper/earnings",
-    icon: Coins,
-  },
-  {
-    title: "Availability",
-    description: "Switch status between online and offline.",
-    href: "/helper/availability",
-    icon: Wifi,
-  },
-  {
-    title: "Verification",
-    description: "Submit and track KYC verification status.",
-    href: "/helper/verification",
-    icon: ShieldCheck,
-  },
-];
 
 export default function HelperHomePage() {
   const { session } = useSession();
+  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isOnline, setIsOnline] = useState(false);
   const [helperProfile, setHelperProfile] = useState<HelperProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch bookings and profile status
     Promise.all([
       fetch("/api/bookings", { credentials: "include" }).then(r => r.json()),
       fetch("/api/helper/profile", { credentials: "include" }).then(r => r.json())
@@ -87,192 +53,180 @@ export default function HelperHomePage() {
     .finally(() => setLoading(false));
   }, []);
 
-  const activeJobs = bookings.filter((b) => b.status === "accepted" || b.status === "in_progress");
+  const activeJobs = bookings.filter((b) => b.status === "in_progress" || b.status === "accepted");
+  const pendingRequests = bookings.filter((b) => b.status === "requested" || b.status === "matched"); // Emulated for UI purposes
   const completedJobs = bookings.filter((b) => b.status === "completed");
   const totalNet = completedJobs.reduce((sum, b) => sum + Math.round((b.finalAmount ?? b.quotedAmount) * (1 - COMMISSION_RATE)), 0);
-  const averageRating = Number(helperProfile?.averageRating ?? 0);
-  const totalRatings = helperProfile?.totalRatings ?? 0;
-  const ratingLabel = totalRatings > 0 ? `${averageRating.toFixed(1)} ★` : "No ratings yet";
+  
   const userName = session?.user?.name?.split(" ")[0] || "Partner";
-  const hasActiveJobs = activeJobs.length > 0;
-  const nextStepHref = hasActiveJobs
-    ? "/helper/active"
-    : isOnline
-      ? "/helper/incoming-jobs"
-      : "/helper/availability";
-  const nextStepLabel = hasActiveJobs
-    ? "Resume active job"
-    : isOnline
-      ? "Review incoming jobs"
-      : "Set availability online";
 
   const toggleAvailability = async () => {
     const newStatus = isOnline ? "offline" : "online";
     try {
-      const res = await fetch("/api/helper/availability", {
+      // Optimistic update for low-tech user feedback speed
+      setIsOnline(!isOnline);
+      await fetch("/api/helper/availability", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ availabilityStatus: newStatus }),
       });
-      if (res.ok) {
-        setIsOnline(!isOnline);
-      }
-    } catch {}
+    } catch {
+      setIsOnline(isOnline);
+    }
   };
 
   return (
-    <main className="space-y-10 pb-20">
-      {/* Welcome Hero & Quick Toggle */}
-      <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 reveal-up">
-        <div className="space-y-1">
-          <h1 className="text-4xl font-heading font-bold tracking-tight">
-            Hello, <span className="text-primary">{userName}!</span>
-          </h1>
-          <p className="text-muted-foreground text-lg font-medium">
-            You are currently <span className={cn("font-bold", isOnline ? "text-green-500" : "text-muted-foreground")}>
-              {isOnline ? "Online" : "Offline"}
-            </span>
+    <main className="pb-24 max-w-lg mx-auto md:max-w-4xl space-y-8 fade-up">
+      {/* 1. FLAT AVAILABILITY TOGGLE */}
+      <section>
+        <div 
+          onClick={toggleAvailability}
+          className={cn(
+            "cursor-pointer rounded-[12px] p-6 border transition-all duration-200 flex flex-col items-center justify-center min-h-[160px]",
+            isOnline 
+              ? "bg-success/5 border-success/40" 
+              : "bg-muted border-border"
+          )}
+        >
+          <div className={cn(
+            "size-16 rounded-full flex items-center justify-center transition-all duration-200 mb-3",
+            isOnline ? "bg-success text-white" : "bg-muted-foreground text-background"
+          )}>
+            <Wifi className="size-8" />
+          </div>
+          <h2 className={cn(
+            "text-2xl font-black tracking-tight",
+            isOnline ? "text-success" : "text-muted-foreground"
+          )}>
+            {isOnline ? "YOU ARE ONLINE" : "YOU ARE OFFLINE"}
+          </h2>
+          <p className="text-muted-foreground font-semibold text-sm text-center mt-1">
+            {isOnline ? "Waiting for nearby jobs..." : "Tap to start receiving jobs"}
           </p>
         </div>
-        
-        <div className="flex items-center gap-4 bg-card/40 border border-border/50 p-2 rounded-3xl shadow-xl backdrop-blur-xl">
-           <span className="text-sm font-bold ml-4 mr-2">{isOnline ? "Go Offline" : "Go Online"}</span>
-           <Button 
-             onClick={toggleAvailability}
-             disabled={loading}
-             className={cn(
-               "size-14 rounded-full shadow-2xl transition-all duration-500 flex items-center justify-center p-0",
-               isOnline ? "bg-green-500 hover:bg-green-600 scale-110" : "bg-muted-foreground/20 hover:bg-muted-foreground/30"
-             )}
-           >
-             <Wifi className={cn("size-6 transition-all", isOnline ? "text-white scale-110" : "text-muted-foreground")} />
-           </Button>
-        </div>
       </section>
 
-      {/* Stats Overview */}
-      <section className="grid gap-6 sm:grid-cols-2 reveal-up delay-1">
-        <Card className="surface-card-strong border-none p-2 overflow-hidden relative group">
-          <div className="absolute -right-4 -top-4 size-32 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all" />
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3 text-lg font-bold text-muted-foreground">
-              <TrendingUp className="size-5 text-primary" /> Today&apos;s Earning
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-             <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-heading font-black tracking-tighter">₹{totalNet.toLocaleString("en-IN")}</span>
-                <span className="text-sm text-green-500 font-bold">+12% vs last week</span>
-             </div>
-             <p className="text-xs text-muted-foreground mt-4 font-medium uppercase tracking-widest">Payouts every Monday</p>
-          </CardContent>
-        </Card>
-
-        <Card className="surface-card border-none p-2">
-           <CardHeader>
-             <CardTitle className="text-lg font-bold">Service Stats</CardTitle>
-           </CardHeader>
-           <CardContent className="grid grid-cols-2 gap-4">
-              <div className="bg-muted/30 p-4 rounded-2xl space-y-1">
-                 <p className="text-xs text-muted-foreground font-bold uppercase">Jobs Done</p>
-                 <p className="text-2xl font-black">{completedJobs.length}</p>
-              </div>
-              <div className="bg-muted/30 p-4 rounded-2xl space-y-1">
-                 <p className="text-xs text-muted-foreground font-bold uppercase">Rating</p>
-                  <p className="text-2xl font-black">{ratingLabel}</p>
-                  <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{totalRatings} reviews</p>
-              </div>
-           </CardContent>
-        </Card>
-      </section>
-
-      <section className="reveal-up delay-2">
-        <Card className="surface-card-strong border-none p-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="space-y-2">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">Operational Flow</p>
-              <h2 className="text-2xl font-heading font-black">Your Next Step</h2>
-              <p className="text-sm text-muted-foreground">
-                {hasActiveJobs
-                  ? "You have an active assignment. Continue from one place with OTP and status controls."
-                  : isOnline
-                    ? "You are online. Check and accept matching requests quickly to maximize conversion."
-                    : "Go online first so new bookings can reach you in real-time."}
-              </p>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">{isOnline ? "Online" : "Offline"}</Badge>
-                <Badge variant="outline">{activeJobs.length} active</Badge>
-              </div>
-            </div>
-            <Link href={nextStepHref} className={buttonVariants({ variant: "default", className: "rounded-2xl px-6" })}>
-              {nextStepLabel}
-            </Link>
+      {/* 2. INCOMING REQUESTS (Prominent if Online) */}
+      {isOnline && pendingRequests.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 text-foreground font-bold text-lg">
+             <div className="size-2 rounded-full bg-success animate-pulse" /> NEW JOB REQUEST
           </div>
-        </Card>
-      </section>
-
-      {/* Active Jobs Section */}
-      <section className="reveal-up delay-3">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-heading font-bold">Ongoing Tasks</h2>
-          <Link href="/helper/job-history" className="text-primary text-sm font-semibold hover:underline">
-            History
-          </Link>
-        </div>
-        
-        {activeJobs.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {activeJobs.map((b) => (
-              <Card key={b.id} className="surface-card border-none p-1 transition-all hover:-translate-y-1 active:scale-95 group">
-                <Link href={`/helper/bookings/${b.id}`} className="p-5 flex flex-col gap-4">
-                  <div className="flex items-center justify-between">
-                    <Badge className="bg-primary/10 text-primary border-none rounded-lg px-2 py-1 font-bold text-[10px]">
-                      {CATEGORY_LABELS[b.categoryId] || b.categoryId}
-                    </Badge>
-                    <span className="text-lg font-black tracking-tighter text-primary">₹{b.quotedAmount}</span>
-                  </div>
-                  <div>
-                    <p className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">Helper Request #{b.id.slice(-4).toUpperCase()}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Status: {b.status === "in_progress" ? "In Progress" : "Accepted"}</p>
-                  </div>
-                  <div className="flex items-center text-sm font-bold text-primary gap-2 mt-2">
-                    Manage Task <ArrowRight className="size-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </Link>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-muted/20 border border-dashed border-border/50 rounded-3xl p-12 text-center space-y-4">
-             <div className="size-16 rounded-full bg-muted/40 flex items-center justify-center mx-auto">
-                <Clock className="size-8 text-muted-foreground" />
+          
+          <div className="bg-card border border-border rounded-[12px] shadow-sm overflow-hidden flex flex-col">
+             <div className="h-24 bg-muted flex items-center justify-center border-b border-border">
+                 <Navigation className="size-8 text-muted-foreground" />
              </div>
-             <div className="space-y-1">
-                <p className="font-bold text-lg">No active jobs</p>
-                <p className="text-sm text-muted-foreground">Go online to start receiving requests near you.</p>
+             <div className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                   <div>
+                     <h3 className="text-xl font-bold text-foreground">House Cleaning</h3>
+                     <p className="text-muted-foreground font-medium text-sm mt-1">2.4 km away • HSR Layout</p>
+                   </div>
+                   <div className="text-right">
+                     <h4 className="text-2xl font-black text-foreground">₹450</h4>
+                     <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">Estimated</p>
+                   </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 mt-6">
+                  <Button className="h-12 rounded-[8px] text-[15px] font-bold bg-muted text-foreground hover:bg-muted/80 transition-colors border-none group">
+                     <XCircle className="mr-2 size-4 text-muted-foreground" /> Reject
+                  </Button>
+                  <Button className="h-12 rounded-[8px] text-[15px] font-bold bg-foreground text-background hover:bg-foreground/90 transition-colors border-none">
+                     <CheckCircle2 className="mr-2 size-4" /> Accept
+                  </Button>
+                </div>
              </div>
           </div>
-        )}
+        </section>
+      )}
+
+      {/* ACTIVE TASKS */}
+      {activeJobs.length > 0 && (
+        <section>
+           <h3 className="text-xl font-bold mb-4 tracking-tight">Active Task</h3>
+           {activeJobs.map(job => (
+             <Link key={job.id} href={`/helper/bookings/${job.id}`} className="block">
+               <div className="bg-foreground text-background p-6 rounded-[12px] border-none flex flex-col justify-between items-center sm:flex-row gap-4 hover:opacity-95 transition-opacity">
+                  <div className="text-center sm:text-left">
+                    <div className="bg-white/20 text-white w-fit mx-auto sm:mx-0 mb-3 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest">
+                      {job.status === "in_progress" ? "In Progress" : "Go to location"}
+                    </div>
+                    <h4 className="text-xl font-black">{CATEGORY_LABELS[job.categoryId] || job.categoryId}</h4>
+                    <p className="text-white/70 font-semibold text-sm mt-1">{job.addressLine || "Check map for details"}</p>
+                  </div>
+                  <div className="size-12 rounded-full bg-background flex items-center justify-center shrink-0">
+                    <ArrowRight className="size-5 text-foreground" />
+                  </div>
+               </div>
+             </Link>
+           ))}
+        </section>
+      )}
+
+      {/* 3. SIMPLIFIED EARNINGS GRAPH */}
+      <section>
+         <h3 className="text-xl font-bold mb-4 tracking-tight">Your Earnings</h3>
+         <div className="bg-card border border-border p-6 rounded-[12px]">
+            <div className="flex justify-between items-end mb-8">
+               <div>
+                  <p className="text-muted-foreground font-semibold uppercase tracking-widest text-xs">Today</p>
+                  <h4 className="text-4xl font-black text-foreground tracking-tighter mt-1">
+                    ₹{totalNet.toLocaleString("en-IN")}
+                  </h4>
+               </div>
+               <div className="bg-success/10 text-success font-bold px-3 py-1 rounded-sm text-xs flex items-center">
+                 <TrendingUp className="size-3 mr-1"/> Top 10%
+               </div>
+            </div>
+
+            {/* Flat Bar Graph */}
+            <div className="flex items-end justify-between h-32 gap-3 mt-4">
+               {[10, 40, 20, 60, 30, 90, 50].map((height, i) => (
+                 <div key={i} className="w-full flex justify-center group relative h-full items-end">
+                    {/* Tooltip emulation */}
+                    <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-background text-xs font-bold py-1 px-2 rounded-[4px]">
+                       ₹{height * 10}
+                    </div>
+                    {/* Bar */}
+                    <div 
+                      className={cn(
+                        "w-full max-w-[2rem] rounded-t-sm transition-colors duration-200",
+                        height === 90 ? "bg-foreground" : "bg-muted hover:bg-muted-foreground/30"
+                      )}
+                      style={{ height: `${height}%` }}
+                    />
+                 </div>
+               ))}
+            </div>
+            <div className="flex justify-between text-[11px] font-bold text-muted-foreground mt-4 px-1">
+               <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+            </div>
+         </div>
       </section>
 
-      {/* Helper Quick Links */}
-      <section className="grid sm:grid-cols-3 gap-6 reveal-up delay-4">
-        {helperActions.filter(a => a.href !== "/helper/availability").map((action) => (
-          <Link 
-            key={action.href} 
-            href={action.href}
-            className="surface-card p-6 flex flex-col gap-4 hover:scale-105 active:scale-95 transition-all group"
-          >
-            <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
-                <action.icon className="size-6" />
-            </div>
-            <div className="space-y-1">
-                <p className="font-bold text-lg leading-tight">{action.title}</p>
-                <p className="text-xs text-muted-foreground font-medium">{action.description}</p>
-            </div>
-          </Link>
-        ))}
+      {/* QUICK ACTIONS */}
+      <section className="grid grid-cols-2 gap-4">
+         <Link href="/helper/earnings">
+           <div className="bg-card border border-border p-4 rounded-[12px] flex flex-col items-center justify-center text-center gap-2 hover:border-foreground/30 transition-colors">
+             <div className="size-10 rounded-full bg-muted flex items-center justify-center text-foreground">
+                <Coins className="size-5" />
+             </div>
+             <p className="font-bold text-sm">Payouts</p>
+           </div>
+         </Link>
+
+         <Link href="/helper/verification">
+           <div className="bg-card border border-border p-4 rounded-[12px] flex flex-col items-center justify-center text-center gap-2 hover:border-foreground/30 transition-colors">
+             <div className="size-10 rounded-full bg-muted flex items-center justify-center text-foreground">
+                <ShieldCheck className="size-5" />
+             </div>
+             <p className="font-bold text-sm">Profile</p>
+           </div>
+         </Link>
       </section>
+
     </main>
   );
 }
