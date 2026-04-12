@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Zap, Users, Globe, Heart, Shield, Target, TrendingUp } from "lucide-react";
 
@@ -35,8 +36,8 @@ export default function AboutPage() {
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl h-16">
         <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
           <Link href="/">
-            <img src="/dozo-logo.svg" alt="DOZO" className="h-8 w-auto" onError={(e) => { (e.target as HTMLImageElement).style.display='none'; }} />
-            <span className="font-black text-xl tracking-tight" style={{display:'none'}}>Dozo</span>
+            <Image src="/dozo-logo.svg" alt="DOZO" className="h-8 w-auto" width={128} height={32} priority />
+            <span className="font-black text-xl tracking-tight">Dozo</span>
           </Link>
           <Link href="/" className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
             ← Back to Home
@@ -53,7 +54,7 @@ export default function AboutPage() {
               Our Story
             </div>
             <h1 className="text-5xl lg:text-6xl font-black tracking-tight leading-tight">
-              We're making help{" "}
+              We&apos;re making help{" "}
               <span className="text-orange-500">instant</span>{" "}
               for every Indian.
             </h1>
@@ -83,21 +84,28 @@ export default function AboutPage() {
                 <Target className="size-4" /> Our Mission
               </div>
               <h2 className="text-4xl font-black tracking-tight leading-tight">
-                Building India's most trusted service marketplace.
+                Building India&apos;s most trusted service marketplace.
               </h2>
               <p className="text-lg text-muted-foreground font-medium leading-relaxed">
                 We connect skilled workers with people who need them — instantly, reliably, and fairly. Our platform creates economic opportunity for helpers while giving customers peace of mind that the job will be done right.
               </p>
               <p className="text-lg text-muted-foreground font-medium leading-relaxed">
-                We've served over 2 million jobs across 50+ cities and we're just getting started.
+                We&apos;ve served over 2 million jobs across 50+ cities and we&apos;re just getting started.
               </p>
               <Link href="/customer/book" className="inline-flex items-center gap-2 bg-foreground text-background font-bold px-6 py-3 rounded-[10px] hover:bg-foreground/90 transition">
                 Book a Service <ArrowRight className="size-4" />
               </Link>
             </div>
             <div className="relative aspect-square max-w-lg mx-auto">
-              <img src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=800&q=80" alt="DOZO team" className="w-full h-full object-cover rounded-[24px] border border-border shadow-xl" />
-              <div className="absolute -bottom-5 -right-5 bg-background border border-border rounded-[16px] p-5 shadow-lg">
+              <Image
+                src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=800&q=80"
+                alt="DOZO team"
+                fill
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                className="object-cover rounded-3xl border border-border shadow-xl"
+                priority
+              />
+              <div className="absolute -bottom-5 -right-5 bg-background border border-border rounded-xl p-5 shadow-lg">
                 <div className="flex items-center gap-3">
                   <TrendingUp className="size-6 text-orange-500" />
                   <div>
@@ -121,7 +129,7 @@ export default function AboutPage() {
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {VALUES.map((v) => (
-                <div key={v.title} className="bg-background rounded-[16px] border border-border p-6 space-y-4 hover:shadow-md transition-shadow">
+                <div key={v.title} className="bg-background rounded-xl border border-border p-6 space-y-4 hover:shadow-md transition-shadow">
                   <div className={`size-12 rounded-[12px] border flex items-center justify-center ${v.color}`}>
                     <v.icon className="size-5" strokeWidth={2.5} />
                   </div>
@@ -142,12 +150,12 @@ export default function AboutPage() {
               <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground uppercase tracking-widest">
                 <Users className="size-4" /> Leadership Team
               </div>
-              <h2 className="text-4xl font-black tracking-tight">Built by people who've done it before.</h2>
+              <h2 className="text-4xl font-black tracking-tight">Built by people who&apos;ve done it before.</h2>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {TEAM.map((t) => (
-                <div key={t.name} className="bg-background rounded-[16px] border border-border p-6 space-y-4 hover:shadow-md transition-shadow">
-                  <img src={t.avatar} alt={t.name} className="size-16 rounded-full object-cover border-2 border-border" />
+                <div key={t.name} className="bg-background rounded-xl border border-border p-6 space-y-4 hover:shadow-md transition-shadow">
+                  <Image src={t.avatar} alt={t.name} width={64} height={64} className="size-16 rounded-full object-cover border-2 border-border" />
                   <div>
                     <p className="font-bold text-foreground">{t.name}</p>
                     <p className="text-sm font-bold text-orange-500 mb-2">{t.role}</p>

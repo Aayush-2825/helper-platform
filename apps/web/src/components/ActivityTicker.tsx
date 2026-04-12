@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
+import Image from "next/image";
 import { CheckCircle2 } from "lucide-react";
 
 const ACTIVITIES = [
@@ -20,13 +21,13 @@ export function ActivityTicker() {
   return (
     <div className="border-y border-border bg-background py-3 overflow-hidden relative">
       {/* Fade masks */}
-      <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+      <div className="absolute left-0 top-0 bottom-0 w-24 bg-linear-to-r from-background to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-24 bg-linear-to-l from-background to-transparent z-10 pointer-events-none" />
 
       <div ref={trackRef} className="flex gap-6 animate-ticker" style={{ width: "max-content" }}>
         {[...ACTIVITIES, ...ACTIVITIES].map((a, i) => (
           <div key={i} className="flex items-center gap-2.5 bg-muted/60 border border-border rounded-full px-3 py-1.5 shrink-0">
-            <img src={a.avatar} alt={a.name} className="size-5 rounded-full object-cover" />
+            <Image src={a.avatar} alt={a.name} width={20} height={20} className="size-5 rounded-full object-cover" />
             <span className="text-xs font-bold text-foreground">{a.name}</span>
             <span className="text-xs font-medium text-muted-foreground">in {a.city}</span>
             <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
