@@ -106,7 +106,7 @@ export default function DozoLandingPage() {
               height={36}
               priority
             />
-            <span className="font-black text-2xl tracking-tight">Dozo</span>
+            {/* <span className="font-black text-2xl tracking-tight">Dozo</span> */}
           </Link>
 
           {/* Desktop Nav */}
