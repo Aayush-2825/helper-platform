@@ -66,14 +66,45 @@ const adminActions = [
 export default function AdminHomePage() {
   return (
     <div className="space-y-12">
-      <div className="reveal-up space-y-2 px-1">
+      <div className="reveal-up space-y-3 px-1">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Admin control center</p>
         <h2 className="text-4xl font-heading font-black tracking-tight">
           Marketplace <span className="text-primary">Control</span>
         </h2>
-        <p className="text-muted-foreground font-medium">
-          Manage global operations, verify providers, and handle service
-          disputes.
+        <p className="max-w-3xl text-muted-foreground font-medium">
+          Manage global operations, verify providers, and handle service disputes with a single operational workspace.
         </p>
+      </div>
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Card className="surface-card-strong border-none">
+          <CardContent className="p-5">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">User operations</p>
+            <p className="mt-2 text-lg font-bold tracking-tight">Customer and helper management</p>
+            <p className="mt-1 text-sm text-muted-foreground">Review accounts, verifications, and role-specific health from dedicated modules.</p>
+          </CardContent>
+        </Card>
+        <Card className="surface-card-strong border-none">
+          <CardContent className="p-5">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Financial operations</p>
+            <p className="mt-2 text-lg font-bold tracking-tight">Payments, disputes, and payouts</p>
+            <p className="mt-1 text-sm text-muted-foreground">Use finance and dispute queues for real-time reconciliation and resolution workflows.</p>
+          </CardContent>
+        </Card>
+        <Card className="surface-card-strong border-none">
+          <CardContent className="p-5">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Performance operations</p>
+            <p className="mt-2 text-lg font-bold tracking-tight">Marketplace performance analytics</p>
+            <p className="mt-1 text-sm text-muted-foreground">Track growth and service quality through live analytics dashboards.</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-2xl font-heading font-black tracking-tight">Core Operations</h3>
+        <Button render={<Link href="/admin/analytics" />} variant="outline" className="rounded-xl font-semibold">
+          View Analytics
+        </Button>
       </div>
 
       <main className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -85,7 +116,7 @@ export default function AdminHomePage() {
               className="surface-card-strong border-none group transition-all hover:-translate-y-2 hover:shadow-2xl reveal-up"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              <CardHeader className="p-8 pb-4">
+              <CardHeader className="p-7 pb-3">
                 <div className="size-16 rounded-3xl bg-primary/10 flex items-center justify-center text-primary mb-6 transition-transform group-hover:scale-110 group-hover:rotate-3 shadow-inner">
                   <Icon className="size-8" />
                 </div>
@@ -96,7 +127,7 @@ export default function AdminHomePage() {
                   {action.description}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-8 pt-0">
+              <CardContent className="p-7 pt-0">
                 <Button
                   render={<Link href={action.href} />}
                   className="w-full h-12 rounded-2xl font-black shadow-lg shadow-primary/10 group-hover:shadow-primary/20"
@@ -109,15 +140,6 @@ export default function AdminHomePage() {
           );
         })}
       </main>
-
-      
-
-      {/* Decorative footer for admin */}
-      <div className="reveal-up delay-3 pt-12 border-t border-border/40 text-center opacity-40 selection:bg-teal-500">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em]">
-          Administrative Security Protocol v2.4.0 (Teal Branch)
-        </p>
-      </div>
     </div>
   );
 }

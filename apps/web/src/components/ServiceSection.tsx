@@ -2,10 +2,13 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Sparkles, Zap, Droplets, Wind, Wrench, Hammer, Bug, Paintbrush, Shirt, ShieldCheck,
   Car, Package, Utensils, Baby, Shield, CarFront, Dog, Dumbbell, PartyPopper, Truck, Heart, UserCheck, ArrowRight, Search, MapPin, X
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type ServiceItem = {
   id: string;
@@ -70,7 +73,7 @@ export function ServiceSection() {
   const noResults = isSearching && searchResults.length === 0;
 
   return (
-    <section id="services" className="py-24 px-6 border-t border-border bg-muted/20">
+    <section id="services" className="scroll-mt-24 py-24 px-6 border-t border-border bg-muted/20">
       <div className="max-w-7xl mx-auto space-y-10">
 
         {/* Section Header */}
@@ -86,21 +89,27 @@ export function ServiceSection() {
         {/* Search Bar */}
         <div className="relative max-w-2xl">
           <div className="flex items-center gap-3 bg-background border border-border rounded-[14px] px-4 py-3.5 shadow-sm focus-within:ring-2 focus-within:ring-primary/30 focus-within:border-primary/50 transition-all duration-200">
+            <label htmlFor="service-search" className="sr-only">Search for services</label>
             <Search className="size-5 text-muted-foreground shrink-0" strokeWidth={2} />
-            <input
+            <Input
+              id="service-search"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search for a service — e.g. plumber, chef, driver..."
-              className="flex-1 bg-transparent text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none"
+              className="flex-1 bg-transparent border-0 shadow-none text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none h-auto px-0 py-0 rounded-none focus-visible:ring-0"
             />
             {searchQuery && (
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
                 onClick={() => setSearchQuery("")}
-                className="size-6 flex items-center justify-center rounded-full bg-muted hover:bg-muted-foreground/20 text-muted-foreground transition-colors"
+                aria-label="Clear service search"
+                className="size-6 rounded-full bg-muted hover:bg-muted-foreground/20 text-muted-foreground"
               >
                 <X className="size-3.5" strokeWidth={2.5} />
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -108,26 +117,30 @@ export function ServiceSection() {
         {/* Tab Toggle — only shown when not searching */}
         {!isSearching && (
           <div className="inline-flex bg-muted p-1.5 rounded-[12px] shadow-sm w-full md:w-auto">
-            <button
+            <Button
+              type="button"
+              variant="ghost"
               onClick={() => setActiveTab("household")}
-              className={`flex-1 md:flex-none px-6 py-3 rounded-[8px] text-sm font-bold transition-all duration-300 ${
+              className={`flex-1 md:flex-none px-6 py-3 rounded-lg text-sm font-bold transition-all duration-300 ${
                 activeTab === "household"
                   ? "bg-background shadow-sm text-foreground ring-1 ring-border"
                   : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
               }`}
             >
               Home Services
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
               onClick={() => setActiveTab("allrounder")}
-              className={`flex-1 md:flex-none px-6 py-3 rounded-[8px] text-sm font-bold transition-all duration-300 ${
+              className={`flex-1 md:flex-none px-6 py-3 rounded-lg text-sm font-bold transition-all duration-300 ${
                 activeTab === "allrounder"
                   ? "bg-background shadow-sm text-foreground ring-1 ring-border"
                   : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
               }`}
             >
               All-Rounder Services
-            </button>
+            </Button>
           </div>
         )}
 
@@ -150,12 +163,13 @@ export function ServiceSection() {
                 We don&apos;t offer <span className="font-bold text-foreground">&ldquo;{searchQuery}&rdquo;</span> just yet, but we&apos;re expanding fast. We&apos;ll be launching this service at your location very soon — stay tuned! 🚀
               </p>
             </div>
-            <button
+            <Button
+              type="button"
               onClick={() => setSearchQuery("")}
-              className="px-5 py-2.5 rounded-[10px] text-sm font-bold bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              className="px-5 py-2.5 rounded-[10px] text-sm font-bold bg-primary text-primary-foreground hover:opacity-90"
             >
               Browse Available Services
-            </button>
+            </Button>
           </div>
         ) : (
           /* Services Grid */
@@ -164,12 +178,12 @@ export function ServiceSection() {
               <Link
                 key={srv.id}
                 href={`/customer/book?service=${srv.id}`}
-                className="group bg-background rounded-[16px] border border-border flex flex-col transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-primary/50 overflow-hidden relative h-full"
+                className="group bg-background rounded-xl border border-border flex flex-col transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-primary/50 overflow-hidden relative h-full"
               >
                 {srv.image ? (
-                  <div className="relative w-full h-[180px] bg-muted shrink-0 overflow-hidden">
-                    <img src={srv.image} alt={srv.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                  <div className="relative w-full h-45 bg-muted shrink-0 overflow-hidden">
+                    <Image src={srv.image} alt={srv.title} fill sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/10 to-transparent" />
                     {srv.badge && (
                       <span className="absolute top-3 right-3 px-3 py-1 text-[11px] font-black tracking-wide uppercase rounded-full bg-white/90 text-zinc-900 shadow-sm">
                         {srv.badge}
@@ -182,7 +196,7 @@ export function ServiceSection() {
                 ) : (
                   <div className="p-5 pb-0 flex items-start justify-between">
                     <div className="size-12 rounded-[12px] border border-border bg-muted/50 group-hover:bg-primary/5 flex items-center justify-center text-foreground group-hover:text-primary transition-colors">
-                      <srv.icon className="size-[22px]" strokeWidth={2} />
+                      <srv.icon className="size-5.5" strokeWidth={2} />
                     </div>
                     {srv.badge && (
                       <span className="px-3 py-1 text-[11px] font-black tracking-wide uppercase rounded-full bg-accent/10 text-accent border border-accent/20">
@@ -205,7 +219,7 @@ export function ServiceSection() {
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 bg-accent/10 text-accent px-2.5 py-1 rounded-[6px] text-[12px] font-bold">
+                    <div className="flex items-center gap-1.5 bg-accent/10 text-accent px-2.5 py-1 rounded-md text-[12px] font-bold">
                       Book Now
                     </div>
                     <div className="size-8 rounded-full bg-muted/50 border border-border flex items-center justify-center group-hover:bg-accent group-hover:text-white group-hover:border-accent transition-all duration-300">

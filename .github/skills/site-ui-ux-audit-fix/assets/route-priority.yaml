@@ -1,0 +1,65 @@
+# Default route priority for UI/UX audits in this repository
+priority_groups:
+  - name: conversion-and-core-journeys
+    priority: 1
+    routes:
+      - /
+      - /auth/signin
+      - /auth/signup
+      - /auth/forgot-password
+      - /auth/reset-password
+      - /auth/verify-email
+      - /auth/check-email
+      - /auth/2fa-verify
+      - /customer/book
+      - /customer/bookings
+      - /customer/bookings/[id]
+      - /customer/payments
+      - /helper/incoming-jobs
+      - /helper/active
+      - /helper/earnings
+      - /dashboard
+
+  - name: trust-and-discovery-marketing
+    priority: 2
+    routes:
+      - /about
+      - /careers
+      - /help
+      - /blog
+      - /blog/[slug]
+      - /privacy
+      - /terms
+
+  - name: account-and-helper-lifecycle
+    priority: 3
+    routes:
+      - /account/settings
+      - /organizations
+      - /customer
+      - /customer/active
+      - /customer/reviews
+      - /customer/helper/[id]
+      - /helper
+      - /helper/onboarding
+      - /helper/verification
+      - /helper/verification-pending
+      - /helper/availability
+      - /helper/job-history
+
+  - name: admin-operations
+    priority: 4
+    routes:
+      - /admin
+      - /admin/analytics
+      - /admin/bookings
+      - /admin/users
+      - /admin/helpers
+      - /admin/payouts
+      - /admin/verifications
+      - /admin/disputes
+
+notes:
+  - Source of truth is app routes in apps/web/src/app excluding /api route handlers.
+  - Dynamic routes are represented with [param] syntax and should be tested with at least one realistic record.
+  - If the audit scope is broad, run priority groups in order 1 to 4.

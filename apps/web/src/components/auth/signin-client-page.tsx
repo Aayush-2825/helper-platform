@@ -86,7 +86,7 @@ export function SignInClientPage({ nextPath }: SignInClientPageProps) {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleEmailSignIn} noValidate>
+          <form onSubmit={handleEmailSignIn} noValidate aria-busy={isLoading}>
             <FieldGroup>
               {formError ? (
                 <Alert variant="destructive">
@@ -139,13 +139,13 @@ export function SignInClientPage({ nextPath }: SignInClientPageProps) {
                 </Link>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="min-h-11 w-full" disabled={isLoading}>
                 {form.formState.isSubmitting ? "Signing in..." : "Sign in"}
               </Button>
 
               <FieldSeparator>Or continue with</FieldSeparator>
 
-              <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isLoading}>
+              <Button type="button" variant="outline" className="min-h-11 w-full" onClick={handleGoogleSignIn} disabled={isLoading}>
                 <Chrome data-icon="inline-start" />
                 Continue with Google
               </Button>

@@ -57,7 +57,7 @@ export function VerifyEmailClientPage() {
             <CheckCircle2 className="text-primary" />
           </CardContent>
           <CardFooter>
-            <Link href="/dashboard" className={buttonVariants({ className: "w-full" })}>
+            <Link href="/dashboard" className={buttonVariants({ className: "min-h-11 w-full" })}>
               Go to dashboard
             </Link>
           </CardFooter>
@@ -80,10 +80,10 @@ export function VerifyEmailClientPage() {
           <XCircle className="text-destructive" />
         </CardContent>
         <CardFooter className="flex flex-col gap-2">
-          <Link href="/auth/signup" className={buttonVariants({ className: "w-full" })}>
+          <Link href="/auth/signup" className={buttonVariants({ className: "min-h-11 w-full" })}>
             Sign up again
           </Link>
-          <Link href="/auth/signin" className={buttonVariants({ variant: "outline", className: "w-full" })}>
+          <Link href="/auth/signin" className={buttonVariants({ variant: "outline", className: "min-h-11 w-full" })}>
             Back to sign in
           </Link>
         </CardFooter>

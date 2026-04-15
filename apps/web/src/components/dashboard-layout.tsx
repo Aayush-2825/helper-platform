@@ -81,26 +81,29 @@ export function DashboardLayout({
   }
 
   const currentNavLink = navLinks.find((link) => pathname === link.href);
+  const [titleLead, ...titleTail] = title.split(" ");
+  const titleAccent = titleTail.join(" ");
 
   return (
-    <div className="flex h-screen flex-col bg-background selection:bg-primary selection:text-white">
+    <div className="flex min-h-dvh flex-col bg-background selection:bg-primary selection:text-white">
       {/* Navbar */}
       <Navbar title={title} />
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="relative flex flex-1 overflow-hidden">
         {/* Sidebar - Hidden on mobile, visible on lg */}
-        <aside className="hidden w-80 border-r border-border/40 bg-card/20 backdrop-blur-3xl lg:block relative overflow-hidden">
+        <aside className="relative hidden w-76 border-r border-border/40 bg-card/20 backdrop-blur-3xl lg:block">
           {/* Decorative background glow for sidebar */}
           <div className="absolute top-0 -left-20 w-40 h-40 bg-primary/10 blur-[80px] rounded-full pointer-events-none" />
           
           <ScrollArea className="h-full relative z-10">
-            <div className="p-8 space-y-12">
-              <div className="space-y-2 reveal-up">
-                <h1 className="text-3xl font-heading font-black tracking-tight text-foreground leading-[0.9]">
-                  {title.split(" ")[0]} <br />
-                  <span className="text-primary">{title.split(" ").slice(1).join(" ")}</span>
+            <div className="space-y-10 p-7">
+              <div className="space-y-3 reveal-up">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Portal</p>
+                <h1 className="text-2xl font-heading font-black tracking-tight text-foreground leading-tight">
+                  {titleLead}
+                  {titleAccent ? <span className="block text-primary">{titleAccent}</span> : null}
                 </h1>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60">{description}</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
               </div>
 
               <nav className="flex flex-col gap-1.5 reveal-up delay-1">
@@ -111,36 +114,36 @@ export function DashboardLayout({
                       key={link.href}
                       href={link.href}
                       className={cn(
-                        "group relative flex items-center gap-4 rounded-2xl px-5 py-3.5 text-sm font-bold transition-all duration-500",
+                        "group relative flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-300",
                         isActive
-                          ? "bg-primary text-primary-foreground shadow-2xl shadow-primary/30 scale-105 z-10"
-                          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground hover:translate-x-1"
+                          ? "border-primary/30 bg-primary/10 text-primary shadow-sm"
+                          : "border-transparent text-muted-foreground hover:border-border/70 hover:bg-accent/30 hover:text-foreground"
                       )}
                     >
                       {link.icon && (
                         <span className={cn(
-                          "size-5 flex-shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3",
-                          isActive ? "text-white" : "text-primary/60 group-hover:text-primary"
+                          "size-5 shrink-0 transition-transform duration-300 group-hover:scale-105",
+                          isActive ? "text-primary" : "text-primary/60 group-hover:text-primary"
                         )}>
                           {link.icon}
                         </span>
                       )}
                       <span className="flex-1 truncate tracking-tight">{link.label}</span>
                       {isActive && (
-                         <div className="absolute right-4 size-1.5 rounded-full bg-white animate-pulse" />
+                         <div className="absolute right-3 size-2 rounded-full bg-primary" />
                       )}
                     </Link>
                   );
                 })}
               </nav>
 
-              <div className="pt-12 border-t border-border/40 flex flex-col gap-3 reveal-up delay-2">
+              <div className="flex flex-col gap-3 border-t border-border/40 pt-8 reveal-up delay-2">
                 <Link
                   href="/dashboard"
                   className={buttonVariants({
                     variant: "ghost",
                     size: "default",
-                    className: "w-full justify-start rounded-2xl font-bold text-muted-foreground hover:text-primary hover:bg-primary/5",
+                    className: "w-full justify-start rounded-xl font-semibold text-muted-foreground hover:text-primary hover:bg-primary/5",
                   })}
                 >
                   <ChevronRight className="mr-2 h-4 w-4 rotate-180" />
@@ -149,7 +152,7 @@ export function DashboardLayout({
                 <Button
                   variant="ghost"
                   size="default"
-                  className="w-full justify-start rounded-2xl font-bold text-destructive/70 hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  className="w-full justify-start rounded-xl font-semibold text-destructive/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
                   onClick={async () => {
                     await authClient.signOut({
                       fetchOptions: {
@@ -169,18 +172,18 @@ export function DashboardLayout({
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-hidden relative">
+        <main className="relative flex-1 overflow-hidden">
           {/* Dynamic Background Glow based on Title */}
           <div className={cn(
-            "absolute -top-40 -right-40 w-[600px] h-[600px] blur-[140px] rounded-full opacity-20 pointer-events-none -z-10 animate-pulse",
+            "absolute -top-40 -right-40 w-150 h-150 blur-[140px] rounded-full opacity-20 pointer-events-none -z-10 animate-pulse",
             title.toLowerCase().includes("admin") ? "bg-teal-500" : 
             title.toLowerCase().includes("helper") ? "bg-orange-500" : "bg-primary"
           )} />
 
           <ScrollArea className="h-full">
-            <div className="flex flex-col gap-10 p-6 pt-8 sm:p-10 lg:p-14 pb-32 lg:pb-16">
+            <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-6 pb-32 pt-8 sm:p-8 sm:pb-32 lg:p-10 lg:pb-16">
               {/* Breadcrumb - Hidden on very small screens */}
-              <Breadcrumb className="hidden md:flex">
+              <Breadcrumb className="hidden rounded-lg border border-border/50 bg-background/70 px-3 py-2 backdrop-blur md:flex">
                 <BreadcrumbList>
                   <BreadcrumbItem>
                     <Link href="/dashboard" className="hover:text-primary transition-colors"> Dashboard </Link>
@@ -202,7 +205,7 @@ export function DashboardLayout({
 
               {/* Mobile Header */}
               <div className="flex flex-col gap-2 lg:hidden">
-                <h1 className="text-3xl font-heading font-bold tracking-tight">{title}</h1>
+                <h1 className="text-3xl font-heading font-bold tracking-tight">{currentNavLink?.label ?? title}</h1>
                 <p className="text-sm text-muted-foreground">{description}</p>
               </div>
 

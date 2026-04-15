@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CalendarRange, CheckCircle2, Loader2, PlayCircle, RefreshCcw, Search, XCircle } from "lucide-react";
@@ -129,8 +129,9 @@ export default function AdminPayoutsPage() {
   const rows = payoutsQuery.data?.payouts ?? [];
   const summary = payoutsQuery.data?.summary;
   const pagination = payoutsQuery.data?.pagination;
+  const { refetch } = payoutsQuery;
 
-  const updatePayoutStatus = async (input: {
+  const updatePayoutStatus = useCallback(async (input: {
     payoutId: string;
     status: Exclude<PayoutStatus, "pending">;
     providerTransferId?: string;
@@ -157,13 +158,13 @@ export default function AdminPayoutsPage() {
       }
 
       toast.success(payload.message ?? "Payout updated.");
-      await payoutsQuery.refetch();
+      await refetch();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Payout update failed.");
     } finally {
       setActionLoadingId(null);
     }
-  };
+  }, [refetch]);
 
   const columns = useMemo<ColumnDef<AdminPayout>[]>(
     () => [
@@ -306,7 +307,7 @@ export default function AdminPayoutsPage() {
         },
       },
     ],
-    [actionLoadingId],
+    [actionLoadingId, updatePayoutStatus],
   );
 
   return (

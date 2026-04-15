@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MyMap } from "@/components/map-component";
 import { useSession } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
 import { ChevronLeft, Star, Clock, CheckCircle2, Search, ArrowRight, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -92,7 +93,7 @@ export default function CustomerBookPage() {
               <Button 
                 onClick={handleNext} 
                 disabled={!selectedService}
-                className="bg-foreground text-background hover:bg-foreground/90 h-12 px-8 rounded-[8px] text-[15px] font-bold transition-all w-full md:w-auto"
+                className="bg-foreground text-background hover:bg-foreground/90 h-12 px-8 rounded-lg text-[15px] font-bold transition-all w-full md:w-auto"
               >
                 Continue <ArrowRight className="ml-2 size-4" />
               </Button>
@@ -113,13 +114,13 @@ export default function CustomerBookPage() {
                </div>
             </div>
             
-            <div className="h-[400px] rounded-[16px] overflow-hidden border border-border relative">
+            <div className="h-100 rounded-xl overflow-hidden border border-border relative">
               <MyMap userId={session?.user.id} />
             </div>
             
             <Button 
                onClick={simulateSearch} 
-               className="bg-foreground text-background hover:bg-foreground/90 h-12 px-8 rounded-[8px] text-[15px] font-bold transition-all w-full"
+              className="bg-foreground text-background hover:bg-foreground/90 h-12 px-8 rounded-lg text-[15px] font-bold transition-all w-full"
             >
                Confirm & Find Helper
             </Button>
@@ -164,7 +165,13 @@ export default function CustomerBookPage() {
                  ].map((h, i) => (
                    <div key={i} className="bg-card border border-border rounded-[12px] p-5 flex flex-col md:flex-row gap-5 items-start md:items-center justify-between transition-colors hover:border-foreground/30">
                      <div className="flex items-center gap-4">
-                       <img src={`https://i.pravatar.cc/150?u=${i+10}`} alt={h.name} className="size-14 rounded-full bg-muted object-cover" />
+                       <Image
+                         src={`https://i.pravatar.cc/150?u=${i + 10}`}
+                         alt={h.name}
+                         width={56}
+                         height={56}
+                         className="size-14 rounded-full bg-muted object-cover"
+                       />
                        <div>
                          <h3 className="font-bold text-[16px]">{h.name}</h3>
                          <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground mt-1">
@@ -181,7 +188,7 @@ export default function CustomerBookPage() {
                         <span className="font-bold text-lg">{h.price}</span>
                         <Button 
                           onClick={() => router.push('/customer')} 
-                          className="bg-accent text-white hover:bg-accent/90 outline-none border-none font-bold rounded-[8px] h-10 px-6 transition-all"
+                          className="bg-accent text-white hover:bg-accent/90 outline-none border-none font-bold rounded-lg h-10 px-6 transition-all"
                         >
                           Book Now
                         </Button>

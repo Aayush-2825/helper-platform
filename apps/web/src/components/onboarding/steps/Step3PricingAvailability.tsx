@@ -3,10 +3,24 @@
 import { UseFormReturn, FieldValues, Controller } from "react-hook-form";
 import { Label } from "@/components/ui/label";
 import { FormField } from "@/components/ui/form-field";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { DollarSign, Clock, Calendar } from "lucide-react";
 
 interface Step3PricingAvailabilityProps<T extends FieldValues> {
   form: UseFormReturn<T>;
+}
+
+function readNestedErrorMessage(errorValue: unknown): string | null {
+  if (!errorValue || typeof errorValue !== "object") {
+    return null;
+  }
+
+  const maybeMessage = (errorValue as { message?: unknown }).message;
+  return typeof maybeMessage === "string" && maybeMessage.length > 0
+    ? maybeMessage
+    : null;
 }
 
 const DAYS_OF_WEEK = [
@@ -33,25 +47,14 @@ export function Step3PricingAvailability<T extends FieldValues>({
   const pricingType = watch("pricingType" as any);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const availableDays = (watch("availableDays" as any) || []) as string[];
-
-  const toggleDay = (day: string) => {
-    const current = Array.isArray(availableDays) ? availableDays : [];
-    if (current.includes(day)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setValue("availableDays" as any, current.filter((d) => d !== day) as any, {
-        shouldValidate: true,
-        shouldDirty: true,
-        shouldTouch: true,
-      });
-    } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setValue("availableDays" as any, [...current, day] as any, {
-        shouldValidate: true,
-        shouldDirty: true,
-        shouldTouch: true,
-      });
-    }
-  };
+  const workingHoursErrors = errors.workingHours as
+    | { start?: unknown; end?: unknown }
+    | undefined;
+  const startTimeError = readNestedErrorMessage(workingHoursErrors?.start);
+  const endTimeError = readNestedErrorMessage(workingHoursErrors?.end);
+  const startTimeErrorId = "workingHoursStart-error";
+  const endTimeErrorId = "workingHoursEnd-error";
+  const availableDaysErrorId = "availableDays-error";
 
   return (
     <div className="space-y-6">
@@ -70,12 +73,23 @@ export function Step3PricingAvailability<T extends FieldValues>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         name={"pricingType" as any}
         render={({ field }) => (
-          <div>
-            <Label>
-              <DollarSign className="inline h-4 w-4 mr-2" />
+          <fieldset>
+            <legend className="flex items-center gap-2 text-sm font-medium text-gray-900">
+              <DollarSign className="h-4 w-4" />
               Pricing Model
-            </Label>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            </legend>
+            <ToggleGroup
+              multiple={false}
+              variant="outline"
+              className="mt-3 grid w-full gap-3 sm:grid-cols-3"
+              value={typeof field.value === "string" ? [field.value] : []}
+              onValueChange={(values) => {
+                const nextValue = values[0];
+                if (nextValue) {
+                  field.onChange(nextValue);
+                }
+              }}
+            >
               {[
                 {
                   value: "fixed",
@@ -93,33 +107,19 @@ export function Step3PricingAvailability<T extends FieldValues>({
                   desc: "Discuss price with customer",
                 },
               ].map((option) => (
-                <label
+                <ToggleGroupItem
                   key={option.value}
-                  className="flex items-center space-x-3 rounded-lg border-2 p-3 cursor-pointer transition-all"
-                  style={{
-                    borderColor:
-                      field.value === option.value ? "#3b82f6" : "#e5e7eb",
-                    backgroundColor:
-                      field.value === option.value ? "#f0f9ff" : "#ffffff",
-                  }}
-                >
-                <input
-                  type="radio"
                   value={option.value}
-                  checked={field.value === option.value}
-                  onChange={(e) => field.onChange(e.target.value)}
-                    className="h-4 w-4"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {option.label}
-                    </p>
-                    <p className="text-xs text-gray-500">{option.desc}</p>
-                  </div>
-                </label>
+                  className="h-auto min-h-11 w-full flex-col items-start gap-1 rounded-lg border-2 border-gray-200 px-3 py-3 text-left data-pressed:border-blue-500 data-pressed:bg-blue-50"
+                >
+                  <span className="text-sm font-medium text-gray-900">
+                    {option.label}
+                  </span>
+                  <span className="text-xs text-gray-500">{option.desc}</span>
+                </ToggleGroupItem>
               ))}
-            </div>
-          </div>
+            </ToggleGroup>
+          </fieldset>
         )}
       />
 
@@ -142,23 +142,10 @@ export function Step3PricingAvailability<T extends FieldValues>({
                 helperText={
                   pricingType === "fixed"
                     ? "You can adjust per job based on requirements"
-                    : "Per hour of work"
+                    : "Per hour of work in INR"
                 }
                 onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
               />
-              <style jsx>{`
-                #basePrice {
-                  padding-left: 1.75rem;
-                }
-                #basePrice::before {
-                  content: '₹';
-                  position: absolute;
-                  left: 0.75rem;
-                  top: 50%;
-                  transform: translateY(-50%);
-                  color: rgb(75, 85, 99);
-                }
-              `}</style>
             </div>
           )}
         />
@@ -170,12 +157,14 @@ export function Step3PricingAvailability<T extends FieldValues>({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         name={"isOnline" as any}
         render={({ field }) => (
-          <label className="flex items-center space-x-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
-            <input
-              type="checkbox"
+          <label
+            htmlFor="isOnline"
+            className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-3 hover:bg-gray-50 focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2"
+          >
+            <Checkbox
+              id="isOnline"
               checked={field.value || false}
-              onChange={(e) => field.onChange(e.target.checked)}
-              className="rounded"
+              onCheckedChange={(checked) => field.onChange(Boolean(checked))}
             />
             <div>
               <p className="text-sm font-medium text-gray-900">Go Online Now</p>
@@ -200,13 +189,16 @@ export function Step3PricingAvailability<T extends FieldValues>({
             name={"workingHours.start" as any}
             render={({ field }) => (
               <div>
-                <label className="block text-sm text-gray-700 mb-1">
+                <label htmlFor="workingHoursStart" className="mb-1 block text-sm text-gray-700">
                   From
                 </label>
-                <input
+                <Input
+                  id="workingHoursStart"
                   {...field}
                   type="time"
                   value={typeof field.value === "string" ? field.value : ""}
+                  aria-invalid={Boolean(startTimeError)}
+                  aria-describedby={startTimeError ? startTimeErrorId : undefined}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 />
               </div>
@@ -218,19 +210,32 @@ export function Step3PricingAvailability<T extends FieldValues>({
             name={"workingHours.end" as any}
             render={({ field }) => (
               <div>
-                <label className="block text-sm text-gray-700 mb-1">
+                <label htmlFor="workingHoursEnd" className="mb-1 block text-sm text-gray-700">
                   To
                 </label>
-                <input
+                <Input
+                  id="workingHoursEnd"
                   {...field}
                   type="time"
                   value={typeof field.value === "string" ? field.value : ""}
+                  aria-invalid={Boolean(endTimeError)}
+                  aria-describedby={endTimeError ? endTimeErrorId : undefined}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 />
               </div>
             )}
           />
         </div>
+        {startTimeError && (
+          <p id={startTimeErrorId} className="text-xs text-red-500" role="alert">
+            {startTimeError}
+          </p>
+        )}
+        {endTimeError && (
+          <p id={endTimeErrorId} className="text-xs text-red-500" role="alert">
+            {endTimeError}
+          </p>
+        )}
       </div>
 
       {/* Available Days */}
@@ -239,24 +244,34 @@ export function Step3PricingAvailability<T extends FieldValues>({
           <Calendar className="inline h-4 w-4 mr-2" />
           Available Days
         </Label>
-        <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-7">
+        <ToggleGroup
+          multiple
+          variant="outline"
+          aria-invalid={Boolean(errors.availableDays && "message" in errors.availableDays)}
+          aria-describedby={errors.availableDays && "message" in errors.availableDays ? availableDaysErrorId : undefined}
+          className="mt-3 grid w-full grid-cols-4 gap-2 sm:grid-cols-7"
+          value={availableDays}
+          onValueChange={(values) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setValue("availableDays" as any, values as any, {
+              shouldValidate: true,
+              shouldDirty: true,
+              shouldTouch: true,
+            });
+          }}
+        >
           {DAYS_OF_WEEK.map((day) => (
-            <button
+            <ToggleGroupItem
               key={day.id}
-              type="button"
-              onClick={() => toggleDay(day.id)}
-              className={`rounded-lg border-2 py-2 px-1 text-sm font-medium transition-all text-center ${
-                (availableDays as string[]).includes(day.id)
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
-              }`}
+              value={day.id}
+              className="min-h-11 w-full rounded-lg border-2 border-gray-200 px-1 py-2 text-center text-sm font-medium text-gray-700 data-pressed:border-blue-500 data-pressed:bg-blue-50 data-pressed:text-blue-700"
             >
               {day.label}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
         {errors.availableDays && "message" in errors.availableDays && (
-          <p className="mt-2 text-xs text-red-500">
+          <p id={availableDaysErrorId} className="mt-2 text-xs text-red-500" role="alert">
             {(errors.availableDays.message as string)}
           </p>
         )}

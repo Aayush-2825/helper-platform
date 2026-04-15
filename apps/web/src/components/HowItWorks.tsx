@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
-  Search, Cpu, CheckCircle2, ArrowRight, Zap, ShieldCheck, Star, MapPin, Clock, Phone
+  Search, Cpu, CheckCircle2, ArrowRight, Zap, ShieldCheck, Star, MapPin, Clock
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const STEPS = [
   {
@@ -59,21 +61,25 @@ export function HowItWorks() {
 
   // Matching animation
   useEffect(() => {
-    setIsMatched(false);
-    setIsMatching(true);
+    const start = setTimeout(() => {
+      setIsMatched(false);
+      setIsMatching(true);
+    }, 0);
     const t = setTimeout(() => {
       setIsMatching(false);
       setIsMatched(true);
       setHelperIndex((prev) => (prev + 1) % HELPERS.length);
     }, 1500);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(start);
+      clearTimeout(t);
+    };
   }, [activeStep]);
 
   const helper = HELPERS[helperIndex];
-  const step = STEPS[activeStep];
 
   return (
-    <section id="how-it-works" className="py-28 px-6 border-y border-border bg-background overflow-hidden">
+    <section id="how-it-works" className="scroll-mt-24 py-28 px-6 border-y border-border bg-background overflow-hidden">
       <div className="max-w-7xl mx-auto">
 
         {/* Header */}
@@ -98,15 +104,17 @@ export function HowItWorks() {
               const Icon = s.icon;
               const isActive = activeStep === i;
               return (
-                <button
+                <Button
                   key={i}
+                  type="button"
+                  variant="ghost"
                   onClick={() => {
                     setActiveStep(i);
                     if (intervalRef.current) clearInterval(intervalRef.current);
                   }}
-                  className={`w-full text-left rounded-[16px] border p-6 transition-all duration-500 cursor-pointer group ${
+                  className={`h-auto w-full whitespace-normal justify-start items-start rounded-xl border p-6 transition-all duration-500 cursor-pointer group hover:scale-100 active:scale-100 ${
                     isActive
-                      ? "border-primary/30 bg-primary/[0.03] shadow-md"
+                      ? "border-primary/30 bg-primary/3 shadow-md"
                       : "border-border bg-background hover:border-border/80 hover:shadow-sm"
                   }`}
                 >
@@ -126,7 +134,7 @@ export function HowItWorks() {
                         <h3 className="font-bold text-[17px] text-foreground">{s.title}</h3>
                       </div>
                       <p className={`text-sm font-medium leading-relaxed transition-all duration-300 ${
-                        isActive ? "text-muted-foreground max-h-20 opacity-100" : "text-transparent max-h-0 opacity-0 overflow-hidden"
+                        isActive ? "text-muted-foreground max-h-32 opacity-100" : "text-transparent max-h-0 opacity-0 overflow-hidden"
                       }`}>
                         {s.description}
                       </p>
@@ -142,12 +150,12 @@ export function HowItWorks() {
                     <div className="mt-5 h-1 bg-muted rounded-full overflow-hidden">
                       <div
                         key={activeStep}
-                        className={`h-full rounded-full bg-gradient-to-r ${s.color} animate-progress`}
+                        className={`h-full rounded-full bg-linear-to-r ${s.color} animate-progress`}
                         style={{ animation: "progress 3s linear forwards" }}
                       />
                     </div>
                   )}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -156,14 +164,14 @@ export function HowItWorks() {
           <div className="relative flex flex-col items-center justify-center">
 
             {/* Background Glow */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-violet-500/5 rounded-[32px] blur-2xl" />
+            <div className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-violet-500/5 rounded-4xl blur-2xl" />
 
             <div className="relative w-full max-w-sm mx-auto space-y-4">
 
               {/* Status Card — Request */}
-              <div className="bg-background border border-border rounded-[16px] p-5 shadow-sm">
+              <div className="bg-background border border-border rounded-xl p-5 shadow-sm">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="size-8 rounded-[8px] bg-blue-50 border border-blue-100 flex items-center justify-center">
+                  <div className="size-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center">
                     <Search className="size-4 text-blue-600" strokeWidth={2.5} />
                   </div>
                   <div>
@@ -175,18 +183,18 @@ export function HowItWorks() {
                     2.1 km
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium bg-muted/50 rounded-[8px] px-3 py-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium bg-muted/50 rounded-lg px-3 py-2">
                   <Clock className="size-3.5 shrink-0" />
                   Submitted just now · Matching in progress...
                 </div>
               </div>
 
               {/* Matching Animation Card */}
-              <div className={`bg-background border rounded-[16px] p-5 shadow-sm transition-all duration-500 ${
+              <div className={`bg-background border rounded-xl p-5 shadow-sm transition-all duration-500 ${
                 isMatched ? "border-emerald-200 bg-emerald-50/30" : "border-border"
               }`}>
                 <div className="flex items-center gap-3 mb-5">
-                  <div className={`size-8 rounded-[8px] flex items-center justify-center transition-all duration-500 ${
+                  <div className={`size-8 rounded-lg flex items-center justify-center transition-all duration-500 ${
                     isMatched ? "bg-emerald-50 border border-emerald-100" : "bg-violet-50 border border-violet-100"
                   }`}>
                     {isMatched
@@ -219,9 +227,11 @@ export function HowItWorks() {
                 {isMatched && (
                   <div className="flex items-center gap-4">
                     <div className="relative shrink-0">
-                      <img
+                      <Image
                         src={helper.avatar}
                         alt={helper.name}
+                        width={56}
+                        height={56}
                         className="size-14 rounded-full object-cover border-2 border-emerald-200"
                       />
                       <div className="absolute -bottom-1 -right-1 size-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white">
@@ -259,7 +269,7 @@ export function HowItWorks() {
                   </div>
                   <Link
                     href="/customer/book"
-                    className="flex items-center gap-2 bg-background text-foreground text-xs font-bold px-4 py-2 rounded-[8px] hover:bg-background/90 transition"
+                    className="flex items-center gap-2 bg-background text-foreground text-xs font-bold px-4 py-2 rounded-lg hover:bg-background/90 transition"
                   >
                     Book Now <ArrowRight className="size-3.5" />
                   </Link>
