@@ -71,10 +71,11 @@ export function ServiceSelector<
     control,
     name,
   });
-  const selectedValues = Array.isArray(field.value)
-    ? (field.value as string[])
-    : typeof field.value === "string" && field.value.length > 0
-      ? [field.value]
+  const fieldValue: unknown = field.value;
+  const selectedValues = Array.isArray(fieldValue)
+    ? (fieldValue as string[])
+    : typeof fieldValue === "string" && fieldValue.length > 0
+      ? [fieldValue]
       : [];
 
   return (
