@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Minus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const FAQS = [
   {
@@ -53,7 +54,7 @@ export function FAQ() {
             Everything you need to know.
           </h2>
           <p className="text-muted-foreground font-medium text-lg">
-            Can't find an answer? <a href="mailto:support@dozo.in" className="text-primary font-bold hover:underline">Email our support team →</a>
+            Can&apos;t find an answer? <a href="mailto:support@dozo.in" className="text-primary font-bold hover:underline">Email our support team →</a>
           </p>
         </div>
 
@@ -66,9 +67,14 @@ export function FAQ() {
                 openIdx === i ? "border-primary/30 shadow-sm" : "border-border hover:border-border/80"
               }`}
             >
-              <button
+              <Button
+                type="button"
+                variant="ghost"
                 className="w-full flex items-center justify-between gap-4 p-6 text-left"
                 onClick={() => setOpenIdx(openIdx === i ? null : i)}
+                aria-expanded={openIdx === i}
+                aria-controls={`faq-answer-${i}`}
+                id={`faq-question-${i}`}
               >
                 <span className={`font-bold text-[16px] leading-snug transition-colors ${openIdx === i ? "text-primary" : "text-foreground"}`}>
                   {faq.q}
@@ -78,9 +84,9 @@ export function FAQ() {
                 }`}>
                   {openIdx === i ? <Minus className="size-3.5" strokeWidth={3} /> : <Plus className="size-3.5" strokeWidth={3} />}
                 </div>
-              </button>
+              </Button>
               {openIdx === i && (
-                <div className="px-6 pb-6">
+                <div id={`faq-answer-${i}`} role="region" aria-labelledby={`faq-question-${i}`} className="px-6 pb-6">
                   <p className="text-muted-foreground font-medium leading-relaxed">{faq.a}</p>
                 </div>
               )}

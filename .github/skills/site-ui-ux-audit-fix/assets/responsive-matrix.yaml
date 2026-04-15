@@ -1,0 +1,53 @@
+# Default responsive coverage matrix for UI/UX audits
+viewports:
+  - name: mobile-small
+    width: 360
+    height: 800
+    category: mobile
+  - name: mobile-large
+    width: 430
+    height: 932
+    category: mobile
+  - name: tablet-portrait
+    width: 768
+    height: 1024
+    category: tablet
+  - name: tablet-landscape
+    width: 1024
+    height: 768
+    category: tablet
+  - name: laptop
+    width: 1366
+    height: 768
+    category: desktop
+  - name: desktop-wide
+    width: 1920
+    height: 1080
+    category: desktop
+
+checks_per_viewport:
+  - no horizontal overflow
+  - primary CTA visible without overlap
+  - nav and header remain usable
+  - forms and modals fit viewport
+  - touch targets usable on mobile
+  - typography readable at default zoom
+
+interaction_states:
+  - default
+  - hover
+  - focus
+  - active
+  - disabled
+  - loading
+  - error
+  - empty
+
+accessibility_pass:
+  keyboard_only_required: true
+  focus_visible_required: true
+  semantic_landmarks_required: true
+
+notes:
+  - For dynamic routes, validate at least one realistic data case on mobile and desktop.
+  - If a route is authenticated, test both signed-in and signed-out redirect behavior.

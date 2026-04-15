@@ -15,10 +15,8 @@ interface Step5BankPayoutProps<T extends FieldValues> {
 export function Step5BankPayout<T extends FieldValues>({
   form,
 }: Step5BankPayoutProps<T>) {
-  const { register, formState, watch } = form;
+  const { register, formState } = form;
   const { errors } = formState;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  watch("upiId" as any);
 
   return (
     <div className="space-y-6">
@@ -34,7 +32,7 @@ export function Step5BankPayout<T extends FieldValues>({
 
       <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
         <div className="flex gap-3">
-          <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
           <div>
             <p className="text-sm font-medium text-blue-900">
               Information is secure and encrypted
@@ -94,9 +92,10 @@ export function Step5BankPayout<T extends FieldValues>({
       {/* UPI Alternative */}
       <div className="rounded-lg bg-gray-50 border border-gray-200 p-4">
         <p className="text-sm font-medium text-gray-900 mb-3">
-          💡 Prefer UPI? (Optional)
+          Prefer UPI? (Optional)
         </p>
         <FormField
+          label="UPI ID (Optional)"
           placeholder="user@upi"
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           {...register("upiId" as any)}
@@ -114,13 +113,13 @@ export function Step5BankPayout<T extends FieldValues>({
         </summary>
         <div className="mt-3 space-y-2 text-sm text-gray-600">
           <p>
-            <strong>🏦 Bank Account Number:</strong> On your debit card, passbook, or online banking portal
+            <strong>Bank Account Number:</strong> On your debit card, passbook, or online banking portal
           </p>
           <p>
-            <strong>📋 IFSC Code:</strong> On your bank&apos;s website, or ask your bank
+            <strong>IFSC Code:</strong> On your bank&apos;s website, or ask your bank
           </p>
           <p>
-            <strong>📱 UPI ID:</strong> Set up in your bank&apos;s mobile app (usually yourname@bankname)
+            <strong>UPI ID:</strong> Set up in your bank&apos;s mobile app (usually yourname@bankname)
           </p>
         </div>
       </details>
@@ -128,7 +127,7 @@ export function Step5BankPayout<T extends FieldValues>({
       {/* Security Note */}
       <div className="rounded-lg bg-green-50 border border-green-200 p-4">
         <p className="text-xs text-green-900">
-          🔒 <strong>Your data is secure:</strong> Uses AES-256 encryption. No one sees your full account number.
+          <strong>Your data is secure:</strong> Uses AES-256 encryption. No one sees your full account number.
         </p>
       </div>
     </div>

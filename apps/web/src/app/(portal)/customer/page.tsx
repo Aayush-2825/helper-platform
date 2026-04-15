@@ -58,26 +58,53 @@ export default function CustomerHomePage() {
 
   const activeBookings = bookings.filter((b) => ACTIVE_STATUSES.has(b.status));
   const inProgressBooking = activeBookings.find((booking) => booking.status === "in_progress");
-  const userName = session?.user?.name?.split(" ")[0] || "there";
+  const userName = session?.user?.name?.split(" ")[0] || "Customer";
+  const recentCompleted = bookings.filter((b) => b.status === "completed").length;
+  const totalSpent = bookings
+    .filter((b) => b.status === "completed")
+    .reduce((sum, booking) => {
+      const amounts = booking as Booking & { finalAmount?: number | null };
+      return sum + Number(amounts.finalAmount ?? booking.quotedAmount ?? 0);
+    }, 0);
+  const recentHistory = [...bookings]
+    .filter((booking) => booking.status === "completed")
+    .slice(0, 3);
 
   return (
     <main className="space-y-10 pb-20">
-      {/* Search Header - Flat Style */}
-      <section className="bg-card border border-border rounded-none sm:rounded-[12px] p-6 lg:p-10 fade-up">
-        <h1 className="text-3xl font-black tracking-tight">
-          Welcome back, {userName}
-        </h1>
-        <p className="text-muted-foreground mt-2 text-[15px] font-medium">
-          What do you need help with today?
-        </p>
-        
-        <div className="mt-8 relative max-w-2xl">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search for cleaners, electricians, etc."
-            className="w-full pl-12 pr-4 py-4 rounded-lg bg-muted/50 border-none focus:outline-none focus:ring-1 focus:ring-foreground text-[15px] font-medium transition-shadow"
-          />
+      <section className="fade-up overflow-hidden rounded-2xl border border-border/70 bg-card/70 p-6 shadow-sm lg:p-8">
+        <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Customer workspace</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight lg:text-4xl">Welcome back, {userName}</h1>
+            <p className="mt-2 text-[15px] font-medium text-muted-foreground">What do you need help with today?</p>
+
+            <div className="mt-6 relative max-w-2xl">
+              <label htmlFor="customer-home-search" className="sr-only">Search services</label>
+              <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                id="customer-home-search"
+                type="text"
+                placeholder="Search for cleaners, electricians, etc."
+                className="w-full rounded-xl bg-muted/40 py-3 pl-12 pr-4 text-[15px] font-medium transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 lg:min-w-80">
+            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+              <p className="text-xs font-medium text-muted-foreground">Active</p>
+              <p className="text-2xl font-black tracking-tight">{activeBookings.length}</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+              <p className="text-xs font-medium text-muted-foreground">Completed</p>
+              <p className="text-2xl font-black tracking-tight">{recentCompleted}</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/80 px-4 py-3">
+              <p className="text-xs font-medium text-muted-foreground">Total Spent</p>
+              <p className="text-2xl font-black tracking-tight">₹{totalSpent.toLocaleString("en-IN")}</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -171,6 +198,24 @@ export default function CustomerHomePage() {
               ))}
             </div>
           </section>
+
+          <section className="fade-up delay-3">
+            <h2 className="mb-4 text-xl font-bold tracking-tight">Quick Actions</h2>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Link href="/customer/book" className="rounded-xl border border-border/70 bg-background p-4 transition-colors hover:border-primary/40 hover:bg-primary/5">
+                <p className="font-bold">Start New Booking</p>
+                <p className="mt-1 text-sm text-muted-foreground">Book a helper in under 1 minute.</p>
+              </Link>
+              <Link href="/customer/active" className="rounded-xl border border-border/70 bg-background p-4 transition-colors hover:border-primary/40 hover:bg-primary/5">
+                <p className="font-bold">Track Active Job</p>
+                <p className="mt-1 text-sm text-muted-foreground">Follow helper status in real time.</p>
+              </Link>
+              <Link href="/customer/payments" className="rounded-xl border border-border/70 bg-background p-4 transition-colors hover:border-primary/40 hover:bg-primary/5">
+                <p className="font-bold">Manage Payments</p>
+                <p className="mt-1 text-sm text-muted-foreground">See invoices and wallet activity.</p>
+              </Link>
+            </div>
+          </section>
           
         </div>
 
@@ -181,7 +226,8 @@ export default function CustomerHomePage() {
                <h3 className="font-semibold text-xs tracking-wider uppercase">DOZO Wallet</h3>
                <CreditCard className="size-4" />
             </div>
-            <h2 className="text-4xl font-black mt-1 tracking-tight text-foreground">₹1,240.00</h2>
+            <h2 className="text-4xl font-black mt-1 tracking-tight text-foreground">₹{totalSpent.toLocaleString("en-IN")}</h2>
+            <p className="mt-2 text-xs font-medium text-muted-foreground">Total paid for completed bookings</p>
             <Link href="/customer/payments" className="mt-6 flex items-center justify-center gap-2 w-full bg-accent text-white hover:bg-accent/90 font-bold py-3 rounded-lg transition-colors text-sm">
               Manage Funds
             </Link>
@@ -194,20 +240,26 @@ export default function CustomerHomePage() {
             </div>
             
             <div className="space-y-4">
-               {[1,2].map(i => (
-                 <div key={i} className="flex justify-between items-center py-3 border-b border-border last:border-0 hover:bg-muted/30 px-2 -mx-2 rounded-lg transition-colors cursor-pointer">
-                    <div className="flex items-center gap-3">
-                       <div className="size-10 rounded-full bg-muted flex items-center justify-center">
-                          <History className="size-4 text-muted-foreground" />
-                       </div>
-                       <div>
-                         <p className="font-bold text-sm">Electrician</p>
-                         <p className="text-xs text-muted-foreground">2 days ago</p>
-                       </div>
-                    </div>
-                    <span className="font-bold text-sm text-foreground">₹299</span>
-                 </div>
-               ))}
+              {recentHistory.length > 0 ? recentHistory.map((booking) => {
+                const amounts = booking as Booking & { finalAmount?: number | null };
+                const amount = Number(amounts.finalAmount ?? booking.quotedAmount ?? 0);
+                return (
+                 <Link key={booking.id} href={`/customer/bookings/${booking.id}`} className="flex justify-between items-center py-3 border-b border-border last:border-0 hover:bg-muted/30 px-2 -mx-2 rounded-lg transition-colors">
+                   <div className="flex items-center gap-3">
+                     <div className="size-10 rounded-full bg-muted flex items-center justify-center">
+                       <History className="size-4 text-muted-foreground" />
+                     </div>
+                     <div>
+                      <p className="font-bold text-sm">{categoryLabels[booking.categoryId] || "Service"}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{booking.status.replace("_", " ")}</p>
+                     </div>
+                   </div>
+                   <span className="font-bold text-sm text-foreground">₹{amount.toLocaleString("en-IN")}</span>
+                 </Link>
+                );
+              }) : (
+                <p className="text-sm text-muted-foreground">No completed bookings yet.</p>
+              )}
             </div>
           </div>
           
@@ -217,7 +269,7 @@ export default function CustomerHomePage() {
                 <h3 className="font-bold text-[15px]">Need Help?</h3>
              </div>
              <p className="text-sm text-muted-foreground font-medium mb-4">Contact support or browse our help center.</p>
-             <Button variant="outline" className="w-full justify-between font-bold h-10 rounded-lg bg-background">
+             <Button variant="outline" className="w-full justify-between font-bold h-10 rounded-lg bg-background" render={<Link href="/help" />}>
                Help Center <ArrowRight className="size-4" />
              </Button>
           </div>

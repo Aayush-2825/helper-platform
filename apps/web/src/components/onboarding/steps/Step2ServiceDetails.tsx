@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { FormField } from "@/components/ui/form-field";
 import { ServiceSelector } from "../ServiceSelector";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Briefcase, Clock, Globe } from "lucide-react";
 
 interface Step2ServiceDetailsProps<T extends FieldValues> {
@@ -21,6 +22,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
   isIndividual,
 }: Step2ServiceDetailsProps<T>) {
   const { control } = form;
+  const languagesErrorId = "languages-error";
 
   const languages = [
     "English",
@@ -119,46 +121,45 @@ export function Step2ServiceDetails<T extends FieldValues>({
         control={control}
         name={"languages" as FieldPath<T>}
         render={({ field, fieldState: { error } }) => (
-          <div>
-            <Label>
-              <Globe className="inline h-4 w-4 mr-2" />
+          <fieldset aria-invalid={Boolean(error)} aria-describedby={error ? languagesErrorId : undefined}>
+            <legend className="text-sm font-medium text-gray-900">
+              <Globe className="mr-2 inline h-4 w-4" />
               Languages Spoken
-            </Label>
+            </legend>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {languages.map((lang) => (
                 <label
                   key={lang}
-                  className="flex items-center space-x-2 rounded-lg border border-gray-200 p-2 cursor-pointer hover:bg-gray-50"
+                  htmlFor={`language-${lang.toLowerCase()}`}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 p-2 hover:bg-gray-50"
                 >
-                  <input
-                    type="checkbox"
-                    value={lang.toLowerCase()}
+                  <Checkbox
+                    id={`language-${lang.toLowerCase()}`}
                     checked={
                       Array.isArray(field.value) &&
                       (field.value as string[]).includes(lang.toLowerCase())
                     }
-                    onChange={(e) => {
-                      const value = e.target.value;
+                    onCheckedChange={(checked) => {
+                      const value = lang.toLowerCase();
                       const currentValue = Array.isArray(field.value)
                         ? (field.value as string[])
                         : [];
-                      const newLanguages = e.target.checked
+                      const newLanguages = checked
                         ? [...currentValue, value]
                         : currentValue.filter((l: string) => l !== value);
                       field.onChange(newLanguages);
                     }}
-                    className="rounded"
                   />
                   <span className="text-sm text-gray-700">{lang}</span>
                 </label>
               ))}
             </div>
             {error && (
-              <p className="mt-2 text-xs text-red-500">
+              <p id={languagesErrorId} className="mt-2 text-xs text-red-500" role="alert">
                 {error.message}
               </p>
             )}
-          </div>
+          </fieldset>
         )}
       />
 
@@ -215,12 +216,14 @@ export function Step2ServiceDetails<T extends FieldValues>({
             control={control}
             name={"canAssignJobsInternally" as FieldPath<T>}
             render={({ field }) => (
-              <label className="flex items-center space-x-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
-                <input
-                  type="checkbox"
+              <label
+                htmlFor="canAssignJobsInternally"
+                className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 p-3 hover:bg-gray-50"
+              >
+                <Checkbox
+                  id="canAssignJobsInternally"
                   checked={field.value || false}
-                  onChange={(e) => field.onChange(e.target.checked)}
-                  className="rounded"
+                  onCheckedChange={(checked) => field.onChange(Boolean(checked))}
                 />
                 <div>
                   <p className="text-sm font-medium text-gray-900">

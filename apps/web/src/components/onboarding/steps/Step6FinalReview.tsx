@@ -1,7 +1,9 @@
 "use client";
 
-import { UseFormReturn, FieldValues, type FieldPath } from "react-hook-form";
+import Link from "next/link";
+import { Controller, UseFormReturn, FieldValues, type FieldPath } from "react-hook-form";
 import { Check, AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Step6FinalReviewProps<T extends FieldValues> {
   form: UseFormReturn<T>;
@@ -16,7 +18,7 @@ export function Step6FinalReview<T extends FieldValues>({
   form,
   isIndividual,
 }: Step6FinalReviewProps<T>) {
-  const { watch, register, formState } = form;
+  const { watch, control, formState } = form;
   const { errors } = formState;
   
   const formData = watch();
@@ -52,39 +54,39 @@ export function Step6FinalReview<T extends FieldValues>({
         {/* Profile Section */}
         <div className="rounded-lg border border-gray-200 overflow-hidden">
           <div className="bg-gray-50 px-4 py-3 border-b">
-            <h3 className="font-semibold text-gray-900">👤 Profile Information</h3>
+            <h3 className="font-semibold text-gray-900">Profile Information</h3>
           </div>
           <div className="p-4 space-y-2 text-sm">
             {isIndividual ? (
               <>
-                <div className="flex justify-between">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-gray-600">Name:</span>
-                  <span className="font-medium text-gray-900">{formData.fullName}</span>
+                  <span className="font-medium text-gray-900 sm:text-right">{formData.fullName}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-gray-600">Phone:</span>
-                  <span className="font-medium text-gray-900">+91 {formData.phone}</span>
+                  <span className="font-medium text-gray-900 sm:text-right">+91 {formData.phone}</span>
                 </div>
               </>
             ) : (
               <>
-                <div className="flex justify-between">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-gray-600">Business:</span>
-                  <span className="font-medium text-gray-900">{formData.businessName}</span>
+                  <span className="font-medium text-gray-900 sm:text-right">{formData.businessName}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-gray-600">Owner:</span>
-                  <span className="font-medium text-gray-900">{formData.ownerName}</span>
+                  <span className="font-medium text-gray-900 sm:text-right">{formData.ownerName}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-gray-600">Phone:</span>
-                  <span className="font-medium text-gray-900">+91 {formData.phone}</span>
+                  <span className="font-medium text-gray-900 sm:text-right">+91 {formData.phone}</span>
                 </div>
               </>
             )}
-            <div className="flex justify-between">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-gray-600">City:</span>
-              <span className="font-medium text-gray-900">{formData.city}</span>
+              <span className="font-medium text-gray-900 sm:text-right">{formData.city}</span>
             </div>
           </div>
         </div>
@@ -92,22 +94,22 @@ export function Step6FinalReview<T extends FieldValues>({
         {/* Services Section */}
         <div className="rounded-lg border border-gray-200 overflow-hidden">
           <div className="bg-gray-50 px-4 py-3 border-b">
-            <h3 className="font-semibold text-gray-900">🔧 Services</h3>
+            <h3 className="font-semibold text-gray-900">Services</h3>
           </div>
           <div className="p-4 space-y-2 text-sm">
-            <div className="flex justify-between">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-gray-600">Primary Category:</span>
-              <span className="font-medium text-gray-900">
+              <span className="font-medium text-gray-900 sm:text-right">
                 {getServiceLabel(formData.primaryCategory)}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-gray-600">Years of Experience:</span>
-              <span className="font-medium text-gray-900">{formData.yearsExperience} years</span>
+              <span className="font-medium text-gray-900 sm:text-right">{formData.yearsExperience} years</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-gray-600">Service Radius:</span>
-              <span className="font-medium text-gray-900">{formData.serviceRadiusKm} km</span>
+              <span className="font-medium text-gray-900 sm:text-right">{formData.serviceRadiusKm} km</span>
             </div>
             {formData.bio && (
               <div>
@@ -121,30 +123,30 @@ export function Step6FinalReview<T extends FieldValues>({
         {/* Pricing & Availability Section */}
         <div className="rounded-lg border border-gray-200 overflow-hidden">
           <div className="bg-gray-50 px-4 py-3 border-b">
-            <h3 className="font-semibold text-gray-900">💰 Pricing & Availability</h3>
+            <h3 className="font-semibold text-gray-900">Pricing & Availability</h3>
           </div>
           <div className="p-4 space-y-2 text-sm">
-            <div className="flex justify-between">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-gray-600">Pricing Type:</span>
-              <span className="font-medium text-gray-900 capitalize">{formData.pricingType}</span>
+              <span className="font-medium text-gray-900 capitalize sm:text-right">{formData.pricingType}</span>
             </div>
             {formData.basePrice && (
-              <div className="flex justify-between">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-gray-600">
                   Base {formData.pricingType === "fixed" ? "Price" : "Rate"}:
                 </span>
-                <span className="font-medium text-gray-900">₹{formData.basePrice}</span>
+                <span className="font-medium text-gray-900 sm:text-right">₹{formData.basePrice}</span>
               </div>
             )}
-            <div className="flex justify-between">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-gray-600">Working Hours:</span>
-              <span className="font-medium text-gray-900">
+              <span className="font-medium text-gray-900 sm:text-right">
                 {formData.workingHours?.start} - {formData.workingHours?.end}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-gray-600">Status:</span>
-              <span className={`font-medium ${formData.isOnline ? "text-green-600" : "text-gray-500"}`}>
+              <span className={`font-medium sm:text-right ${formData.isOnline ? "text-green-600" : "text-gray-500"}`}>
                 {formData.isOnline ? "🟢 Online" : "⚫ Offline"}
               </span>
             </div>
@@ -154,10 +156,10 @@ export function Step6FinalReview<T extends FieldValues>({
         {/* Verification Status */}
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
           <div className="flex gap-3">
-            <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
             <div>
               <p className="text-sm font-medium text-amber-900">
-                ⏳ Pending Verification
+                Pending Verification
               </p>
               <p className="text-xs text-amber-700 mt-1">
                 Your profile will be reviewed within 24-48 hours. You will receive email updates on the status.
@@ -169,47 +171,67 @@ export function Step6FinalReview<T extends FieldValues>({
 
       {/* Terms & Agreements */}
       <div className="space-y-3">
-        <label className="flex items-start space-x-3 rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-50">
-          <input
-            type="checkbox"
-            {...register("agreedToTerms" as FieldPath<T>)}
-            className="mt-1 rounded"
-          />
-          <div>
-            <p className="text-sm font-medium text-gray-900">
-              I agree to Terms of Service and Privacy Policy
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Read our{" "}
-              <a href="#" className="text-blue-600 hover:underline">
-                terms
-              </a>{" "}
-              and{" "}
-              <a href="#" className="text-blue-600 hover:underline">
-                privacy policy
-              </a>
-            </p>
-          </div>
-        </label>
+        <Controller
+          control={control}
+          name={"agreedToTerms" as FieldPath<T>}
+          render={({ field }) => (
+            <label
+              htmlFor="agreedToTerms"
+              className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-4 hover:bg-gray-50"
+            >
+              <Checkbox
+                id="agreedToTerms"
+                checked={Boolean(field.value)}
+                onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                className="mt-1"
+              />
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  I agree to Terms of Service and Privacy Policy
+                </p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  Read our{" "}
+                  <Link href="/terms" className="text-blue-600 hover:underline">
+                    terms
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" className="text-blue-600 hover:underline">
+                    privacy policy
+                  </Link>
+                </p>
+              </div>
+            </label>
+          )}
+        />
         {errors.agreedToTerms && (
           <p className="text-xs text-red-500">{errors.agreedToTerms.message as string}</p>
         )}
 
-        <label className="flex items-start space-x-3 rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-50">
-          <input
-            type="checkbox"
-            {...register("agreedToCommission" as FieldPath<T>)}
-            className="mt-1 rounded"
-          />
-          <div>
-            <p className="text-sm font-medium text-gray-900">
-              I accept the commission structure (10-25% varies by service)
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Different services have different commission rates. You will see exact details in your dashboard.
-            </p>
-          </div>
-        </label>
+        <Controller
+          control={control}
+          name={"agreedToCommission" as FieldPath<T>}
+          render={({ field }) => (
+            <label
+              htmlFor="agreedToCommission"
+              className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-4 hover:bg-gray-50"
+            >
+              <Checkbox
+                id="agreedToCommission"
+                checked={Boolean(field.value)}
+                onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                className="mt-1"
+              />
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  I accept the commission structure (10-25% varies by service)
+                </p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  Different services have different commission rates. You will see exact details in your dashboard.
+                </p>
+              </div>
+            </label>
+          )}
+        />
         {errors.agreedToCommission && (
           <p className="text-xs text-red-500">{errors.agreedToCommission.message as string}</p>
         )}

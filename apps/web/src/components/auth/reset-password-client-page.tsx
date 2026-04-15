@@ -61,6 +61,8 @@ export function ResetPasswordClientPage({ token }: ResetPasswordClientPageProps)
     }
   });
 
+  const isSubmitting = form.formState.isSubmitting;
+
   if (!token) {
     return (
       <div className="auth-shell">
@@ -73,7 +75,7 @@ export function ResetPasswordClientPage({ token }: ResetPasswordClientPageProps)
             <CardDescription>This password reset link is invalid or has expired.</CardDescription>
           </CardHeader>
           <CardFooter>
-            <Link href="/auth/forgot-password" className={buttonVariants({ className: "w-full" })}>
+            <Link href="/auth/forgot-password" className={buttonVariants({ className: "min-h-11 w-full" })}>
               Request a new link
             </Link>
           </CardFooter>
@@ -110,7 +112,7 @@ export function ResetPasswordClientPage({ token }: ResetPasswordClientPageProps)
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
             <FieldGroup>
               {formError ? (
                 <Alert variant="destructive">
@@ -158,8 +160,8 @@ export function ResetPasswordClientPage({ token }: ResetPasswordClientPageProps)
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Resetting..." : "Reset password"}
+              <Button type="submit" className="min-h-11 w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Resetting..." : "Reset password"}
               </Button>
             </FieldGroup>
           </form>

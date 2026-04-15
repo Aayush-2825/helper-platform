@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Star, Quote } from "lucide-react";
 
 const REVIEWS = [
@@ -90,11 +91,11 @@ export function Testimonials() {
 
         {/* Reviews Scrolling Row 1 */}
         <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-0 w-20 bg-linear-to-r from-background to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-20 bg-linear-to-l from-background to-transparent z-10 pointer-events-none" />
           <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide" style={{ scrollbarWidth: "none" }}>
             {REVIEWS.map((r, i) => (
-              <div key={i} className="shrink-0 w-[340px] bg-background border border-border rounded-[16px] p-6 space-y-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div key={i} className="shrink-0 w-85 bg-background border border-border rounded-xl p-6 space-y-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
                 {/* Stars */}
                 <div className="flex items-center gap-1">
                   {Array.from({ length: r.rating }).map((_, si) => (
@@ -112,7 +113,7 @@ export function Testimonials() {
 
                 {/* Author */}
                 <div className="flex items-center gap-3 pt-3 border-t border-border/60">
-                  <img src={r.avatar} alt={r.name} className="size-10 rounded-full object-cover border border-border" />
+                  <Image src={r.avatar} alt={r.name} width={40} height={40} className="size-10 rounded-full object-cover border border-border" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-bold text-sm text-foreground truncate">{r.name}</p>

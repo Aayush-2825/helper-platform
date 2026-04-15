@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, IndianRupee, Clock, TrendingUp, Star, ShieldCheck } from "lucide-react";
 
 const HELPER_BENEFITS = [
@@ -27,7 +28,7 @@ export function BecomeHelper() {
                 <span className="text-orange-500">steady income.</span>
               </h2>
               <p className="text-muted-foreground font-medium text-lg leading-relaxed max-w-md">
-                Join 10,000+ verified helpers already earning on DOZO. Whether you're an electrician, chef, driver, or cleaner — there's work waiting for you.
+                Join 10,000+ verified helpers already earning on DOZO. Whether you&apos;re an electrician, chef, driver, or cleaner - there&apos;s work waiting for you.
               </p>
             </div>
 
@@ -60,9 +61,9 @@ export function BecomeHelper() {
               { name: "Sunita Devi", skill: "Deep Cleaning", city: "Delhi NCR", earning: "₹32,000/mo", avatar: "https://randomuser.me/api/portraits/women/52.jpg", quote: "DOZO gave me financial independence. I work 5 hours a day and earn more than my husband. The customers are respectful and the pay comes on time — always." },
               { name: "Manish Patel", skill: "Personal Driver", city: "Delhi NCR", earning: "₹41,000/mo", avatar: "https://randomuser.me/api/portraits/men/77.jpg", quote: "I was driving an auto before. Now I drive luxury cars for premium customers through DOZO and earn 3x my previous income with zero downtime between rides." },
             ].map((h) => (
-              <div key={h.name} className="bg-muted/30 border border-border rounded-[16px] p-5 space-y-4 hover:shadow-sm transition-all">
+              <div key={h.name} className="bg-muted/30 border border-border rounded-xl p-5 space-y-4 hover:shadow-sm transition-all">
                 <div className="flex items-center gap-3">
-                  <img src={h.avatar} alt={h.name} className="size-12 rounded-full object-cover border-2 border-border" />
+                  <Image src={h.avatar} alt={h.name} width={48} height={48} className="size-12 rounded-full object-cover border-2 border-border" />
                   <div className="flex-1">
                     <p className="font-bold text-foreground">{h.name}</p>
                     <p className="text-sm text-muted-foreground font-medium">{h.skill} · {h.city}</p>

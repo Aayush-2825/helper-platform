@@ -109,6 +109,8 @@ function LocationSearchBar({ onSelect }: { onSelect: (loc: GeocodedLocation) => 
         )}
         {query && !searching && (
           <button
+            type="button"
+            aria-label="Clear location search"
             onClick={() => { setQuery(""); setResults([]); }}
             className="text-muted-foreground hover:text-foreground"
           >
@@ -121,6 +123,7 @@ function LocationSearchBar({ onSelect }: { onSelect: (loc: GeocodedLocation) => 
           {results.map((r, i) => (
             <li key={i}>
               <button
+                type="button"
                 className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors"
                 onClick={() => handleSelect(r)}
               >
@@ -352,27 +355,28 @@ export function MyMap({ userId }: { userId?: string }) {
   // Process events with batching to prevent excessive re-renders
   useEffect(() => {
     if (!eventMessages.length) return;
-    const msg = eventMessages[0]; // Only process the latest event
-    if (msg.type !== "event") return;
+    for (const msg of eventMessages) {
+      if (msg.type !== "event") continue;
 
-    if (msg.event === "helper_presence") {
-      const d = msg.data as
-        | { helperUserId?: string; status?: string; latitude?: number | string; longitude?: number | string }
-        | undefined;
-      if (!d?.helperUserId) return;
-      const uid: string = d.helperUserId;
-      const latitude = d.latitude != null ? Number(d.latitude) : null;
-      const longitude = d.longitude != null ? Number(d.longitude) : null;
-      const hasValidCoords =
-        latitude != null &&
-        longitude != null &&
-        !Number.isNaN(latitude) &&
-        !Number.isNaN(longitude);
+      if (msg.event === "helper_presence") {
+        const d = msg.data as
+          | { helperUserId?: string; status?: string; latitude?: number | string; longitude?: number | string }
+          | undefined;
+        if (!d?.helperUserId) continue;
+        const uid: string = d.helperUserId;
+        const latitude = d.latitude != null ? Number(d.latitude) : null;
+        const longitude = d.longitude != null ? Number(d.longitude) : null;
+        const hasValidCoords =
+          latitude != null &&
+          longitude != null &&
+          !Number.isNaN(latitude) &&
+          !Number.isNaN(longitude);
 
-      // Update the tracking object instead of state immediately
-      if (d.status === "offline") {
-        delete helperUpdatesRef.current[uid];
-      } else {
+        if (d.status === "offline") {
+          delete helperUpdatesRef.current[uid];
+          continue;
+        }
+
         const existing = helperUpdatesRef.current[uid];
         helperUpdatesRef.current[uid] = {
           ...(existing || {
@@ -392,36 +396,32 @@ export function MyMap({ userId }: { userId?: string }) {
           availability: (d.status ?? "online") as NearbyHelper["availability"],
           ...(hasValidCoords ? { lat: latitude!, lng: longitude!, latitude: latitude!, longitude: longitude! } : {}),
         };
+
+        continue;
       }
 
-      // Batch the update
-      scheduleBatchUpdate();
-      return;
-    }
+      if (msg.event === "location_update") {
+        const d = msg.data as
+          | { helperUserId?: string; latitude?: number | string; longitude?: number | string }
+          | undefined;
+        const latitude = d?.latitude != null ? Number(d.latitude) : Number.NaN;
+        const longitude = d?.longitude != null ? Number(d.longitude) : Number.NaN;
+        if (!d?.helperUserId || Number.isNaN(latitude) || Number.isNaN(longitude)) continue;
+        const uid: string = d.helperUserId;
 
-    if (msg.event === "location_update") {
-      const d = msg.data as
-        | { helperUserId?: string; latitude?: number | string; longitude?: number | string }
-        | undefined;
-      const latitude = d?.latitude != null ? Number(d.latitude) : Number.NaN;
-      const longitude = d?.longitude != null ? Number(d.longitude) : Number.NaN;
-      if (!d?.helperUserId || Number.isNaN(latitude) || Number.isNaN(longitude)) return;
-      const uid: string = d.helperUserId;
-
-      // Update the tracking object instead of state immediately
-      if (helperUpdatesRef.current[uid]) {
-        helperUpdatesRef.current[uid] = {
-          ...helperUpdatesRef.current[uid],
-          lat: latitude,
-          lng: longitude,
-          latitude,
-          longitude,
-        };
+        if (helperUpdatesRef.current[uid]) {
+          helperUpdatesRef.current[uid] = {
+            ...helperUpdatesRef.current[uid],
+            lat: latitude,
+            lng: longitude,
+            latitude,
+            longitude,
+          };
+        }
       }
-
-      // Batch the update
-      scheduleBatchUpdate();
     }
+
+    scheduleBatchUpdate();
   }, [eventMessages, scheduleBatchUpdate]);
 
   // Cleanup timeout on unmount

@@ -39,16 +39,17 @@ export function BottomNav() {
   const navItems = isHelperContext ? helperNavItems : customerNavItems;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md lg:hidden">
-      <nav className="surface-card flex items-center justify-between px-6 py-3 border border-white/20 shadow-2xl">
+    <div className="fixed bottom-4 left-1/2 z-50 w-[92%] max-w-md -translate-x-1/2 lg:hidden">
+      <nav aria-label="Portal navigation" className="surface-card flex items-center justify-between rounded-2xl border border-border/70 px-3 py-2.5 shadow-xl backdrop-blur-xl">
         {navItems.map((item) => {
           const isActive = isRouteActive(pathname, item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center gap-1 transition-all duration-300",
+                "relative flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 rounded-xl px-2 transition-all duration-300",
                 isActive ? "text-primary scale-110" : "text-muted-foreground hover:text-foreground"
               )}
             >

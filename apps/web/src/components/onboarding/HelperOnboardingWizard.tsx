@@ -464,7 +464,14 @@ export function HelperOnboardingWizard({
                 {progressPercentage}%
               </div>
             </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-2 bg-gray-100 rounded-full overflow-hidden"
+              role="progressbar"
+              aria-label="Onboarding progress"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progressPercentage}
+            >
               <div
                 className="h-full bg-linear-to-r from-blue-500 to-blue-600 transition-all duration-300"
                 style={{ width: `${progressPercentage}%` }}
@@ -484,6 +491,7 @@ export function HelperOnboardingWizard({
                       ? "bg-blue-600"
                       : "bg-gray-100"
                   }`}
+                  aria-current={i === currentStep ? "step" : undefined}
                 />
               </div>
             ))}
@@ -497,7 +505,7 @@ export function HelperOnboardingWizard({
       </div>
 
       {/* Main Content */}
-      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Form Container */}
         <div className="bg-white rounded-lg">
           {currentStep === 0 && <Step0RoleSelection form={form} />}
@@ -564,6 +572,7 @@ export function HelperOnboardingWizard({
                 onClick={() => form.saveToStorage(form.getValues())}
                 className="flex-1 sm:flex-none"
                 title="Save progress to browser"
+                aria-label="Save progress"
               >
                 <Save className="h-4 w-4" />
               </Button>
@@ -581,18 +590,20 @@ export function HelperOnboardingWizard({
 
         {/* Save Status */}
         {form.hasStoredData && (
-          <div className="mt-4 text-center text-xs text-gray-500">
+          <div className="mt-4 text-center text-xs text-gray-500" aria-live="polite">
             ✓ Progress auto-saved to your browser
           </div>
         )}
-      </div>
+      </main>
 
       {/* Floating Help Badge */}
       <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6">
         <button
+          type="button"
           onClick={() => toast.info("Need help? Contact support@helperplatform.com")}
           className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors"
           title="Help & Support"
+          aria-label="Help and support"
         >
           ?
         </button>

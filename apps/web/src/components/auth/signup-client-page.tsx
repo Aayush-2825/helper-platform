@@ -79,7 +79,7 @@ export function SignUpClientPage() {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleEmailSignUp} noValidate>
+          <form onSubmit={handleEmailSignUp} noValidate aria-busy={isLoading}>
             <FieldGroup>
               {formError ? (
                 <Alert variant="destructive">
@@ -164,13 +164,13 @@ export function SignUpClientPage() {
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="min-h-11 w-full" disabled={isLoading}>
                 {form.formState.isSubmitting ? "Creating account..." : "Sign up"}
               </Button>
 
               <FieldSeparator>Or continue with</FieldSeparator>
 
-              <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignUp} disabled={isLoading}>
+              <Button type="button" variant="outline" className="min-h-11 w-full" onClick={handleGoogleSignUp} disabled={isLoading}>
                 <Chrome data-icon="inline-start" />
                 Continue with Google
               </Button>

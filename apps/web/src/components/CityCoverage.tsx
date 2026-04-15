@@ -1,6 +1,9 @@
 "use client";
 
+import { FormEvent, useState } from "react";
 import { MapPin, CheckCircle2, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const CITIES = [
   { name: "Delhi NCR", helpers: "1,800+", status: "active", badge: "Currently Serving" },
@@ -18,6 +21,24 @@ const CITIES = [
 ];
 
 export function CityCoverage() {
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+
+  const handleNotify = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    setError("");
+    const subject = encodeURIComponent("DOZO city launch notifications");
+    const body = encodeURIComponent(`Please notify me when DOZO launches in my city.\n\nEmail: ${trimmed}`);
+    window.location.href = `mailto:support@dozo.in?subject=${subject}&body=${body}`;
+  };
+
   return (
     <section className="py-24 px-6 border-t border-border bg-muted/20">
       <div className="max-w-7xl mx-auto space-y-12">
@@ -33,7 +54,7 @@ export function CityCoverage() {
               <span className="text-muted-foreground font-bold text-3xl">Expanding to every city soon.</span>
             </h2>
             <p className="text-muted-foreground font-medium max-w-lg">
-              We're building the most reliable service network in India — one city at a time. Your city is next.
+              We&apos;re building the most reliable service network in India - one city at a time. Your city is next.
             </p>
           </div>
           <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground bg-background border border-border px-4 py-2.5 rounded-[10px] shrink-0">
@@ -56,7 +77,7 @@ export function CityCoverage() {
               {city.status === "active" && (
                 <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-bl-[40px]" />
               )}
-              <div className={`size-8 rounded-[8px] flex items-center justify-center border ${
+              <div className={`size-8 rounded-lg flex items-center justify-center border ${
                 city.status === "active"
                   ? "bg-emerald-100 border-emerald-200"
                   : "bg-muted/50 border-border"
@@ -86,21 +107,30 @@ export function CityCoverage() {
         </div>
 
         {/* CTA */}
-        <div className="bg-background border border-border rounded-[16px] p-6 flex flex-col sm:flex-row items-center gap-5 justify-between">
+        <div className="bg-background border border-border rounded-xl p-6 flex flex-col sm:flex-row items-center gap-5 justify-between">
           <div>
             <p className="font-black text-lg">Want DOZO in your city?</p>
-            <p className="text-muted-foreground font-medium text-sm mt-1">Leave your details and we'll notify you the moment we launch near you.</p>
+            <p className="text-muted-foreground font-medium text-sm mt-1">Leave your details and we&apos;ll notify you the moment we launch near you.</p>
           </div>
-          <div className="flex gap-2 w-full sm:w-auto shrink-0">
-            <input
-              type="email"
-              placeholder="your@email.com"
-              className="flex-1 sm:w-56 px-4 py-2.5 rounded-[10px] border border-border bg-muted/30 text-sm font-medium outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
-            />
-            <button className="px-5 py-2.5 bg-foreground text-background font-bold text-sm rounded-[10px] hover:bg-foreground/90 transition shrink-0">
-              Notify Me
-            </button>
-          </div>
+          <form onSubmit={handleNotify} className="w-full sm:w-auto shrink-0">
+            <label htmlFor="city-notify-email" className="sr-only">Your email for launch updates</label>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Input
+                id="city-notify-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                className="flex-1 sm:w-56 px-4 py-2.5 rounded-[10px] border border-border bg-muted/30 text-sm font-medium h-auto"
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? "city-notify-error" : undefined}
+              />
+              <Button type="submit" className="px-5 py-2.5 bg-foreground text-background font-bold text-sm rounded-[10px] hover:bg-foreground/90 shrink-0">
+                Notify Me
+              </Button>
+            </div>
+            {error && <p id="city-notify-error" className="mt-2 text-xs text-rose-600 font-medium">{error}</p>}
+          </form>
         </div>
       </div>
     </section>

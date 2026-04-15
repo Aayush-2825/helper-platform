@@ -3,6 +3,8 @@ import { useController, FieldValues, FieldPath, Control } from "react-hook-form"
 import { Upload, X, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 interface FileUploadFieldProps<
   TFieldValues extends FieldValues = FieldValues,
@@ -42,12 +44,13 @@ export function FileUploadField<
   const [fileName, setFileName] = useState<string>("");
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputId = `file-upload-${String(name).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 
   const handleFile = (file: File) => {
     // Validate file size
     const fileSizeMb = file.size / (1024 * 1024);
     if (fileSizeMb > maxSize) {
-      alert(`File size must be less than ${maxSize}MB`);
+      toast.error(`File size must be less than ${maxSize}MB.`);
       return;
     }
 
@@ -97,6 +100,13 @@ export function FileUploadField<
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileInputRef.current?.click();
+    }
+  };
+
   const handleRemove = () => {
     field.onChange(null);
     setPreview(null);
@@ -111,10 +121,10 @@ export function FileUploadField<
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="block text-sm font-medium text-gray-900">
+        <Label htmlFor={inputId} className="block text-sm font-medium text-gray-900">
           {label}
           {required && <span className="ml-1 text-red-500">*</span>}
-        </label>
+        </Label>
       </div>
 
       {!hasFile ? (
@@ -122,6 +132,9 @@ export function FileUploadField<
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+          role="button"
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
           className={cn(
             "relative rounded-lg border-2 border-dashed transition-colors p-6 text-center cursor-pointer",
             isDragActive
@@ -131,6 +144,7 @@ export function FileUploadField<
           onClick={() => fileInputRef.current?.click()}
         >
           <input
+            id={inputId}
             ref={fileInputRef}
             type="file"
             accept={accept}

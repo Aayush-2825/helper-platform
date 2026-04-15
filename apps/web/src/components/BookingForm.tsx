@@ -268,6 +268,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {CATEGORY_OPTIONS.map((opt) => (
                 <button
+                  type="button"
                   key={opt.value}
                   onClick={() => { setCategoryID(opt.value); setErrors({}); }}
                   className={cn(
@@ -294,9 +295,12 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
         {step === 2 && (
           <div className="space-y-5 fade-up">
             <div className="space-y-4">
+              <div className="space-y-1">
+                <label htmlFor="booking-address-line" className="text-sm font-semibold text-foreground">Address line</label>
               <div className="relative">
                 <MapPin className="absolute left-4 top-4 size-5 text-muted-foreground" />
                 <input
+                  id="booking-address-line"
                   type="text"
                   value={addressLine}
                   onChange={(e) => setAddressLine(e.target.value)}
@@ -304,26 +308,37 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                   className={cn("w-full h-14 pl-12 pr-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.addressLine ? "border-red-500 focus:border-red-500" : "border-border premium-input-ring")}
                 />
               </div>
+              </div>
 
-              <input
-                type="text"
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-                placeholder="Area / Locality"
-                className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.area ? "border-red-500" : "border-border premium-input-ring")}
-              />
+              <div className="space-y-1">
+                <label htmlFor="booking-area" className="text-sm font-semibold text-foreground">Area / locality</label>
+                <input
+                  id="booking-area"
+                  type="text"
+                  value={area}
+                  onChange={(e) => setArea(e.target.value)}
+                  placeholder="Area / Locality"
+                  className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.area ? "border-red-500" : "border-border premium-input-ring")}
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="City"
-                  className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.city ? "border-red-500" : "border-border premium-input-ring")}
-                />
+                <div className="space-y-1">
+                  <label htmlFor="booking-city" className="text-sm font-semibold text-foreground">City</label>
+                  <input
+                    id="booking-city"
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="City"
+                    className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.city ? "border-red-500" : "border-border premium-input-ring")}
+                  />
+                </div>
                 <div className="relative">
+                  <label htmlFor="booking-budget" className="sr-only">Budget in rupees</label>
                   <span className="absolute left-4 top-4 font-bold text-muted-foreground">₹</span>
                   <input
+                    id="booking-budget"
                     type="number"
                     value={quotedAmount}
                     onChange={(e) => setQuotedAmount(e.target.value)}
@@ -334,51 +349,71 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  placeholder="State"
-                  className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.state ? "border-red-500" : "border-border premium-input-ring")}
-                />
-                <input
-                  type="text"
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-                  placeholder="PIN Code"
-                  className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.postalCode ? "border-red-500" : "border-border premium-input-ring")}
-                />
+                <div className="space-y-1">
+                  <label htmlFor="booking-state" className="text-sm font-semibold text-foreground">State</label>
+                  <input
+                    id="booking-state"
+                    type="text"
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    placeholder="State"
+                    className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.state ? "border-red-500" : "border-border premium-input-ring")}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="booking-postal-code" className="text-sm font-semibold text-foreground">PIN code</label>
+                  <input
+                    id="booking-postal-code"
+                    type="text"
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                    placeholder="PIN Code"
+                    className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.postalCode ? "border-red-500" : "border-border premium-input-ring")}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <input
-                  type="tel"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="Contact phone (optional)"
-                  className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.customerPhone ? "border-red-500" : "border-border premium-input-ring")}
-                />
+                <div className="space-y-1">
+                  <label htmlFor="booking-customer-phone" className="text-sm font-semibold text-foreground">Contact phone (optional)</label>
+                  <input
+                    id="booking-customer-phone"
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    placeholder="Contact phone (optional)"
+                    className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.customerPhone ? "border-red-500" : "border-border premium-input-ring")}
+                  />
+                </div>
 
-                <select
-                  value={preferredContactMethod}
-                  onChange={(e) => setPreferredContactMethod(e.target.value as "call" | "sms" | "whatsapp" | "in_app")}
-                  className="w-full h-14 px-4 bg-muted/30 border border-border rounded-2xl text-base font-medium outline-none premium-input-ring transition-all"
-                >
-                  <option value="call">Preferred contact: Call</option>
-                  <option value="sms">Preferred contact: SMS</option>
-                  <option value="whatsapp">Preferred contact: WhatsApp</option>
-                  <option value="in_app">Preferred contact: In-App</option>
-                </select>
+                <div className="space-y-1">
+                  <label htmlFor="booking-contact-method" className="text-sm font-semibold text-foreground">Preferred contact method</label>
+                  <select
+                    id="booking-contact-method"
+                    value={preferredContactMethod}
+                    onChange={(e) => setPreferredContactMethod(e.target.value as "call" | "sms" | "whatsapp" | "in_app")}
+                    className="w-full h-14 px-4 bg-muted/30 border border-border rounded-2xl text-base font-medium outline-none premium-input-ring transition-all"
+                  >
+                    <option value="call">Preferred contact: Call</option>
+                    <option value="sms">Preferred contact: SMS</option>
+                    <option value="whatsapp">Preferred contact: WhatsApp</option>
+                    <option value="in_app">Preferred contact: In-App</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="relative">
-                <CalendarDays className="absolute left-4 top-4 size-5 text-muted-foreground" />
-                <input
-                  type="datetime-local"
-                  value={scheduledFor}
-                  onChange={(e) => setScheduledFor(e.target.value)}
-                  className="w-full h-14 pl-12 pr-4 bg-muted/30 border border-border rounded-2xl text-base font-medium outline-none premium-input-ring transition-all"
-                />
+              <div className="space-y-1">
+                <label htmlFor="booking-scheduled-for" className="text-sm font-semibold text-foreground">Schedule for (optional)</label>
+                <div className="relative">
+                  <CalendarDays className="absolute left-4 top-4 size-5 text-muted-foreground" />
+                  <input
+                    id="booking-scheduled-for"
+                    type="datetime-local"
+                    value={scheduledFor}
+                    onChange={(e) => setScheduledFor(e.target.value)}
+                    className="w-full h-14 pl-12 pr-4 bg-muted/30 border border-border rounded-2xl text-base font-medium outline-none premium-input-ring transition-all"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
@@ -387,13 +422,17 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                 <Button type="button" variant="outline" className="rounded-xl" onClick={() => setSchedulePreset("tomorrow")}>Tomorrow</Button>
               </div>
 
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Describe the task briefly (optional but recommended)"
-                className="w-full min-h-24 px-4 py-3 bg-muted/30 border border-border rounded-2xl text-sm font-medium outline-none premium-input-ring transition-all resize-y"
-                maxLength={500}
-              />
+              <div className="space-y-1">
+                <label htmlFor="booking-notes" className="text-sm font-semibold text-foreground">Task notes (optional)</label>
+                <textarea
+                  id="booking-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Describe the task briefly (optional but recommended)"
+                  className="w-full min-h-24 px-4 py-3 bg-muted/30 border border-border rounded-2xl text-sm font-medium outline-none premium-input-ring transition-all resize-y"
+                  maxLength={500}
+                />
+              </div>
               <p className="text-xs text-muted-foreground text-right">{notes.length}/500</p>
 
               {(errors.addressLine || errors.area || errors.city || errors.state || errors.postalCode || errors.quotedAmount || errors.customerPhone) && (

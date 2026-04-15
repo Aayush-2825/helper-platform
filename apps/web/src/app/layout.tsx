@@ -27,8 +27,6 @@ export const metadata: Metadata = {
   description: "Verified professionals for home and business services, delivered in under 60 seconds.",
 };
 
-import { ThemeProvider } from "@/components/theme-provider";
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -37,23 +35,16 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${plusJakartaSans.variable} ${fraunces.variable} ${geistMono.variable}`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <Suspense fallback={null}>
-            <QueryProvider>
-              <SessionProvider>
-                <TooltipProvider>
-                  {children}
-                  <Toaster />
-                </TooltipProvider>
-              </SessionProvider>
-            </QueryProvider>
-          </Suspense>
-        </ThemeProvider>
+        <Suspense fallback={null}>
+          <QueryProvider>
+            <SessionProvider>
+              <TooltipProvider>
+                {children}
+                <Toaster />
+              </TooltipProvider>
+            </SessionProvider>
+          </QueryProvider>
+        </Suspense>
       </body>
     </html>
   );

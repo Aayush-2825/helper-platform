@@ -35,6 +35,8 @@ export function TwoFactorVerifyClientPage() {
     name: "method",
   });
 
+  const isSubmitting = form.formState.isSubmitting;
+
   const handleSubmit = form.handleSubmit(async (values) => {
     setFormError("");
 
@@ -74,7 +76,7 @@ export function TwoFactorVerifyClientPage() {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
             <FieldGroup>
               {formError ? (
                 <Alert variant="destructive">
@@ -88,11 +90,13 @@ export function TwoFactorVerifyClientPage() {
                 control={form.control}
                 render={({ field }) => (
                   <Field>
-                    <FieldLabel>Verification method</FieldLabel>
+                    <FieldLabel htmlFor="verificationMethod">Verification method</FieldLabel>
                     <ToggleGroup
+                      id="verificationMethod"
                       multiple={false}
                       variant="outline"
                       className="w-full"
+                      aria-label="Verification method"
                       value={field.value ? [field.value] : []}
                       onValueChange={(values) => {
                         const nextValue = values[0];
@@ -102,10 +106,10 @@ export function TwoFactorVerifyClientPage() {
                         }
                       }}
                     >
-                      <ToggleGroupItem value="totp" className="flex-1">
+                      <ToggleGroupItem value="totp" className="min-h-11 flex-1">
                         Authenticator app
                       </ToggleGroupItem>
-                      <ToggleGroupItem value="backup" className="flex-1">
+                      <ToggleGroupItem value="backup" className="min-h-11 flex-1">
                         Backup code
                       </ToggleGroupItem>
                     </ToggleGroup>
@@ -158,8 +162,8 @@ export function TwoFactorVerifyClientPage() {
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Verifying..." : "Verify"}
+              <Button type="submit" className="min-h-11 w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Verifying..." : "Verify"}
               </Button>
             </FieldGroup>
           </form>

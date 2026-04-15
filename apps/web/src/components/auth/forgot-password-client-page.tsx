@@ -48,6 +48,8 @@ export function ForgotPasswordClientPage() {
     }
   });
 
+  const isSubmitting = form.formState.isSubmitting;
+
   if (success) {
     return (
       <div className="auth-shell">
@@ -67,7 +69,7 @@ export function ForgotPasswordClientPage() {
             </p>
           </CardContent>
           <CardFooter>
-            <Link href="/auth/signin" className={buttonVariants({ className: "w-full" })}>
+            <Link href="/auth/signin" className={buttonVariants({ className: "min-h-11 w-full" })}>
               Back to sign in
             </Link>
           </CardFooter>
@@ -90,7 +92,7 @@ export function ForgotPasswordClientPage() {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
             <FieldGroup>
               {formError ? (
                 <Alert variant="destructive">
@@ -118,8 +120,8 @@ export function ForgotPasswordClientPage() {
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Sending..." : "Send reset link"}
+              <Button type="submit" className="min-h-11 w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Sending..." : "Send reset link"}
               </Button>
             </FieldGroup>
           </form>

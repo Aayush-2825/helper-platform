@@ -3,6 +3,8 @@
 import { UseFormReturn, FieldValues, Controller } from "react-hook-form";
 import { FormField } from "@/components/ui/form-field";
 import { Label } from "@/components/ui/label";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FileUploadField } from "../FileUploadField";
 import { AlertCircle, ShieldCheck } from "lucide-react";
 
@@ -33,26 +35,29 @@ export function Step4KYCVerification<T extends FieldValues>({
     { value: "passport", label: "Passport" },
   ];
 
+  const idDocumentTypeErrorId = "idDocumentType-error";
+  const ownerIdDocumentTypeErrorId = "ownerIdDocumentType-error";
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          <ShieldCheck className="inline h-6 w-6 mr-2 text-green-600" />
+        <h1 className="text-2xl font-bold text-foreground">
+          <ShieldCheck className="mr-2 inline h-6 w-6 text-primary" />
           Identity Verification
         </h1>
-        <p className="mt-2 text-gray-600">
+        <p className="mt-2 text-muted-foreground">
           Help us verify your identity to build trust with customers
         </p>
       </div>
 
-      <div className="rounded-lg bg-green-50 border border-green-200 p-4">
+      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
         <div className="flex gap-3">
-          <ShieldCheck className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
           <div>
-            <p className="text-sm font-medium text-green-900">
+            <p className="text-sm font-medium text-foreground">
               Verified badge increases job chances by 3x
             </p>
-            <p className="text-xs text-green-700 mt-1">
+            <p className="mt-1 text-xs text-muted-foreground">
               Your documents are encrypted and reviewed securely
             </p>
           </div>
@@ -68,21 +73,28 @@ export function Step4KYCVerification<T extends FieldValues>({
             render={({ field, fieldState: { error } }) => (
               <div>
                 <Label htmlFor="idDocumentType">Government ID Type</Label>
-                <select
+                <ToggleGroup
                   id="idDocumentType"
-                  {...field}
-                  value={typeof field.value === "string" ? field.value : ""}
-                  className="w-full mt-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  multiple={false}
+                  variant="outline"
+                  value={typeof field.value === "string" && field.value.length > 0 ? [field.value] : []}
+                  onValueChange={(values) => field.onChange(values[0] ?? "")}
+                  aria-invalid={!!error?.message}
+                  aria-describedby={error?.message ? idDocumentTypeErrorId : undefined}
+                  className="mt-2 grid w-full grid-cols-2 gap-2"
                 >
-                  <option value="">Select ID type...</option>
                   {ID_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
+                    <ToggleGroupItem
+                      key={type.value}
+                      value={type.value}
+                      className="h-auto min-h-11 w-full rounded-lg border-2 border-border px-3 py-2 text-sm font-medium text-foreground data-pressed:border-primary data-pressed:bg-primary/10 data-pressed:text-primary"
+                    >
                       {type.label}
-                    </option>
+                    </ToggleGroupItem>
                   ))}
-                </select>
+                </ToggleGroup>
                 {error?.message && (
-                  <p className="mt-1 text-xs text-red-500">{error.message}</p>
+                  <p id={idDocumentTypeErrorId} className="mt-1 text-xs text-destructive" role="alert">{error.message}</p>
                 )}
               </div>
             )}
@@ -115,9 +127,9 @@ export function Step4KYCVerification<T extends FieldValues>({
             hint="Clear photos showing all visible text and security features"
           />
 
-          <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
-            <p className="text-sm text-blue-900">
-              <AlertCircle className="inline h-4 w-4 mr-2" />
+          <div className="rounded-lg border border-accent/30 bg-accent/10 p-4">
+            <p className="text-sm text-foreground">
+              <AlertCircle className="mr-2 inline h-4 w-4 text-accent" />
               <strong>Optional:</strong> Upload a selfie holding your ID for instant verification
             </p>
           </div>
@@ -180,21 +192,28 @@ export function Step4KYCVerification<T extends FieldValues>({
             render={({ field, fieldState: { error } }) => (
               <div>
                 <Label htmlFor="ownerIdDocumentType">Owner/Manager ID Type</Label>
-                <select
+                <ToggleGroup
                   id="ownerIdDocumentType"
-                  {...field}
-                  value={typeof field.value === "string" ? field.value : ""}
-                  className="w-full mt-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  multiple={false}
+                  variant="outline"
+                  value={typeof field.value === "string" && field.value.length > 0 ? [field.value] : []}
+                  onValueChange={(values) => field.onChange(values[0] ?? "")}
+                  aria-invalid={!!error?.message}
+                  aria-describedby={error?.message ? ownerIdDocumentTypeErrorId : undefined}
+                  className="mt-2 grid w-full grid-cols-2 gap-2"
                 >
-                  <option value="">Select ID type...</option>
                   {ID_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
+                    <ToggleGroupItem
+                      key={type.value}
+                      value={type.value}
+                      className="h-auto min-h-11 w-full rounded-lg border-2 border-border px-3 py-2 text-sm font-medium text-foreground data-pressed:border-primary data-pressed:bg-primary/10 data-pressed:text-primary"
+                    >
                       {type.label}
-                    </option>
+                    </ToggleGroupItem>
                   ))}
-                </select>
+                </ToggleGroup>
                 {error?.message && (
-                  <p className="mt-1 text-xs text-red-500">{error.message}</p>
+                  <p id={ownerIdDocumentTypeErrorId} className="mt-1 text-xs text-destructive" role="alert">{error.message}</p>
                 )}
               </div>
             )}
@@ -216,18 +235,21 @@ export function Step4KYCVerification<T extends FieldValues>({
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             name={"workerDeclarationAgreed" as any}
             render={({ field }) => (
-              <label className="flex items-start space-x-3 rounded-lg border border-gray-200 p-3 cursor-pointer">
-                <input
-                  type="checkbox"
+              <label
+                htmlFor="workerDeclarationAgreed"
+                className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3"
+              >
+                <Checkbox
+                  id="workerDeclarationAgreed"
                   checked={field.value || false}
-                  onChange={(e) => field.onChange(e.target.checked)}
-                  className="mt-1 rounded"
+                  onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                  className="mt-1"
                 />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-foreground">
                     I certify that all workers on my team have verified their identity
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     We will verify this during onboarding completion
                   </p>
                 </div>
@@ -235,15 +257,15 @@ export function Step4KYCVerification<T extends FieldValues>({
             )}
           />
           {errors.workerDeclarationAgreed && (
-            <p className="text-xs text-red-500">
+            <p className="text-xs text-destructive" role="alert">
               {errors.workerDeclarationAgreed.message as string}
             </p>
           )}
         </>
       )}
 
-      <div className="rounded-lg bg-gray-50 border border-gray-200 p-4">
-        <p className="text-xs text-gray-700">
+      <div className="rounded-lg border border-border bg-muted/40 p-4">
+        <p className="text-xs text-muted-foreground">
           <strong>Timeline:</strong> Verification typically completes within 24-48 hours. You will receive updates via email.
         </p>
       </div>

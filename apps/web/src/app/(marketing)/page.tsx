@@ -7,6 +7,7 @@ import {
   Zap, Users, Clock, Phone, BadgeCheck, Award, TrendingUp, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ServiceSection } from "@/components/ServiceSection";
 import { HowItWorks } from "@/components/HowItWorks";
 import { ActivityTicker } from "@/components/ActivityTicker";
@@ -68,13 +69,14 @@ const HERO_STATS = [
   { icon: Users, value: "10,000+", label: "Verified Helpers" },
   { icon: TrendingUp, value: "2M+", label: "Jobs Completed" },
   { icon: Star, value: "4.9★", label: "Average Rating" },
-  { icon: MapPin, value: "50+", label: "Cities Active" },
+  { icon: MapPin, value: "Delhi NCR", label: "Currently Live" },
 ];
 
 export default function DozoLandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [helperIdx, setHelperIdx] = useState(0);
   const [helperVisible, setHelperVisible] = useState(true);
+  const [address, setAddress] = useState("");
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -89,6 +91,9 @@ export default function DozoLandingPage() {
   }, []);
 
   const helper = LIVE_HELPERS[helperIdx];
+  const bookingHref = address.trim()
+    ? `/customer/book?address=${encodeURIComponent(address.trim())}`
+    : "/customer/book";
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans overflow-x-hidden selection:bg-primary/20">
@@ -121,10 +126,20 @@ export default function DozoLandingPage() {
 
             <Link href="/helper" className="hidden lg:block font-bold text-sm text-muted-foreground hover:text-primary transition-colors mr-1">Become a Helper</Link>
             <Link href="/auth/signin" className="hidden sm:block font-bold text-sm hover:text-primary transition">Log in</Link>
-            <Button className="bg-foreground text-background hover:bg-foreground/90 font-bold px-5 py-2.5 rounded-lg transition-all text-sm h-auto">
-              Sign Up Free
-            </Button>
-            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            <Link href="/auth/signup">
+              <Button className="bg-foreground text-background hover:bg-foreground/90 font-bold px-5 py-2.5 rounded-lg transition-all text-sm h-auto">
+                Sign Up Free
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav-menu"
+            >
               {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
             </Button>
           </div>
@@ -132,7 +147,7 @@ export default function DozoLandingPage() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-border bg-background px-6 py-4 space-y-3">
+          <div id="mobile-nav-menu" className="md:hidden border-t border-border bg-background px-6 py-4 space-y-3">
             {[
               ["#services", "Services"],
               ["#how-it-works", "How it Works"],
@@ -156,7 +171,7 @@ export default function DozoLandingPage() {
               {/* Pill */}
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-sm font-bold">
                 <Zap className="size-3.5 fill-orange-500" />
-                Help in 10 Minutes · Across 50+ Cities
+                Help in 10 Minutes · Live in Delhi NCR
               </div>
 
               <h1 className="text-5xl lg:text-[5.5rem] font-black tracking-tighter leading-[1.05] text-balance">
@@ -171,14 +186,18 @@ export default function DozoLandingPage() {
               {/* Search / CTA */}
               <div className="bg-card p-2 rounded-[14px] border border-border shadow-sm flex flex-col sm:flex-row gap-2 max-w-xl">
                 <div className="relative flex-1 flex items-center">
+                  <label htmlFor="hero-address" className="sr-only">Enter your address or locality</label>
                   <MapPin className="size-5 text-muted-foreground absolute left-4 shrink-0" />
-                  <input
+                  <Input
+                    id="hero-address"
                     type="text"
                     placeholder="Enter your address or locality..."
-                    className="w-full bg-transparent pl-11 pr-4 outline-none text-base font-medium placeholder:text-muted-foreground h-12"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="w-full bg-transparent pl-11 pr-4 border-0 shadow-none outline-none text-base font-medium placeholder:text-muted-foreground h-12 rounded-none focus-visible:ring-0"
                   />
                 </div>
-                <Link href="/customer/book" className="w-full sm:w-auto">
+                <Link href={bookingHref} className="w-full sm:w-auto">
                   <Button className="h-12 w-full px-8 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-[10px] text-base shadow-md shadow-orange-500/20 transition-all">
                     Book Now
                   </Button>
@@ -300,7 +319,7 @@ export default function DozoLandingPage() {
         <AppDownload />
 
         {/* 5. TRUST & SAFETY */}
-        <section id="trust" className="py-28 px-6 border-t border-border bg-muted/20">
+        <section id="trust" className="scroll-mt-24 py-28 px-6 border-t border-border bg-muted/20">
           <div className="max-w-7xl mx-auto space-y-16">
             {/* Header */}
             <div className="text-center space-y-4 max-w-2xl mx-auto">
@@ -374,7 +393,7 @@ export default function DozoLandingPage() {
                     Careers <span className="px-1.5 py-0.5 text-[10px] font-black bg-orange-100 text-orange-600 rounded-full">Hiring</span>
                   </Link>
                   <Link href="/blog" className="hover:text-foreground transition-colors">Blog</Link>
-                  <Link href="/about#press" className="hover:text-foreground transition-colors">Press</Link>
+                  <Link href="/press" className="hover:text-foreground transition-colors">Press</Link>
                 </div>
               </div>
 
@@ -391,10 +410,10 @@ export default function DozoLandingPage() {
               <div className="space-y-4">
                 <h4 className="font-black text-sm uppercase tracking-wide">Support</h4>
                 <div className="flex flex-col gap-3 text-muted-foreground font-medium text-sm">
-                  <Link href="#" className="hover:text-foreground transition-colors">Help Center</Link>
+                  <Link href="/help" className="hover:text-foreground transition-colors">Help Center</Link>
                   <Link href="#trust" className="hover:text-foreground transition-colors">Trust & Safety</Link>
-                  <Link href="#" className="hover:text-foreground transition-colors">Terms of Service</Link>
-                  <Link href="#" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+                  <Link href="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
+                  <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
                 </div>
               </div>
             </div>
@@ -404,7 +423,7 @@ export default function DozoLandingPage() {
               <div className="flex gap-6">
                 <span>English (IN)</span>
                 <span>₹ INR</span>
-                <Link href="#" className="hover:text-foreground transition-colors">Sitemap</Link>
+                <Link href="/sitemap" className="hover:text-foreground transition-colors">Sitemap</Link>
               </div>
             </div>
           </div>
