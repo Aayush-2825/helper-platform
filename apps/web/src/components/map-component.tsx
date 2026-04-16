@@ -282,12 +282,12 @@ const HelperMarkersLayer = memo(function HelperMarkersLayer({ helpers }: { helpe
 // Main map component
 // ---------------------------------------------------------------------------
 
-export function MyMap({ userId }: { userId?: string }) {
+export function MyMap({ userId, initialCategoryId, initialSubcategoryId }: { userId?: string; initialCategoryId?: string; initialSubcategoryId?: string }) {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 28.6139, lng: 77.209 });
   const [draggableMarker, setDraggableMarker] = useState({ lng: 77.209, lat: 28.6139 });
   const [nearbyHelpers, setNearbyHelpers] = useState<NearbyHelper[]>([]);
-  const selectedCategory = "";
+  const selectedCategory = initialCategoryId ?? "";
   const [prefillAddress, setPrefillAddress] = useState({ addressLine: "", area: "", city: "", state: "", postalCode: "" });
   const [currentBookingId, setCurrentBookingId] = useState<string | null>(null);
   const formRef = useRef<HTMLDivElement | null>(null);
@@ -511,6 +511,7 @@ export function MyMap({ userId }: { userId?: string }) {
           longitude={draggableMarker.lng}
           userId={userId}
           defaultCategory={selectedCategory}
+          defaultSubcategory={initialSubcategoryId}
           defaultAddressLine={prefillAddress.addressLine}
           defaultArea={prefillAddress.area}
           defaultCity={prefillAddress.city || fetchCity}
@@ -527,7 +528,7 @@ export function MyMap({ userId }: { userId?: string }) {
             );
           }}
           onHelpersSearching={() => {
-            setNearbyHelpers((prev) => prev);
+            setNearbyHelpers([]);
           }}
           onSuccess={(id) => {
             setCurrentBookingId(id);

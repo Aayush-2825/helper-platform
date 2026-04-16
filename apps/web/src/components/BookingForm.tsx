@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowRight, ArrowLeft, Sparkles, PlugZap, Wrench, Car, Utensils, Package, Heart, Shield, MapPin, CalendarDays } from "lucide-react";
+import { Loader2, ArrowRight, ArrowLeft, Sparkles, PlugZap, Wrench, Car, Utensils, Package, Heart, Shield, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/useWebsocket";
 import { wsSend } from "@/lib/realtime/wsManager";
@@ -18,12 +18,26 @@ const CATEGORY_OPTIONS = [
   { value: "security_guard", label: "Security Guard", icon: Shield },
 ];
 
+const SUBCATEGORY_OPTIONS_BY_CATEGORY: Record<string, Array<{ value: string; label: string }>> = {
+  driver: [
+    { value: "car_driver", label: "Car Driver" },
+    { value: "bike_driver", label: "Bike Driver" },
+  ],
+  cleaner: [
+    { value: "home_cleaning", label: "Home Cleaning" },
+    { value: "office_cleaning", label: "Office Cleaning" },
+  ],
+  chef: [{ value: "cook", label: "Cook" }],
+  security_guard: [{ value: "security_night", label: "Night Guard" }],
+};
+
 interface BookingFormProps {
   latitude: number;
   longitude: number;
   userId?: string;
   defaultCategory?: string;
   defaultAddressLine?: string;
+  defaultSubcategory?: string;
   defaultArea?: string;
   defaultCity?: string;
   defaultState?: string;
@@ -50,13 +64,18 @@ type LiveHelper = {
 
 export type { LiveHelper };
 
-export function BookingForm({ latitude, longitude, userId, defaultCategory, defaultAddressLine, defaultArea, defaultCity, defaultState, defaultPostalCode, formRef, onHelpersFound, onHelpersSearching, onSuccess }: BookingFormProps) {
+export function BookingForm({ latitude, longitude, userId, defaultCategory, defaultSubcategory, defaultAddressLine, defaultArea, defaultCity, defaultState, defaultPostalCode, formRef, onHelpersFound, onHelpersSearching, onSuccess }: BookingFormProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [categoryID, setCategoryID] = useState(defaultCategory ?? "");
+  const [subcategoryID, setSubcategoryID] = useState(defaultSubcategory ?? "");
 
   useEffect(() => {
     if (defaultCategory) setCategoryID(defaultCategory);
   }, [defaultCategory]);
+
+  useEffect(() => {
+    if (defaultSubcategory !== undefined) setSubcategoryID(defaultSubcategory);
+  }, [defaultSubcategory]);
 
   const [addressLine, setAddressLine] = useState(defaultAddressLine ?? "");
   const [area, setArea] = useState(defaultArea ?? "");
@@ -73,20 +92,29 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
   }, [defaultAddressLine, defaultArea, defaultCity, defaultState, defaultPostalCode]);
 
   const [quotedAmount, setQuotedAmount] = useState("");
-  const [notes, setNotes] = useState("");
-  const [scheduledFor, setScheduledFor] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [preferredContactMethod, setPreferredContactMethod] = useState<"call" | "sms" | "whatsapp" | "in_app">("call");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSearchingHelpers, setIsSearchingHelpers] = useState(false);
   const [liveHelpers, setLiveHelpers] = useState<LiveHelper[]>([]);
   const [searchMessage, setSearchMessage] = useState("");
   const [submittingBooking, setSubmittingBooking] = useState(false);
   const searchRequestIdRef = useRef(0);
+  const activeSearchRequestIdRef = useRef<string | null>(null);
   const parsedQuotedAmount = Number(quotedAmount || 0);
   const platformFee = parsedQuotedAmount > 0 ? Math.round(parsedQuotedAmount * 0.08) : 0;
   const estimatedTax = parsedQuotedAmount > 0 ? Math.round(parsedQuotedAmount * 0.02) : 0;
   const estimatedTotal = parsedQuotedAmount + platformFee + estimatedTax;
+  const subcategoryOptions = useMemo(() => SUBCATEGORY_OPTIONS_BY_CATEGORY[categoryID] ?? [], [categoryID]);
+
+  useEffect(() => {
+    if (subcategoryOptions.length === 0) {
+      if (subcategoryID) setSubcategoryID("");
+      return;
+    }
+
+    if (!subcategoryOptions.some((option) => option.value === subcategoryID)) {
+      setSubcategoryID(subcategoryOptions[0].value);
+    }
+  }, [subcategoryID, subcategoryOptions]);
 
   useWebSocket(userId || "unknown", (msg) => {
     if (msg.type !== "event") return;
@@ -99,6 +127,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
       } | undefined;
 
       if (!payload) return;
+      if (payload.requestId && payload.requestId !== activeSearchRequestIdRef.current) return;
 
       setLiveHelpers(Array.isArray(payload.helpers) ? payload.helpers : []);
       onHelpersFound?.(Array.isArray(payload.helpers) ? payload.helpers : []);
@@ -109,7 +138,8 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
     }
 
     if (msg.event === "helper_search_error") {
-      const payload = msg.data as { message?: string } | undefined;
+      const payload = msg.data as { requestId?: string; message?: string } | undefined;
+      if (payload?.requestId && payload.requestId !== activeSearchRequestIdRef.current) return;
       setSearchMessage(payload?.message || "Unable to search for helpers right now.");
       setIsSearchingHelpers(false);
       onHelpersSearching?.(false);
@@ -140,10 +170,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
     if (!quotedAmount || isNaN(parsedAmount) || !Number.isInteger(parsedAmount) || parsedAmount <= 0) {
       errs.quotedAmount = "Enter a positive whole amount";
     }
-    if (customerPhone && !/^\+?[0-9]{10,15}$/.test(customerPhone)) {
-      errs.customerPhone = "Enter a valid phone number";
-    }
-    
+
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
@@ -155,7 +182,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
     onHelpersSearching?.(true);
     setLiveHelpers([]);
     onHelpersFound?.([]);
-    setSearchMessage("");
+    setSearchMessage("Searching nearby helpers...");
   }
 
   async function handleBookHelper() {
@@ -167,6 +194,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
         credentials: "include",
         body: JSON.stringify({
           categoryID,
+          subcategoryID: subcategoryID || undefined,
           addressLine,
           area,
           city,
@@ -175,10 +203,6 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
           quotedAmount: Number(quotedAmount),
           latitude,
           longitude,
-          notes,
-          scheduledFor,
-          customerPhone: customerPhone || undefined,
-          preferredContactMethod,
         }),
       });
       if (res.status === 201) {
@@ -196,34 +220,20 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
     }
   }
 
-  function setSchedulePreset(preset: "asap" | "2h" | "tomorrow") {
-    const now = new Date();
-    if (preset === "asap") {
-      setScheduledFor("");
+  useEffect(() => {
+    if (step !== 3) return;
+
+    if (!userId) {
+      setIsSearchingHelpers(false);
+      setSearchMessage("Sign in required to search helpers.");
       return;
     }
 
-    const next = new Date(now);
-    if (preset === "2h") {
-      next.setHours(next.getHours() + 2);
-    }
-    if (preset === "tomorrow") {
-      next.setDate(next.getDate() + 1);
-      next.setHours(10, 0, 0, 0);
-    }
-    const local = new Date(next.getTime() - next.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
-    setScheduledFor(local);
-  }
-
-  useEffect(() => {
-    if (step !== 3 || !userId) return;
-
     const requestId = `helper_search_${Date.now()}_${searchRequestIdRef.current++}`;
+    activeSearchRequestIdRef.current = requestId;
     setIsSearchingHelpers(true);
     setLiveHelpers([]);
-    setSearchMessage("");
+    setSearchMessage("Searching nearby helpers...");
 
     wsSend({
       type: "helper_search",
@@ -283,6 +293,28 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                 </button>
               ))}
             </div>
+
+            {categoryID && subcategoryOptions.length > 0 && (
+              <div className="space-y-2">
+                <label htmlFor="booking-subcategory" className="text-sm font-semibold text-foreground">
+                  Sub service
+                </label>
+                <select
+                  id="booking-subcategory"
+                  value={subcategoryID}
+                  onChange={(e) => setSubcategoryID(e.target.value)}
+                  className="w-full h-14 px-4 bg-muted/30 border border-border rounded-2xl text-base font-medium outline-none premium-input-ring transition-all"
+                >
+                  {subcategoryOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">Optional sub service from the booking schema.</p>
+              </div>
+            )}
+
             {errors.categoryID && <p className="text-sm text-red-500 font-bold">{errors.categoryID}</p>}
             {errors.submit && <p className="text-sm text-red-500 font-bold">{errors.submit}</p>}
             <Button onClick={handleNextToStep2} className="w-full bg-primary text-white h-14 rounded-2xl text-lg font-black shadow-lg hover:shadow-xl transition-all mt-4">
@@ -373,71 +405,9 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label htmlFor="booking-customer-phone" className="text-sm font-semibold text-foreground">Contact phone (optional)</label>
-                  <input
-                    id="booking-customer-phone"
-                    type="tel"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="Contact phone (optional)"
-                    className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.customerPhone ? "border-red-500" : "border-border premium-input-ring")}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="booking-contact-method" className="text-sm font-semibold text-foreground">Preferred contact method</label>
-                  <select
-                    id="booking-contact-method"
-                    value={preferredContactMethod}
-                    onChange={(e) => setPreferredContactMethod(e.target.value as "call" | "sms" | "whatsapp" | "in_app")}
-                    className="w-full h-14 px-4 bg-muted/30 border border-border rounded-2xl text-base font-medium outline-none premium-input-ring transition-all"
-                  >
-                    <option value="call">Preferred contact: Call</option>
-                    <option value="sms">Preferred contact: SMS</option>
-                    <option value="whatsapp">Preferred contact: WhatsApp</option>
-                    <option value="in_app">Preferred contact: In-App</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="booking-scheduled-for" className="text-sm font-semibold text-foreground">Schedule for (optional)</label>
-                <div className="relative">
-                  <CalendarDays className="absolute left-4 top-4 size-5 text-muted-foreground" />
-                  <input
-                    id="booking-scheduled-for"
-                    type="datetime-local"
-                    value={scheduledFor}
-                    onChange={(e) => setScheduledFor(e.target.value)}
-                    className="w-full h-14 pl-12 pr-4 bg-muted/30 border border-border rounded-2xl text-base font-medium outline-none premium-input-ring transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <Button type="button" variant="outline" className="rounded-xl" onClick={() => setSchedulePreset("asap")}>ASAP</Button>
-                <Button type="button" variant="outline" className="rounded-xl" onClick={() => setSchedulePreset("2h")}>In 2 Hours</Button>
-                <Button type="button" variant="outline" className="rounded-xl" onClick={() => setSchedulePreset("tomorrow")}>Tomorrow</Button>
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="booking-notes" className="text-sm font-semibold text-foreground">Task notes (optional)</label>
-                <textarea
-                  id="booking-notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Describe the task briefly (optional but recommended)"
-                  className="w-full min-h-24 px-4 py-3 bg-muted/30 border border-border rounded-2xl text-sm font-medium outline-none premium-input-ring transition-all resize-y"
-                  maxLength={500}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground text-right">{notes.length}/500</p>
-
-              {(errors.addressLine || errors.area || errors.city || errors.state || errors.postalCode || errors.quotedAmount || errors.customerPhone) && (
+                {(errors.addressLine || errors.area || errors.city || errors.state || errors.postalCode || errors.quotedAmount) && (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                  {errors.addressLine || errors.area || errors.city || errors.state || errors.postalCode || errors.quotedAmount || errors.customerPhone}
+                    {errors.addressLine || errors.area || errors.city || errors.state || errors.postalCode || errors.quotedAmount}
                 </div>
               )}
 
@@ -469,7 +439,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                 <ArrowLeft className="size-5" />
               </Button>
               <Button onClick={handleNextToStep3} className="flex-1 bg-accent hover:bg-accent/90 text-white h-14 rounded-2xl text-lg font-black shadow-lg hover:shadow-xl transition-all">
-                Find Professionals
+                Confirm & Start Searching
               </Button>
             </div>
           </div>
@@ -494,47 +464,19 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                   </div>
                 )}
 
-                <div className="rounded-2xl border border-border bg-card p-5 space-y-3 shadow-sm">
-                  {liveHelpers.length > 0 ? (
-                    <>
-                      <p className="text-sm text-muted-foreground">Live availability check</p>
-                      <p className="text-2xl font-black text-foreground">
-                        {liveHelpers.length} helper{liveHelpers.length > 1 ? "s" : ""} online
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Your request will be sent to eligible helpers now. The first helper who accepts gets assigned.
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm text-muted-foreground">Live availability check</p>
-                      <p className="text-2xl font-black text-foreground">No helper online yet</p>
-                      <p className="text-sm text-muted-foreground">
-                        You can still place the request. Helpers coming online in your city can receive it before expiry.
-                      </p>
-                    </>
-                  )}
+                <div className="rounded-2xl border border-border bg-card p-5 space-y-2 shadow-sm">
+                  <p className="text-sm text-muted-foreground">Live availability check</p>
+                  <p className="text-2xl font-black text-foreground">
+                    {liveHelpers.length > 0
+                      ? `${liveHelpers.length} helper${liveHelpers.length > 1 ? "s" : ""} online`
+                      : "No helper online yet"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {liveHelpers.length > 0
+                      ? "Confirm to send this booking request to eligible helpers."
+                      : "No live helpers right now. You can still create the booking request."}
+                  </p>
                 </div>
-
-                {liveHelpers.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Top Nearby Professionals</p>
-                    {liveHelpers.slice(0, 3).map((helper) => (
-                      <div key={helper.id} className="rounded-xl border bg-card p-3 flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-sm">{helper.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {helper.category.replace(/_/g, " ")} • {helper.completedJobs} jobs
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Rating</p>
-                          <p className="font-bold">{Number(helper.rating || 0).toFixed(1)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
 
                 <div className="grid gap-3 pt-2">
                   <Button onClick={handleBookHelper} disabled={submittingBooking} className="w-full bg-primary text-white h-14 rounded-2xl text-lg font-black shadow-lg hover:shadow-xl transition-all">
