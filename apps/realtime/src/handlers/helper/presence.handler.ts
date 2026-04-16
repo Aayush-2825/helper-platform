@@ -94,7 +94,7 @@ export async function presenceHandler(_userId: string, data: unknown) {
 
         const validCandidates = pendingCandidates.filter(
           (candidate) =>
-            candidate.booking.status === "requested" &&
+            ["requested", "matched"].includes(candidate.booking.status) &&
             (!candidate.expiresAt || candidate.expiresAt > new Date()),
         );
 
