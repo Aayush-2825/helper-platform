@@ -72,7 +72,7 @@ export function BookingJourneySummary({
     : "No recent activity yet";
 
   return (
-    <Card className="border-border/70 bg-gradient-to-br from-background via-background to-muted/30 shadow-sm">
+    <Card className="border-border/70 bg-linear-to-br from-background via-background to-muted/30 shadow-sm">
       <CardContent className="space-y-4 p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <div>

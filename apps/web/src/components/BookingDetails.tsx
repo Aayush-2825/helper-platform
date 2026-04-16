@@ -87,6 +87,13 @@ type RealtimeBookingUpdate = {
   eventType?: string;
   message?: string;
   booking?: Partial<BookingDetailsRecord> & { id?: string };
+  helperId?: string | null;
+  helperName?: string | null;
+  helperPhone?: string | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
+  startCode?: string | null;
+  completeCode?: string | null;
 };
 
 interface BookingDetailsProps {
@@ -106,6 +113,19 @@ function formatElapsed(value: Date | string) {
   }
 
   return `${minutes}m`;
+}
+
+function isBookingStatus(value: string): value is BookingStatus {
+  return [
+    "requested",
+    "matched",
+    "accepted",
+    "in_progress",
+    "completed",
+    "cancelled",
+    "expired",
+    "disputed",
+  ].includes(value);
 }
 
 export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
@@ -140,6 +160,23 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
         statusEvents: snapshot.statusEvents ?? previous.statusEvents,
       };
     });
+  }, []);
+
+  const buildBookingPatch = useCallback((data: RealtimeBookingUpdate): Partial<BookingDetailsRecord> & { id?: string } => {
+    const snapshot = data.booking ?? {};
+    const nextStatus = snapshot.status ?? (data.status && isBookingStatus(data.status) ? data.status : undefined);
+
+    return {
+      ...snapshot,
+      id: snapshot.id ?? data.bookingId,
+      status: nextStatus,
+      helperName: snapshot.helperName ?? data.helperName ?? undefined,
+      helperPhone: snapshot.helperPhone ?? data.helperPhone ?? undefined,
+      latitude: snapshot.latitude ?? data.latitude ?? undefined,
+      longitude: snapshot.longitude ?? data.longitude ?? undefined,
+      startCode: snapshot.startCode ?? data.startCode ?? undefined,
+      completeCode: snapshot.completeCode ?? data.completeCode ?? undefined,
+    };
   }, []);
 
   const fetchBooking = useCallback(async () => {
@@ -218,7 +255,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
     lastProcessedEventKey.current = nextEventKey;
 
     if (latest.event === "booking_update") {
-      const snapshot = data.booking ?? data;
+      const snapshot = buildBookingPatch(data);
       applyRealtimeBookingUpdate(snapshot);
 
       if (snapshot.status === "completed" || data.eventType === "completed") {
@@ -227,7 +264,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
     } else if (latest.event === "payment_update") {
       void fetchPayment();
     }
-  }, [applyRealtimeBookingUpdate, eventMessages, bookingId, fetchPayment]);
+  }, [applyRealtimeBookingUpdate, buildBookingPatch, eventMessages, bookingId, fetchPayment]);
 
   const handleCustomerPayment = async () => {
     if (!booking || booking.status !== "completed") {
