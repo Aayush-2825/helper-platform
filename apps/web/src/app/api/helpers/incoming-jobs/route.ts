@@ -137,7 +137,7 @@ export async function GET() {
           .filter(
             (candidate) =>
               (!candidate.expiresAt || candidate.expiresAt > now) &&
-              candidate.booking.status === "requested"
+              ["requested", "matched"].includes(candidate.booking.status)
           )
           .map((candidate) => ({
             candidateId: candidate.id,

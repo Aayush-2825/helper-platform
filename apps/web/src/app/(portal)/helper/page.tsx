@@ -9,6 +9,8 @@ import {
 import { COMMISSION_RATE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { publishHelperPresence } from "@/lib/realtime/client";
+import { useSession } from "@/lib/auth/session";
 
 type Booking = {
   id: string;
@@ -32,6 +34,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export default function HelperHomePage() {
+  const { session } = useSession();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isOnline, setIsOnline] = useState(false);
 
@@ -56,14 +59,41 @@ export default function HelperHomePage() {
   
   const toggleAvailability = async () => {
     const newStatus = isOnline ? "offline" : "online";
+    const userId = session?.user.id;
     try {
       // Optimistic update for low-tech user feedback speed
       setIsOnline(!isOnline);
-      await fetch("/api/helper/availability", {
+      const response = await fetch("/api/helper/availability", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ availabilityStatus: newStatus }),
       });
+
+      if (!response.ok) {
+        setIsOnline(isOnline);
+        return;
+      }
+
+      if (userId) {
+        if (newStatus === "online" && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              publishHelperPresence({
+                helperUserId: userId,
+                status: "online",
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+              });
+            },
+            () => {
+              publishHelperPresence({ helperUserId: userId, status: "online" });
+            },
+            { timeout: 5000 },
+          );
+        } else {
+          publishHelperPresence({ helperUserId: userId, status: newStatus });
+        }
+      }
     } catch {
       setIsOnline(isOnline);
     }
