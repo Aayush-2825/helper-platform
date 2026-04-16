@@ -92,6 +92,9 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
   }, [defaultAddressLine, defaultArea, defaultCity, defaultState, defaultPostalCode]);
 
   const [quotedAmount, setQuotedAmount] = useState("");
+  const [bookingCoords, setBookingCoords] = useState({ latitude, longitude });
+  const [isResolvingCoords, setIsResolvingCoords] = useState(false);
+  const [coordsStatus, setCoordsStatus] = useState<"idle" | "resolved" | "fallback">("idle");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSearchingHelpers, setIsSearchingHelpers] = useState(false);
   const [liveHelpers, setLiveHelpers] = useState<LiveHelper[]>([]);
@@ -99,11 +102,69 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
   const [submittingBooking, setSubmittingBooking] = useState(false);
   const searchRequestIdRef = useRef(0);
   const activeSearchRequestIdRef = useRef<string | null>(null);
+  const geocodeCacheRef = useRef<Map<string, { latitude: number; longitude: number }>>(new Map());
   const parsedQuotedAmount = Number(quotedAmount || 0);
   const platformFee = parsedQuotedAmount > 0 ? Math.round(parsedQuotedAmount * 0.08) : 0;
   const estimatedTax = parsedQuotedAmount > 0 ? Math.round(parsedQuotedAmount * 0.02) : 0;
   const estimatedTotal = parsedQuotedAmount + platformFee + estimatedTax;
   const subcategoryOptions = useMemo(() => SUBCATEGORY_OPTIONS_BY_CATEGORY[categoryID] ?? [], [categoryID]);
+
+  useEffect(() => {
+    setBookingCoords({ latitude, longitude });
+  }, [latitude, longitude]);
+
+  function buildAddressQuery() {
+    return [addressLine, area, city, state, postalCode, "India"]
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  async function resolveCoordinatesFromAddress() {
+    const query = buildAddressQuery();
+    if (!query) {
+      return bookingCoords;
+    }
+
+    const cached = geocodeCacheRef.current.get(query);
+    if (cached) {
+      setBookingCoords(cached);
+      setCoordsStatus("resolved");
+      return cached;
+    }
+
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=1&countrycodes=in`;
+
+    try {
+      setIsResolvingCoords(true);
+      const res = await fetch(url, { headers: { "Accept-Language": "en" } });
+      const data = (await res.json()) as Array<{ lat?: string; lon?: string }>;
+      const first = data[0];
+      const resolvedLatitude = first?.lat != null ? Number(first.lat) : Number.NaN;
+      const resolvedLongitude = first?.lon != null ? Number(first.lon) : Number.NaN;
+
+      if (Number.isFinite(resolvedLatitude) && Number.isFinite(resolvedLongitude)) {
+        const nextCoords = { latitude: resolvedLatitude, longitude: resolvedLongitude };
+        geocodeCacheRef.current.set(query, nextCoords);
+        setBookingCoords(nextCoords);
+        setCoordsStatus("resolved");
+        return nextCoords;
+      }
+    } catch {
+      // Fall back to current marker coordinates if geocoding fails.
+    } finally {
+      setIsResolvingCoords(false);
+    }
+
+    setCoordsStatus("fallback");
+
+    return bookingCoords;
+  }
+
+  useEffect(() => {
+    if (step !== 2) return;
+    setCoordsStatus("idle");
+  }, [step, addressLine, area, city, state, postalCode]);
 
   useEffect(() => {
     if (subcategoryOptions.length === 0) {
@@ -155,7 +216,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
     setStep(2);
   }
 
-  function handleNextToStep3() {
+  async function handleNextToStep3() {
     const errs: Record<string, string> = {};
     if (!addressLine.trim()) errs.addressLine = "Required";
     if (!area.trim()) errs.area = "Required";
@@ -177,6 +238,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
     }
     
     setErrors({});
+    await resolveCoordinatesFromAddress();
     setStep(3);
     setIsSearchingHelpers(true);
     onHelpersSearching?.(true);
@@ -188,6 +250,8 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
   async function handleBookHelper() {
     setSubmittingBooking(true);
     try {
+      const resolvedCoords = await resolveCoordinatesFromAddress();
+
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -201,8 +265,8 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
           state,
           postalCode,
           quotedAmount: Number(quotedAmount),
-          latitude,
-          longitude,
+          latitude: resolvedCoords.latitude,
+          longitude: resolvedCoords.longitude,
         }),
       });
       if (res.status === 201) {
@@ -239,12 +303,12 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
       type: "helper_search",
       requestId,
       categoryID,
-      latitude,
-      longitude,
+      latitude: bookingCoords.latitude,
+      longitude: bookingCoords.longitude,
       city,
       radiusKm: 10,
     });
-  }, [step, userId, categoryID, latitude, longitude, city]);
+  }, [step, userId, categoryID, bookingCoords.latitude, bookingCoords.longitude, city]);
 
   return (
     <div ref={formRef} className="max-w-xl mx-auto py-8">
@@ -405,6 +469,18 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                 </div>
               </div>
 
+              {coordsStatus === "resolved" && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                  Location pinned from entered address.
+                </div>
+              )}
+
+              {coordsStatus === "fallback" && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  Could not pin exact address, using map location coordinates.
+                </div>
+              )}
+
                 {(errors.addressLine || errors.area || errors.city || errors.state || errors.postalCode || errors.quotedAmount) && (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                     {errors.addressLine || errors.area || errors.city || errors.state || errors.postalCode || errors.quotedAmount}
@@ -438,8 +514,8 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
               <Button onClick={() => setStep(1)} variant="outline" className="h-14 px-6 rounded-2xl border-border font-bold shadow-sm">
                 <ArrowLeft className="size-5" />
               </Button>
-              <Button onClick={handleNextToStep3} className="flex-1 bg-accent hover:bg-accent/90 text-white h-14 rounded-2xl text-lg font-black shadow-lg hover:shadow-xl transition-all">
-                Confirm & Start Searching
+              <Button onClick={handleNextToStep3} disabled={isResolvingCoords} className="flex-1 bg-accent hover:bg-accent/90 text-white h-14 rounded-2xl text-lg font-black shadow-lg hover:shadow-xl transition-all disabled:opacity-70">
+                {isResolvingCoords ? <Loader2 className="size-5 animate-spin" /> : "Confirm & Start Searching"}
               </Button>
             </div>
           </div>
