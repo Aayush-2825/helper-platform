@@ -15,6 +15,32 @@ interface BookingStatusProps {
   onClose: () => void;
 }
 
+type RealtimeBookingSnapshot = {
+  status?: string;
+  helperId?: string | null;
+  helperName?: string | null;
+  helperPhone?: string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  startCode?: string | null;
+  completeCode?: string | null;
+};
+
+type BookingRealtimeEventData = {
+  bookingId?: string;
+  status?: string;
+  eventType?: string;
+  message?: string;
+  booking?: RealtimeBookingSnapshot;
+  helperId?: string | null;
+  helperName?: string | null;
+  helperPhone?: string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  startCode?: string | null;
+  completeCode?: string | null;
+};
+
 export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
   const { session } = useSession();
   const [status, setStatus] = useState<string>("requested");
@@ -25,6 +51,35 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
   const [loading, setLoading] = useState(true);
   const [startOTP, setStartOTP] = useState<string | null>(null);
   const [completeOTP, setCompleteOTP] = useState<string | null>(null);
+
+  const applyBookingSnapshot = useCallback((snapshot: RealtimeBookingSnapshot) => {
+    if (snapshot.status) {
+      setStatus(snapshot.status);
+    }
+
+    if (snapshot.helperName !== undefined) {
+      setHelperName(snapshot.helperName);
+    }
+
+    if (snapshot.helperId !== undefined) {
+      setHelperId(snapshot.helperId ?? undefined);
+    }
+
+    if (snapshot.latitude != null && snapshot.longitude != null) {
+      setLocation({
+        lat: Number(snapshot.latitude),
+        lng: Number(snapshot.longitude),
+      });
+    }
+
+    if (snapshot.startCode !== undefined) {
+      setStartOTP(snapshot.startCode);
+    }
+
+    if (snapshot.completeCode !== undefined) {
+      setCompleteOTP(snapshot.completeCode);
+    }
+  }, []);
 
   const stateLabel =
     status === "requested"
@@ -95,19 +150,37 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
   }, [bookingId]);
 
   useWebSocket(session?.user.id || "unknown", (msg) => {
-    if (msg.type === "event" && msg.event === "booking_update") {
-      const data = msg.data as { bookingId?: string; status?: string; eventType?: string; message?: string } | undefined;
-      if (!data || data.bookingId !== bookingId) return;
+    if (msg.type !== "event") return;
 
-      console.log("🔔 Booking update received:", data);
-      const newStatus = data.status || data.eventType;
-      if (newStatus) setStatus(newStatus);
+    if (msg.event !== "matching_update" && msg.event !== "booking_update") {
+      return;
+    }
 
+    const data = msg.data as BookingRealtimeEventData | undefined;
+    if (!data || data.bookingId !== bookingId) return;
+
+    console.log("🔔 Booking realtime event received:", data);
+
+    const snapshot = data.booking ?? data;
+    if (msg.event === "matching_update") {
+      if (data.status) {
+        setStatus(data.status);
+      }
       if (data.message) {
         setSearchMessage(data.message);
       }
+      applyBookingSnapshot(snapshot);
+      return;
+    }
 
-      void syncBookingState();
+    applyBookingSnapshot(snapshot);
+
+    if (data.message) {
+      setSearchMessage(data.message);
+    }
+
+    if (data.eventType) {
+      setStatus(data.eventType);
     }
   });
 

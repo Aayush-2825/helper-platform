@@ -116,7 +116,10 @@ export async function POST(
       customerId: existingBooking.customerId,
       helperId: session.user.id,
       eventType: "in_progress",
-      data: { startedAt: updatedRows[0].startedAt?.toISOString() },
+      data: {
+        startedAt: updatedRows[0].startedAt?.toISOString(),
+        booking: updatedRows[0],
+      },
     });
 
     return NextResponse.json(

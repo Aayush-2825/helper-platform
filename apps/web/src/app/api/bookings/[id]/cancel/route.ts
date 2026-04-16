@@ -107,9 +107,10 @@ export async function POST(
       customerId: session.user.id,
       helperId: existingBooking.helperId ?? undefined,
       eventType: "cancelled",
-      data: { 
-          cancelledBy: "customer", 
-          reason 
+      data: {
+        cancelledBy: "customer",
+        reason,
+        booking: updatedBooking,
       },
     });
 
