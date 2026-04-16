@@ -202,6 +202,9 @@ export async function POST(
       eventType: "accepted",
       data: {
         candidateId: candidate.id,
+        booking: updatedRows[0],
+        helperName: updatedRows[0].helperName ?? helperUser?.name ?? null,
+        helperPhone: updatedRows[0].helperPhone ?? helperUser?.phone ?? null,
       },
     });
 

@@ -54,6 +54,22 @@ function clearTimers(connection: Connection) {
   }
 }
 
+function closeSocketSafely(socket: WebSocket | null) {
+  if (!socket) {
+    return;
+  }
+
+  if (socket.readyState === WebSocket.CLOSING || socket.readyState === WebSocket.CLOSED) {
+    return;
+  }
+
+  try {
+    socket.close();
+  } catch {
+    // Ignore browser close errors during teardown.
+  }
+}
+
 function connect(connection: Connection) {
   if (connection.socket && (connection.socket.readyState === WebSocket.OPEN || connection.socket.readyState === WebSocket.CONNECTING)) {
     return;
@@ -98,7 +114,7 @@ function connect(connection: Connection) {
 
   ws.onerror = (event) => {
     connection.errorListeners.forEach((listener) => listener(event));
-    ws.close();
+    closeSocketSafely(ws);
   };
 }
 
@@ -132,7 +148,7 @@ function subscribe(
     if (isUnused) {
       connections.delete(userId);
       clearTimers(connection);
-      connection.socket?.close();
+      closeSocketSafely(connection.socket);
       connection.socket = null;
     }
   };

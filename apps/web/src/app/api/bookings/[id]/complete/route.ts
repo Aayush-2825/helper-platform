@@ -114,7 +114,10 @@ export async function POST(
       customerId: existingBooking.customerId,
       helperId: session.user.id,
       eventType: "completed",
-      data: { completedAt: updatedRows[0].completedAt?.toISOString() },
+      data: {
+        completedAt: updatedRows[0].completedAt?.toISOString(),
+        booking: updatedRows[0],
+      },
     });
 
     return NextResponse.json(

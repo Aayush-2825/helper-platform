@@ -84,6 +84,9 @@ type PaymentTransaction = {
 type RealtimeBookingUpdate = {
   bookingId?: string;
   status?: string;
+  eventType?: string;
+  message?: string;
+  booking?: Partial<BookingDetailsRecord> & { id?: string };
 };
 
 interface BookingDetailsProps {
@@ -121,6 +124,23 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
   const [, setElapsedNow] = useState(Date.now());
   const lastProcessedEventKey = useRef<string | null>(null);
   const disableAutoRefresh = useRef(false);
+
+  const applyRealtimeBookingUpdate = useCallback((snapshot: Partial<BookingDetailsRecord> & { id?: string }) => {
+    setBooking((previous) => {
+      if (!previous) {
+        return snapshot as BookingDetailsRecord;
+      }
+
+      return {
+        ...previous,
+        ...snapshot,
+        category: snapshot.category ?? previous.category,
+        customer: snapshot.customer ?? previous.customer,
+        helper: snapshot.helper ?? previous.helper,
+        statusEvents: snapshot.statusEvents ?? previous.statusEvents,
+      };
+    });
+  }, []);
 
   const fetchBooking = useCallback(async () => {
     try {
@@ -198,13 +218,16 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
     lastProcessedEventKey.current = nextEventKey;
 
     if (latest.event === "booking_update") {
-      void fetchBooking();
-    }
+      const snapshot = data.booking ?? data;
+      applyRealtimeBookingUpdate(snapshot);
 
-    if (latest.event === "payment_update") {
+      if (snapshot.status === "completed" || data.eventType === "completed") {
+        void fetchPayment();
+      }
+    } else if (latest.event === "payment_update") {
       void fetchPayment();
     }
-  }, [eventMessages, bookingId, fetchBooking, fetchPayment]);
+  }, [applyRealtimeBookingUpdate, eventMessages, bookingId, fetchPayment]);
 
   const handleCustomerPayment = async () => {
     if (!booking || booking.status !== "completed") {
