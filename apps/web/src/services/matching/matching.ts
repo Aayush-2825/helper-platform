@@ -42,6 +42,28 @@ type HelperServiceCategory =
   | "security_guard"
   | "other";
 
+const PRESENCE_HEARTBEAT_WINDOW_MINUTES = 10;
+const MIN_HELPERS_TO_NOTIFY = 10;
+
+function normalizeLocationToken(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function cityMatches(bookingCity: string, helperCity: string | null) {
+  if (!helperCity) return false;
+
+  const bookingToken = normalizeLocationToken(bookingCity);
+  const helperToken = normalizeLocationToken(helperCity);
+
+  if (bookingToken.length === 0 || helperToken.length === 0) return false;
+
+  return (
+    bookingToken === helperToken ||
+    bookingToken.includes(helperToken) ||
+    helperToken.includes(bookingToken)
+  );
+}
+
 function buildDistanceExpression(latitude: number, longitude: number) {
   return sql<number>`(
     6371 * acos(
@@ -70,7 +92,7 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
     const notifiedHelperIds = new Set<string>();
     const now = new Date();
 
-    const radiusSteps = [5, 10, 20, 50];
+    const radiusSteps = [1, 3, 5, 10, 20, 50, 100];
     let allEligibleHelpers: MatchedHelperProfile[] = [];
 
     for (const radius of hasCoordinates ? radiusSteps : []) {
@@ -83,7 +105,7 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
         data: {
           bookingId: bookingData.id,
           radius,
-          message: `Expanding search area to ${radius}km...`,
+          message: `Searching nearby helpers within ${radius}km...`,
         },
       });
 
@@ -119,7 +141,7 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
 
           await createAndNotifyCandidates(bookingData, eligibleRadiusHelpers, now);
 
-          if (allEligibleHelpers.length >= 3) {
+          if (allEligibleHelpers.length >= MIN_HELPERS_TO_NOTIFY) {
             console.log("✅ [Matching] Sufficient helpers found and notified.");
             break;
           }
@@ -141,7 +163,7 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
       }
     }
 
-    if (allEligibleHelpers.length === 0 && bookingData.city) {
+    if (allEligibleHelpers.length < MIN_HELPERS_TO_NOTIFY && bookingData.city) {
       console.log(`🏙️ [Matching] Falling back to city-wide search for: ${bookingData.city}`);
 
       await publishBookingEvent({
@@ -155,40 +177,23 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
         },
       });
 
-      const onlinePresence = await realtimeDb
-        .select({ helperId: helperPresence.helperUserId })
-        .from(helperPresence)
-        .where(
-          and(
-            eq(helperPresence.status, "online"),
-            sql`${helperPresence.lastHeartbeat} > NOW() - INTERVAL '60 seconds'`,
+      let cityHelpers = (await db.query.helperProfile.findMany({
+        where: (helper, { eq: eqOp, and: andOp }) =>
+          andOp(
+            eqOp(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
+            eqOp(helper.isActive, true),
+            eqOp(helper.verificationStatus, "approved"),
+            eqOp(helper.availabilityStatus, "online"),
           ),
-        );
+      })) as MatchedHelperProfile[];
 
-      const onlineHelperIds = [...new Set(onlinePresence.map((row) => row.helperId))];
+      cityHelpers = cityHelpers.filter(
+        (helper) => cityMatches(bookingData.city!, helper.serviceCity) && !notifiedHelperIds.has(helper.userId),
+      );
 
-      if (onlineHelperIds.length > 0) {
-        let cityHelpers = (await db.query.helperProfile.findMany({
-          where: (helper, { eq: eqOp, and: andOp }) =>
-            andOp(
-              inArray(helper.userId, onlineHelperIds),
-              eqOp(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
-              eqOp(helper.isActive, true),
-              eqOp(helper.verificationStatus, "approved"),
-            ),
-        })) as MatchedHelperProfile[];
-
-        const cityLower = bookingData.city.toLowerCase();
-        cityHelpers = cityHelpers.filter(
-          (helper) =>
-            helper.serviceCity?.toLowerCase() === cityLower &&
-            !notifiedHelperIds.has(helper.userId),
-        );
-
-        if (cityHelpers.length > 0) {
-          allEligibleHelpers = [...allEligibleHelpers, ...cityHelpers];
-          await createAndNotifyCandidates(bookingData, cityHelpers, now);
-        }
+      if (cityHelpers.length > 0) {
+        allEligibleHelpers = [...allEligibleHelpers, ...cityHelpers];
+        await createAndNotifyCandidates(bookingData, cityHelpers, now);
       }
     }
 
@@ -324,7 +329,7 @@ async function findNearbyHelperIds(
         eq(helperPresence.status, "online"),
         sql`${helperPresence.latitude} IS NOT NULL`,
         sql`${helperPresence.longitude} IS NOT NULL`,
-        sql`${helperPresence.lastHeartbeat} > NOW() - INTERVAL '60 seconds'`,
+        sql`${helperPresence.lastHeartbeat} > NOW() - (${PRESENCE_HEARTBEAT_WINDOW_MINUTES} * INTERVAL '1 minute')`,
         sql`${distanceKm} <= ${radiusKm}`,
       ),
     )
