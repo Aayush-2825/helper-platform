@@ -108,16 +108,21 @@ function sendToUser(userId: string, message: object) {
   const userSockets = clients.get(userId);
 
   if (!userSockets || userSockets.size === 0) {
+    console.warn(`[WS] No active sockets for target user=${userId}`);
     return;
   }
 
   const payload = JSON.stringify(message);
+  let deliveredCount = 0;
 
   userSockets.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(payload);
+      deliveredCount += 1;
     }
   });
+
+  console.log(`[WS] Delivered message to user=${userId} sockets=${deliveredCount}`);
 
   // Clean up closed sockets opportunistically.
   userSockets.forEach((client) => {
@@ -181,6 +186,9 @@ export function broadcastEvent({
   };
 
   console.log("📡 Broadcasting:", event, targetUserIds ?? "ALL");
+  if (Array.isArray(targetUserIds) && targetUserIds.length > 0) {
+    console.log(`📡 Targeted broadcast count=${targetUserIds.length}`, targetUserIds);
+  }
 
   void persistOutboundEvent({ event, data, targetUserIds });
 

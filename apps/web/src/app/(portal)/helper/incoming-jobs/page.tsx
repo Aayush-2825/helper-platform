@@ -292,6 +292,8 @@ export default function HelperPage() {
   }, [userId, activeBookingId]);
 
   const { connected, error: connectionError } = useWebSocket(userId, (msg) => {
+    console.log("[HelperPortal] WS message received", msg);
+
     if (msg.type === "event" && msg.event === "booking_request") {
       const {
         bookingId,
@@ -322,7 +324,20 @@ export default function HelperPage() {
       };
 
       const matchingCandidate = candidates?.find(({ helperId }) => helperId === userId);
-      if (!bookingId || !matchingCandidate) return;
+      if (!bookingId || !matchingCandidate) {
+        console.warn("[HelperPortal] booking_request ignored (missing bookingId or candidate for helper)", {
+          helperUserId: userId,
+          bookingId,
+          candidates,
+        });
+        return;
+      }
+
+      console.log("[HelperPortal] booking_request accepted for helper", {
+        helperUserId: userId,
+        bookingId,
+        candidateId: matchingCandidate.candidateId,
+      });
 
       const expiresInSeconds = expiresAt
         ? Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
@@ -348,6 +363,7 @@ export default function HelperPage() {
     if (msg.type === "event" && msg.event === "booking_update") {
       const data = msg.data as { bookingId?: string } | undefined;
       if (data?.bookingId) {
+        console.log("[HelperPortal] booking_update removing request", data.bookingId);
         removeJob(data.bookingId);
       }
     }

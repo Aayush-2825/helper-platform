@@ -13,6 +13,7 @@ import { assertMessageContract } from "./message.contract.js";
 
 export function routeMessage(userId: string, data: unknown) {
   assertMessageContract(data);
+  console.log(`[WS] routeMessage user=${userId} type=${data.type}`);
 
   switch (data.type) {
     case "booking_request": return bookingRequestHandler(userId, data);

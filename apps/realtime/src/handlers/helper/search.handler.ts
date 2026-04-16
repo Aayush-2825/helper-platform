@@ -35,6 +35,7 @@ const allowedCategories = [
 ];
 
 type HelperCategory = (typeof allowedCategories)[number];
+const PRESENCE_HEARTBEAT_WINDOW_MINUTES = 10;
 
 function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -72,7 +73,7 @@ async function findNearbyHelpers(
         eq(helperPresence.status, "online"),
         sql`${helperPresence.latitude} IS NOT NULL`,
         sql`${helperPresence.longitude} IS NOT NULL`,
-        sql`${helperPresence.lastHeartbeat} > NOW() - INTERVAL '60 seconds'`,
+        sql`${helperPresence.lastHeartbeat} > NOW() - (${PRESENCE_HEARTBEAT_WINDOW_MINUTES} * INTERVAL '1 minute')`,
         sql`${distanceKm} <= ${radiusKm}`,
       ),
     )
@@ -155,7 +156,7 @@ async function findCityHelpers(categoryID: string, city: string) {
     .where(
       and(
         eq(helperPresence.status, "online"),
-        sql`${helperPresence.lastHeartbeat} > NOW() - INTERVAL '60 seconds'`,
+        sql`${helperPresence.lastHeartbeat} > NOW() - (${PRESENCE_HEARTBEAT_WINDOW_MINUTES} * INTERVAL '1 minute')`,
       ),
     );
 
@@ -204,11 +205,32 @@ export async function helperSearchHandler(userId: string, data: unknown) {
     validateNumericRange(longitude, { min: -180, max: 180, fieldName: "longitude" });
     validateNumericRange(radiusKm, { min: 1, max: 50, fieldName: "radiusKm" });
 
-    let helpers = await findNearbyHelpers(categoryID, latitude, longitude, radiusKm);
+    const progressiveRadiusSteps = [1, 3, 5, 10, 20, 50].filter((step) => step <= radiusKm);
+    let helpers: HelperSearchResult[] = [];
+    let attemptedRadiusKm = radiusKm;
+
+    for (const radius of progressiveRadiusSteps.length > 0 ? progressiveRadiusSteps : [radiusKm]) {
+      attemptedRadiusKm = radius;
+      const radiusHelpers = await findNearbyHelpers(categoryID, latitude, longitude, radius);
+      console.log(
+        `🔎 [HelperSearch] requestId=${requestId} radius=${radius}km results=${radiusHelpers.length}`,
+      );
+
+      if (radiusHelpers.length > 0) {
+        helpers = radiusHelpers;
+        break;
+      }
+    }
 
     if (helpers.length === 0 && city) {
+      console.log(`🏙️ [HelperSearch] requestId=${requestId} falling back to city=${city}`);
       helpers = await findCityHelpers(categoryID, city);
     }
+
+    console.log(
+      `📤 [HelperSearch] requestId=${requestId} sending results=${helpers.length} to user=${userId}`,
+      helpers.map((helper) => helper.userId),
+    );
 
     broadcastEvent({
       event: "helper_search_results",
@@ -218,7 +240,7 @@ export async function helperSearchHandler(userId: string, data: unknown) {
         city: city || null,
         latitude,
         longitude,
-        radiusKm,
+        radiusKm: attemptedRadiusKm,
         helpers,
         message:
           helpers.length > 0
@@ -229,6 +251,7 @@ export async function helperSearchHandler(userId: string, data: unknown) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unable to search for helpers right now.";
+    console.error(`❌ [HelperSearch] requestId=${requestId} failed for user=${userId}:`, err);
 
     broadcastEvent({
       event: "helper_search_error",
