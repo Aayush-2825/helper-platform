@@ -179,7 +179,7 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
       setSearchMessage(data.message);
     }
 
-    if (data.eventType) {
+    if (data.eventType && data.eventType !== "matching_update") {
       setStatus(data.eventType);
     }
   });

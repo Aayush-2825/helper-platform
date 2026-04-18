@@ -13,6 +13,7 @@ import { MapPin, Navigation2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type MapLibreGL from "maplibre-gl";
 import { IncomingJob } from "@/app/(portal)/helper/incoming-jobs/useIncomingJobs";
+import { fetchOsrmRoute } from "@/lib/maps/osrm";
 
 type WorkerLocation = {
   lat: number;
@@ -44,33 +45,49 @@ export function IncomingJobsMap({ jobs, workerLocation }: IncomingJobsMapProps) 
     const activeWorkerLocation = workerLocation;
     if (!activeWorkerLocation || jobs.length === 0) return;
 
+    let cancelled = false;
+    const abortController = new AbortController();
+
     const fetchRoutes = async () => {
       const newRoutes: Record<string, { coordinates: [number, number][]; duration: number; distance: number }> = {};
-      const jobsToRoute = jobs.filter(j => j.latitude && j.longitude).slice(0, 5);
-      
-      for (const job of jobsToRoute) {
-        try {
-          const url = `https://router.project-osrm.org/route/v1/driving/${activeWorkerLocation.lng},${activeWorkerLocation.lat};${job.longitude},${job.latitude}?overview=full&geometries=geojson`;
-          const res = await fetch(url);
-          if (res.ok) {
-            const data = await res.json() as { routes?: Array<{ geometry?: { coordinates: [number, number][] }; duration: number; distance: number }> };
-            const route = data.routes?.[0];
-            if (route?.geometry?.coordinates) {
-              newRoutes[job.bookingId] = {
-                  coordinates: route.geometry.coordinates,
-                  duration: route.duration,
-                  distance: route.distance
-              };
-            }
-          }
-        } catch (err) {
-          console.error(`Failed to fetch route for job ${job.bookingId}:`, err);
+      const jobsToRoute = jobs
+        .filter((job) => job.latitude != null && job.longitude != null)
+        .slice(0, 5);
+
+      const results = await Promise.allSettled(
+        jobsToRoute.map(async (job) => {
+          const route = await fetchOsrmRoute({
+            from: { lng: activeWorkerLocation.lng, lat: activeWorkerLocation.lat },
+            to: { lng: job.longitude as number, lat: job.latitude as number },
+            signal: abortController.signal,
+          });
+
+          return { bookingId: job.bookingId, route };
+        }),
+      );
+
+      for (const result of results) {
+        if (result.status !== "fulfilled") {
+          continue;
+        }
+
+        const { bookingId, route } = result.value;
+        if (route) {
+          newRoutes[bookingId] = route;
         }
       }
-      setRoutes(newRoutes);
+
+      if (!cancelled) {
+        setRoutes(newRoutes);
+      }
     };
 
-    fetchRoutes();
+    void fetchRoutes();
+
+    return () => {
+      cancelled = true;
+      abortController.abort();
+    };
   }, [jobs, workerLocation]);
 
   // Determine the map center: prefer worker location, else first job, else default
@@ -87,7 +104,7 @@ export function IncomingJobsMap({ jobs, workerLocation }: IncomingJobsMapProps) 
 
   if (jobsWithCoords.length === 0 && !workerLocation) {
     return (
-      <Card className="h-[300px] p-0 overflow-hidden flex items-center justify-center bg-muted/30">
+      <Card className="h-75 p-0 overflow-hidden flex items-center justify-center bg-muted/30">
         <p className="text-sm text-muted-foreground px-4 text-center">
           No jobs with location data yet. Job locations will appear here when available.
         </p>
@@ -97,7 +114,7 @@ export function IncomingJobsMap({ jobs, workerLocation }: IncomingJobsMapProps) 
 
   return (
     <div className="reveal-up">
-      <Card className="h-[450px] p-0 overflow-hidden border-none surface-card-strong relative shadow-2xl">
+      <Card className="h-112.5 p-0 overflow-hidden border-none surface-card-strong relative shadow-2xl">
         <Map
           ref={mapRef}
           center={[center.lng, center.lat]}

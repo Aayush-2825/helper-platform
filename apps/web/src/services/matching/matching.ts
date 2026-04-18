@@ -44,6 +44,7 @@ type HelperServiceCategory =
 
 const PRESENCE_HEARTBEAT_WINDOW_MINUTES = 10;
 const MIN_HELPERS_TO_NOTIFY = 10;
+const REQUEST_TIMEOUT_MINUTES = 10;
 
 function normalizeLocationToken(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -250,9 +251,23 @@ async function createAndNotifyCandidates(
     return;
   }
 
-  const deadline = existingBooking.acceptanceDeadline ?? new Date(now.getTime() + 60 * 60 * 1000);
+  // Re-entrant safety: skip helpers that already have a candidate row for this booking.
+  const existingCandidates = await db.query.bookingCandidate.findMany({
+    where: (candidate, { eq: eqOp }) => eqOp(candidate.bookingId, bookingData.id),
+    columns: { helperProfileId: true },
+  });
+
+  const existingHelperProfileIds = new Set(existingCandidates.map((candidate) => candidate.helperProfileId));
+  const freshHelpers = helpers.filter((helper) => !existingHelperProfileIds.has(helper.id));
+
+  if (freshHelpers.length === 0) {
+    console.log(`ℹ️ [Matching] No fresh helpers to notify for booking ${bookingData.id}`);
+    return;
+  }
+
+  const deadline = existingBooking.acceptanceDeadline ?? new Date(now.getTime() + REQUEST_TIMEOUT_MINUTES * 60 * 1000);
   const shouldPromoteToMatched = existingBooking.status === "requested";
-  const candidateRecords = helpers.map((helper) => ({
+  const candidateRecords = freshHelpers.map((helper) => ({
     id: crypto.randomUUID(),
     bookingId: bookingData.id,
     helperProfileId: helper.id,
@@ -279,7 +294,7 @@ async function createAndNotifyCandidates(
         actorUserId: bookingData.customerId,
         note: "Helpers notified for booking",
         metadata: {
-          helperCount: helpers.length,
+          helperCount: freshHelpers.length,
           acceptanceDeadline: deadline.toISOString(),
         },
       });
@@ -311,8 +326,8 @@ async function createAndNotifyCandidates(
   }
 
   console.log(
-    `📨 [Matching] Publishing booking_request to helpers: ${helpers.length}`,
-    helpers.map((helper) => helper.userId),
+    `📨 [Matching] Publishing booking_request to helpers: ${freshHelpers.length}`,
+    freshHelpers.map((helper) => helper.userId),
   );
 
   await publishBookingEvent({
@@ -322,7 +337,7 @@ async function createAndNotifyCandidates(
     data: {
       status: "matched",
       customerId: bookingData.customerId,
-      candidates: helpers.map((helper) => ({
+      candidates: freshHelpers.map((helper) => ({
         helperId: helper.userId,
         candidateId: candidateRecords.find((candidate) => candidate.helperProfileId === helper.id)?.id,
       })),
@@ -331,11 +346,83 @@ async function createAndNotifyCandidates(
       city: bookingData.city ?? "",
       quotedAmount: bookingData.quotedAmount ?? 0,
       customerName,
-      helperCount: helpers.length,
+      helperCount: freshHelpers.length,
       acceptanceDeadline: deadline.toISOString(),
-      message: `Found ${helpers.length} professional${helpers.length > 1 ? "s" : ""} for your request.`,
+      message: `Found ${freshHelpers.length} professional${freshHelpers.length > 1 ? "s" : ""} for your request.`,
     },
   });
+}
+
+export async function resumeMatchingIfNeeded(bookingId: string) {
+  const now = new Date();
+
+  await db
+    .update(bookingCandidate)
+    .set({
+      response: "timeout",
+      respondedAt: now,
+    })
+    .where(
+      and(
+        eq(bookingCandidate.bookingId, bookingId),
+        eq(bookingCandidate.response, "pending"),
+        sql`${bookingCandidate.expiresAt} IS NOT NULL`,
+        sql`${bookingCandidate.expiresAt} <= NOW()`,
+      ),
+    );
+
+  const bookingRow = await db.query.booking.findFirst({
+    where: (bookingRecord, { eq: eqOp }) => eqOp(bookingRecord.id, bookingId),
+    columns: {
+      id: true,
+      customerId: true,
+      categoryId: true,
+      latitude: true,
+      longitude: true,
+      city: true,
+      addressLine: true,
+      quotedAmount: true,
+      status: true,
+      helperId: true,
+    },
+  });
+
+  if (!bookingRow) {
+    return false;
+  }
+
+  if (!isMatchableBookingStatus(bookingRow.status) || bookingRow.helperId) {
+    return false;
+  }
+
+  const pendingCandidates = await db.query.bookingCandidate.findMany({
+    where: and(eq(bookingCandidate.bookingId, bookingId), eq(bookingCandidate.response, "pending")),
+    columns: {
+      id: true,
+      expiresAt: true,
+    },
+  });
+
+  const hasActivePendingCandidates = pendingCandidates.some(
+    (candidate) => !candidate.expiresAt || candidate.expiresAt > now,
+  );
+
+  if (hasActivePendingCandidates) {
+    return false;
+  }
+
+  await startMatching({
+    id: bookingRow.id,
+    customerId: bookingRow.customerId,
+    categoryId: bookingRow.categoryId,
+    latitude: bookingRow.latitude,
+    longitude: bookingRow.longitude,
+    city: bookingRow.city,
+    addressLine: bookingRow.addressLine,
+    quotedAmount: bookingRow.quotedAmount,
+  });
+
+  return true;
 }
 
 async function findNearbyHelperIds(

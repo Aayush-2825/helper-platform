@@ -9,7 +9,7 @@ import cors from "cors";
 import { routeMessage } from "./handlers/index.js";
 import { webDb } from "./db/index.js";
 import { booking } from "./db/schema.js";
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, inArray, lt, sql } from "drizzle-orm";
 import { env } from "./config/env.js";
 import { ValidationError } from "./utils/validation.js";
 import {
@@ -367,7 +367,7 @@ setInterval(async () => {
       .set({ status: "expired", updatedAt: now })
       .where(
         and(
-          eq(booking.status, "requested"),
+          inArray(booking.status, ["requested", "matched"]),
           lt(booking.acceptanceDeadline, now)
         )
       )

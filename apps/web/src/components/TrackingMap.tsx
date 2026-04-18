@@ -12,6 +12,7 @@ import { Clock, MapPin, Navigation, Loader2, AlertCircle, Route } from "lucide-r
 import type MapLibreGL from "maplibre-gl";
 import { useRealtimeEvents } from "@/hooks/use-realtime-events";
 import { useSession } from "@/lib/auth/session";
+import { fetchOsrmRoute, type RouteResult } from "@/lib/maps/osrm";
 
 interface TrackingMapProps {
   bookingId: string;
@@ -20,11 +21,7 @@ interface TrackingMapProps {
   status?: string;
 }
 
-interface RouteData {
-  coordinates: [number, number][];
-  duration: number;
-  distance: number;
-}
+type RouteData = RouteResult;
 
 function formatDuration(seconds: number): string {
   const mins = Math.round(seconds / 60);
@@ -115,27 +112,27 @@ export function TrackingMap({ bookingId, customerLocation, helperId, status }: T
 
     const fetchRoute = async () => {
       try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${helperLocation.lng},${helperLocation.lat};${customerLocation.lng},${customerLocation.lat}?overview=full&geometries=geojson`;
-        addDebug(`OSRM URL: ${url}`);
-        const res = await fetch(url, { signal: abortController.signal });
-        if (!res.ok) {
-          throw new Error(`OSRM API error: ${res.status} ${res.statusText}`);
-        }
-        const data = await res.json();
-        addDebug(`OSRM response: ${data.routes?.length || 0} routes found`);
-        if (data.routes?.[0]?.geometry?.coordinates) {
-          const coords = data.routes[0].geometry.coordinates;
-          addDebug(`Route has ${coords.length} coordinates, first: [${coords[0][0].toFixed(4)},${coords[0][1].toFixed(4)}]`);
-          setRouteInfo({
-            coordinates: coords,
-            duration: data.routes[0].duration,
-            distance: data.routes[0].distance
-          });
+        const route = await fetchOsrmRoute({
+          from: { lng: helperLocation.lng, lat: helperLocation.lat },
+          to: { lng: customerLocation.lng, lat: customerLocation.lat },
+          signal: abortController.signal,
+        });
+
+        if (route) {
+          const first = route.coordinates[0];
+          addDebug(`Route found with ${route.coordinates.length} points`);
+          if (route.source === "fallback") {
+            addDebug("Using approximate straight-line fallback route");
+          }
+          if (first) {
+            addDebug(`Route start: [${first[0].toFixed(4)},${first[1].toFixed(4)}]`);
+          }
+          setRouteInfo(route);
           setRouteError(null);
         } else {
-          const errorMsg = data.message || "No route geometry found";
-          addDebug(`Route error: ${errorMsg}`);
-          setRouteError(errorMsg);
+          addDebug("No drivable route available");
+          setRouteInfo(null);
+          setRouteError("No route available");
         }
       } catch (err) {
         if (err instanceof Error && err.name !== "AbortError") {
@@ -298,6 +295,11 @@ export function TrackingMap({ bookingId, customerLocation, helperId, status }: T
             <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
               Fastest
             </span>
+            {routeInfo.source === "fallback" && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                Approx
+              </span>
+            )}
           </div>
         </div>
       )}
