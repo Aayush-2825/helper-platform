@@ -129,9 +129,9 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    startMatching(newBooking).catch((err) => {
-      console.error("Matching error:", err);
-    });
+    // Run matching inline so serverless runtimes do not terminate the
+    // progressive radius workflow right after the HTTP response is sent.
+    await startMatching(newBooking);
 
     return NextResponse.json(
       {

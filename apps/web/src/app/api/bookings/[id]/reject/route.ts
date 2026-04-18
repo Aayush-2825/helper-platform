@@ -6,6 +6,7 @@ import { booking, bookingCandidate, helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { publishBookingEvent } from "@/lib/realtime/client";
+import { resumeMatchingIfNeeded } from "@/services/matching/matching";
 
 export async function POST(
   request: Request,
@@ -103,6 +104,8 @@ export async function POST(
             reason,
           },
         });
+
+        await resumeMatchingIfNeeded(bookingId);
 
         return NextResponse.json(
           { message: "Booking request rejected." },

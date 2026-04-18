@@ -45,10 +45,25 @@ export async function presenceHandler(_userId: string, data: unknown) {
     }
   }
 
-  // Broadcast to all connected clients
+  // Broadcast to all connected clients.
+  // Omit null coordinates so map consumers never receive `null` lat/lng values.
+  const presenceEventData: Record<string, unknown> = {
+    helperUserId,
+    status,
+    availableSlots,
+  };
+
+  if (latitude != null) {
+    presenceEventData.latitude = latitude;
+  }
+
+  if (longitude != null) {
+    presenceEventData.longitude = longitude;
+  }
+
   broadcastEvent({
     event: "helper_presence",
-    data: { helperUserId, status, latitude, longitude, availableSlots },
+    data: presenceEventData,
   });
 
   // ✅ NEW: If helper goes online, sync pending jobs
