@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { TrackingMap } from "@/components/TrackingMap";
 
 type BookingStatus =
   | "requested"
@@ -402,8 +403,8 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
   const showCustomerLiveGuide = role === "customer" && (isAccepted || isInProgress);
   const inProgressElapsed = isInProgress && booking.startedAt ? formatElapsed(booking.startedAt) : null;
   const hasMapCoordinates = booking.latitude != null && booking.longitude != null;
-  const mapDestination = hasMapCoordinates
-    ? `${encodeURIComponent(String(booking.latitude))},${encodeURIComponent(String(booking.longitude))}`
+  const customerLocation = hasMapCoordinates
+    ? { lat: Number(booking.latitude), lng: Number(booking.longitude) }
     : null;
   const canCustomerPay = role === "customer" && booking.status === "completed" && payment?.status !== "captured";
   const paymentStatusLabel = payment ? payment.status.replaceAll("_", " ") : "pending";
@@ -477,29 +478,20 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
         </div>
       </div>
 
-      {/* Navigation Button instead of Tracking Map */}
-      {(isAccepted || isInProgress) && mapDestination && (
+      {(isAccepted || isInProgress) && customerLocation && (
         <Card className="overflow-hidden shadow-md border-primary/20 bg-card">
           <CardHeader className="p-4 border-b bg-muted/30">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <div className="size-2 rounded-full bg-green-500 animate-pulse" />
-              Navigate to Service Location
+              Live Locations (MVP)
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col items-center justify-center gap-4 py-8">
-            <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${mapDestination}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ textDecoration: "none" }}
-            >
-              <Button
-                className="gap-2 text-base font-semibold px-6 py-3"
-                size="lg"
-              >
-                <MapPin className="size-5" /> Open in Google Maps
-              </Button>
-            </a>
+          <CardContent className="p-4">
+            <TrackingMap
+              bookingId={bookingId}
+              customerLocation={customerLocation}
+              helperId={role === "helper" ? userId : undefined}
+            />
           </CardContent>
         </Card>
       )}
