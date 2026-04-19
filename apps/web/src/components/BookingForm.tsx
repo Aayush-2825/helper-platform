@@ -68,6 +68,8 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [categoryID, setCategoryID] = useState(defaultCategory ?? "");
   const [subcategoryID, setSubcategoryID] = useState(defaultSubcategory ?? "");
+  const [serviceTiming, setServiceTiming] = useState<"now" | "scheduled">("now");
+  const [scheduledFor, setScheduledFor] = useState("");
 
   useEffect(() => {
     if (defaultCategory) setCategoryID(defaultCategory);
@@ -232,6 +234,19 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
       errs.quotedAmount = "Enter a positive whole amount";
     }
 
+    if (serviceTiming === "scheduled") {
+      if (!scheduledFor.trim()) {
+        errs.scheduledFor = "Choose a date and time";
+      } else {
+        const scheduledDate = new Date(scheduledFor);
+        if (Number.isNaN(scheduledDate.getTime())) {
+          errs.scheduledFor = "Choose a valid date and time";
+        } else if (scheduledDate.getTime() < Date.now() + 15 * 60 * 1000) {
+          errs.scheduledFor = "Scheduled time must be at least 15 minutes from now";
+        }
+      }
+    }
+
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
@@ -240,10 +255,18 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
     setErrors({});
     await resolveCoordinatesFromAddress();
     setStep(3);
-    setIsSearchingHelpers(true);
-    onHelpersSearching?.(true);
     setLiveHelpers([]);
     onHelpersFound?.([]);
+
+    if (serviceTiming === "scheduled") {
+      setIsSearchingHelpers(false);
+      onHelpersSearching?.(false);
+      setSearchMessage("Scheduled booking will be matched using helper availability slots.");
+      return;
+    }
+
+    setIsSearchingHelpers(true);
+    onHelpersSearching?.(true);
     setSearchMessage("Searching nearby helpers...");
   }
 
@@ -267,6 +290,10 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
           quotedAmount: Number(quotedAmount),
           latitude: resolvedCoords.latitude,
           longitude: resolvedCoords.longitude,
+          scheduledFor:
+            serviceTiming === "scheduled" && scheduledFor.trim().length > 0
+              ? new Date(scheduledFor).toISOString()
+              : undefined,
         }),
       });
       if (res.status === 201) {
@@ -286,6 +313,12 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
 
   useEffect(() => {
     if (step !== 3) return;
+
+    if (serviceTiming === "scheduled") {
+      setIsSearchingHelpers(false);
+      onHelpersSearching?.(false);
+      return;
+    }
 
     if (!userId) {
       setIsSearchingHelpers(false);
@@ -308,7 +341,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
       city,
       radiusKm: 10,
     });
-  }, [step, userId, categoryID, bookingCoords.latitude, bookingCoords.longitude, city]);
+  }, [step, userId, categoryID, bookingCoords.latitude, bookingCoords.longitude, city, serviceTiming, onHelpersSearching]);
 
   return (
     <div ref={formRef} className="max-w-xl mx-auto py-8">
@@ -332,7 +365,13 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
           <p className="text-muted-foreground font-medium text-sm">
             {step === 1 && "Select exactly the service you require right now."}
             {step === 2 && "Provide location and budget to find exact matches."}
-            {step === 3 && (isSearchingHelpers ? "Searching live helpers..." : "Helpers will receive your booking request and the first eligible acceptance will be assigned.")}
+            {step === 3 && (
+              isSearchingHelpers
+                ? "Searching live helpers..."
+                : serviceTiming === "scheduled"
+                  ? "Scheduled booking will be assigned to helpers available in that time window."
+                  : "Helpers will receive your booking request and the first eligible acceptance will be assigned."
+            )}
           </p>
         </div>
 
@@ -444,6 +483,54 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-foreground">Service timing</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setServiceTiming("now")}
+                    className={cn(
+                      "h-12 rounded-2xl border text-sm font-semibold transition-all",
+                      serviceTiming === "now"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border bg-muted/30 text-foreground"
+                    )}
+                  >
+                    Need now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setServiceTiming("scheduled")}
+                    className={cn(
+                      "h-12 rounded-2xl border text-sm font-semibold transition-all",
+                      serviceTiming === "scheduled"
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border bg-muted/30 text-foreground"
+                    )}
+                  >
+                    Schedule
+                  </button>
+                </div>
+              </div>
+
+              {serviceTiming === "scheduled" && (
+                <div className="space-y-1">
+                  <label htmlFor="booking-scheduled-for" className="text-sm font-semibold text-foreground">
+                    Scheduled date and time
+                  </label>
+                  <input
+                    id="booking-scheduled-for"
+                    type="datetime-local"
+                    value={scheduledFor}
+                    onChange={(e) => setScheduledFor(e.target.value)}
+                    className={cn(
+                      "w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all",
+                      errors.scheduledFor ? "border-red-500" : "border-border premium-input-ring"
+                    )}
+                  />
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label htmlFor="booking-state" className="text-sm font-semibold text-foreground">State</label>
@@ -481,9 +568,9 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                 </div>
               )}
 
-                {(errors.addressLine || errors.area || errors.city || errors.state || errors.postalCode || errors.quotedAmount) && (
+                {(errors.addressLine || errors.area || errors.city || errors.state || errors.postalCode || errors.quotedAmount || errors.scheduledFor) && (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                    {errors.addressLine || errors.area || errors.city || errors.state || errors.postalCode || errors.quotedAmount}
+                  {errors.addressLine || errors.area || errors.city || errors.state || errors.postalCode || errors.quotedAmount || errors.scheduledFor}
                 </div>
               )}
 

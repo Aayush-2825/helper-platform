@@ -46,15 +46,33 @@ export function getRealtimeWsUrl(): string {
   return `${wsProtocol}${host}${DEFAULT_WS_PATH}`;
 }
 
-async function postJson(path: string, payload: JsonRecord): Promise<Response> {
+async function postJson(
+  path: string,
+  payload: JsonRecord,
+  extraHeaders?: Record<string, string>,
+): Promise<Response> {
   const baseUrl = getRealtimeHttpBaseUrl();
   return fetch(`${baseUrl}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(extraHeaders ?? {}),
     },
     body: JSON.stringify(payload),
   });
+}
+
+function getRealtimeBroadcastHeaders(): Record<string, string> {
+  if (typeof window !== "undefined") {
+    return {};
+  }
+
+  const secret = process.env.REALTIME_BROADCAST_SECRET;
+  if (!secret || secret.trim().length === 0) {
+    return {};
+  }
+
+  return { "x-realtime-secret": secret.trim() };
 }
 
 export function publishHelperPresence(input: {
@@ -149,7 +167,7 @@ export function publishBookingEvent(input: {
   if (typeof window === "undefined") {
     // 🧠 On server, we must use HTTP because there is no per-user WS connection
     console.log("[RealtimeClient] dispatch via HTTP /api/realtime/broadcast", payload);
-    return postJson("/api/realtime/broadcast", payload).catch((err) => {
+    return postJson("/api/realtime/broadcast", payload, getRealtimeBroadcastHeaders()).catch((err) => {
       console.error("❌ Failed to broadcast booking event via HTTP:", err);
       throw err;
     });
@@ -226,7 +244,7 @@ export function publishPaymentUpdate(input: {
   };
 
   if (typeof window === "undefined") {
-    return postJson("/api/realtime/broadcast", payload).catch((err) => {
+    return postJson("/api/realtime/broadcast", payload, getRealtimeBroadcastHeaders()).catch((err) => {
       console.error("Failed to broadcast payment event via HTTP:", err);
       throw err;
     });

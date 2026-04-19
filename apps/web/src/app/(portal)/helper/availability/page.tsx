@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Wifi, WifiOff, Clock } from "lucide-react";
+import { Loader2, Wifi, WifiOff, Clock, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { publishHelperPresence } from "@/lib/realtime/client";
@@ -9,6 +9,66 @@ import { useSession } from "@/lib/auth/session";
 import { useWebSocket } from "@/hooks/useWebsocket";
 
 type AvailabilityStatus = "online" | "offline" | "busy";
+type AvailabilitySlot = {
+  id: string;
+  dayOfWeek: number;
+  startMinute: number;
+  endMinute: number;
+  timezone: string;
+  isActive: boolean;
+};
+
+type EditableAvailabilitySlot = {
+  id: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  isActive: boolean;
+};
+
+const DAYS: Array<{ label: string; value: number }> = [
+  { label: "Sunday", value: 0 },
+  { label: "Monday", value: 1 },
+  { label: "Tuesday", value: 2 },
+  { label: "Wednesday", value: 3 },
+  { label: "Thursday", value: 4 },
+  { label: "Friday", value: 5 },
+  { label: "Saturday", value: 6 },
+];
+
+function minuteToTime(minute: number): string {
+  const normalizedMinute = Math.max(0, Math.min(1439, minute));
+  const hours = Math.floor(normalizedMinute / 60);
+  const mins = normalizedMinute % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+function timeToMinute(time: string): number | null {
+  const match = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function toEditableSlot(slot: AvailabilitySlot): EditableAvailabilitySlot {
+  return {
+    id: slot.id,
+    dayOfWeek: slot.dayOfWeek,
+    startTime: minuteToTime(slot.startMinute),
+    endTime: minuteToTime(slot.endMinute),
+    timezone: slot.timezone,
+    isActive: slot.isActive,
+  };
+}
 
 const statusConfig: Record<AvailabilityStatus, { label: string; color: string; icon: React.ReactNode }> = {
   online: { label: "Online", color: "bg-green-500", icon: <Wifi className="h-4 w-4" /> },
@@ -25,6 +85,11 @@ export default function HelperAvailabilityPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [slots, setSlots] = useState<EditableAvailabilitySlot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(true);
+  const [slotsSaving, setSlotsSaving] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [slotsSuccessMsg, setSlotsSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchStatus() {
@@ -44,6 +109,111 @@ export default function HelperAvailabilityPage() {
     }
     void fetchStatus();
   }, []);
+
+  useEffect(() => {
+    async function fetchSlots() {
+      try {
+        const res = await fetch("/api/helper/availability/slots", { credentials: "include" });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({})) as { message?: string };
+          setSlotsError(body.message ?? "Could not load availability slots.");
+          return;
+        }
+
+        const data = await res.json() as { slots?: AvailabilitySlot[] };
+        setSlots((data.slots ?? []).map(toEditableSlot));
+      } catch {
+        setSlotsError("Could not load availability slots.");
+      } finally {
+        setSlotsLoading(false);
+      }
+    }
+
+    void fetchSlots();
+  }, []);
+
+  function updateSlot(index: number, patch: Partial<EditableAvailabilitySlot>) {
+    setSlots((current) => current.map((slot, slotIndex) => (slotIndex === index ? { ...slot, ...patch } : slot)));
+  }
+
+  function addSlot() {
+    setSlotsError(null);
+    setSlotsSuccessMsg(null);
+    setSlots((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        dayOfWeek: 1,
+        startTime: "09:00",
+        endTime: "17:00",
+        timezone: "Asia/Kolkata",
+        isActive: true,
+      },
+    ]);
+  }
+
+  function removeSlot(index: number) {
+    setSlotsError(null);
+    setSlotsSuccessMsg(null);
+    setSlots((current) => current.filter((_, slotIndex) => slotIndex !== index));
+  }
+
+  async function saveSlots() {
+    setSlotsSaving(true);
+    setSlotsError(null);
+    setSlotsSuccessMsg(null);
+
+    const payloadSlots: AvailabilitySlot[] = [];
+    for (let index = 0; index < slots.length; index += 1) {
+      const slot = slots[index];
+      const startMinute = timeToMinute(slot.startTime);
+      const endMinute = timeToMinute(slot.endTime);
+
+      if (startMinute === null || endMinute === null) {
+        setSlotsError(`Slot ${index + 1} has an invalid time format.`);
+        setSlotsSaving(false);
+        return;
+      }
+
+      if (startMinute === endMinute) {
+        setSlotsError(`Slot ${index + 1} must have different start and end times.`);
+        setSlotsSaving(false);
+        return;
+      }
+
+      payloadSlots.push({
+        id: slot.id,
+        dayOfWeek: slot.dayOfWeek,
+        startMinute,
+        endMinute,
+        timezone: slot.timezone.trim(),
+        isActive: slot.isActive,
+      });
+    }
+
+    try {
+      const res = await fetch("/api/helper/availability/slots", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ slots: payloadSlots }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string };
+        setSlotsError(body.message ?? "Failed to save availability slots.");
+        return;
+      }
+
+      const data = await res.json() as { message?: string; slots?: AvailabilitySlot[] };
+      setSlots((data.slots ?? []).map(toEditableSlot));
+      setSlotsSuccessMsg(data.message ?? "Availability slots saved.");
+    } catch {
+      setSlotsError("Network error while saving slots.");
+    } finally {
+      setSlotsSaving(false);
+    }
+  }
 
   async function handleStatusChange(newStatus: AvailabilityStatus) {
     setSaving(true);
@@ -150,6 +320,121 @@ export default function HelperAvailabilityPage() {
           <p><span className="font-medium text-foreground">Online</span> — You&apos;ll receive incoming job requests.</p>
           <p><span className="font-medium text-foreground">Busy</span> — You&apos;re on a job and won&apos;t receive new requests.</p>
           <p><span className="font-medium text-foreground">Offline</span> — You won&apos;t receive any job requests.</p>
+        </CardContent>
+      </Card>
+
+      <Card className="surface-card border-none">
+        <CardHeader>
+          <CardTitle className="text-base">Weekly schedule</CardTitle>
+          <CardDescription>
+            Scheduled jobs are matched against these time slots. Add one or more ranges per day.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {slotsLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading slots…
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3">
+                {slots.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No slots yet. Add your first availability range.</p>
+                ) : (
+                  slots.map((slot, index) => (
+                    <div key={slot.id} className="grid gap-3 rounded-md border p-3 md:grid-cols-6 md:items-end">
+                      <label className="text-sm md:col-span-2">
+                        Day
+                        <select
+                          className="mt-1 h-10 w-full rounded-md border bg-background px-3"
+                          value={slot.dayOfWeek}
+                          onChange={(event) => updateSlot(index, { dayOfWeek: Number(event.target.value) })}
+                          disabled={slotsSaving}
+                        >
+                          {DAYS.map((day) => (
+                            <option key={day.value} value={day.value}>
+                              {day.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="text-sm">
+                        Start
+                        <input
+                          type="time"
+                          className="mt-1 h-10 w-full rounded-md border bg-background px-3"
+                          value={slot.startTime}
+                          onChange={(event) => updateSlot(index, { startTime: event.target.value })}
+                          disabled={slotsSaving}
+                        />
+                      </label>
+
+                      <label className="text-sm">
+                        End
+                        <input
+                          type="time"
+                          className="mt-1 h-10 w-full rounded-md border bg-background px-3"
+                          value={slot.endTime}
+                          onChange={(event) => updateSlot(index, { endTime: event.target.value })}
+                          disabled={slotsSaving}
+                        />
+                      </label>
+
+                      <label className="text-sm md:col-span-2">
+                        Timezone
+                        <input
+                          type="text"
+                          className="mt-1 h-10 w-full rounded-md border bg-background px-3"
+                          placeholder="Asia/Kolkata"
+                          value={slot.timezone}
+                          onChange={(event) => updateSlot(index, { timezone: event.target.value })}
+                          disabled={slotsSaving}
+                        />
+                      </label>
+
+                      <div className="flex items-center justify-between gap-2 md:col-span-6">
+                        <label className="inline-flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={slot.isActive}
+                            onChange={(event) => updateSlot(index, { isActive: event.target.checked })}
+                            disabled={slotsSaving}
+                          />
+                          Active slot
+                        </label>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeSlot(index)}
+                          disabled={slotsSaving}
+                          className="gap-2"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Button variant="outline" onClick={addSlot} disabled={slotsSaving} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add slot
+                </Button>
+                <Button onClick={() => void saveSlots()} disabled={slotsSaving} className="gap-2">
+                  {slotsSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Save schedule
+                </Button>
+              </div>
+
+              {slotsError ? <p className="text-sm text-destructive">{slotsError}</p> : null}
+              {slotsSuccessMsg ? <p className="text-sm text-green-600">{slotsSuccessMsg}</p> : null}
+            </>
+          )}
         </CardContent>
       </Card>
     </main>

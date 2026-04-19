@@ -89,6 +89,7 @@ export async function GET() {
             currency: true,
             requestedAt: true,
             acceptanceDeadline: true,
+            scheduledFor: true,
           },
           with: {
             customer: {
@@ -155,6 +156,7 @@ export async function GET() {
             currency: candidate.booking.currency,
             requestedAt: serializeDate(candidate.booking.requestedAt),
             acceptanceDeadline: serializeDate(candidate.booking.acceptanceDeadline),
+            scheduledFor: serializeDate(candidate.booking.scheduledFor),
             offeredAt: serializeDate(candidate.offeredAt),
             expiresAt: serializeDate(candidate.expiresAt),
             rankScore: candidate.rankScore,

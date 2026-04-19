@@ -16,6 +16,7 @@ import {
   flushQueuedNotificationsForUser,
   persistOutboundEvent,
 } from "./services/event-persistence.service.js";
+import { verifyWsAuthToken } from "./lib/ws-auth.js";
 
 const PORT = env.PORT;
 
@@ -214,10 +215,24 @@ wss.on("connection", (socket: WebSocket, request) => {
 
   const url = new URL(request.url || "", "http://localhost");
   const userId = url.searchParams.get("userId");
+  const wsToken = url.searchParams.get("token");
 
   if (!userId) {
     console.warn("[WS] Missing userId → rejected");
     socket.close(1008, "Missing userId");
+    return;
+  }
+
+  const wsSecret = env.REALTIME_WS_AUTH_SECRET || env.AUTH_SECRET || "";
+  if (!wsSecret) {
+    console.error("[WS] Missing websocket auth secret, refusing connection.");
+    socket.close(1011, "WebSocket auth unavailable");
+    return;
+  }
+
+  if (!wsToken || !verifyWsAuthToken(wsToken, userId, wsSecret)) {
+    console.warn(`[WS] Invalid token for user=${userId}. Connection rejected.`);
+    socket.close(1008, "Invalid websocket auth token");
     return;
   }
 

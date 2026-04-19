@@ -25,6 +25,9 @@ type Connection = {
   errorListeners: Set<(event: Event) => void>;
   reconnectTimeout: ReturnType<typeof setTimeout> | null;
   heartbeatInterval: ReturnType<typeof setInterval> | null;
+  reconnectAttempts: number;
+  wsToken: string | null;
+  wsTokenExpiresAt: number | null;
 };
 
 const connections = new Map<string, Connection>();
@@ -39,6 +42,9 @@ function createConnection(userId: string): Connection {
     errorListeners: new Set(),
     reconnectTimeout: null,
     heartbeatInterval: null,
+    reconnectAttempts: 0,
+    wsToken: null,
+    wsTokenExpiresAt: null,
   };
 }
 
@@ -70,13 +76,71 @@ function closeSocketSafely(socket: WebSocket | null) {
   }
 }
 
-function connect(connection: Connection) {
+const TOKEN_REUSE_BUFFER_MS = 30_000;
+
+async function fetchWsToken(connection: Connection): Promise<string | null> {
+  const now = Date.now();
+  if (
+    connection.wsToken &&
+    connection.wsTokenExpiresAt &&
+    connection.wsTokenExpiresAt - TOKEN_REUSE_BUFFER_MS > now
+  ) {
+    return connection.wsToken;
+  }
+
+  try {
+    const response = await fetch("/api/realtime/ws-token", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as { token?: string; expiresAt?: string };
+    if (!payload.token || !payload.expiresAt) {
+      return null;
+    }
+
+    const expiresAt = new Date(payload.expiresAt).getTime();
+    if (Number.isNaN(expiresAt)) {
+      return null;
+    }
+
+    connection.wsToken = payload.token;
+    connection.wsTokenExpiresAt = expiresAt;
+    return payload.token;
+  } catch {
+    return null;
+  }
+}
+
+function nextReconnectDelayMs(attempt: number): number {
+  const maxDelayMs = 20_000;
+  const baseDelayMs = 1_000;
+  return Math.min(maxDelayMs, baseDelayMs * (2 ** Math.max(0, attempt - 1)));
+}
+
+async function connect(connection: Connection) {
   if (connection.socket && (connection.socket.readyState === WebSocket.OPEN || connection.socket.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+
+  const token = await fetchWsToken(connection);
+  if (!token) {
+    connection.reconnectAttempts += 1;
+    const delay = nextReconnectDelayMs(connection.reconnectAttempts);
+    connection.reconnectTimeout = setTimeout(() => {
+      void connect(connection);
+    }, delay);
     return;
   }
 
   const wsUrl = new URL(getRealtimeWsUrl());
   wsUrl.searchParams.set("userId", connection.userId);
+  wsUrl.searchParams.set("token", token);
 
   const ws = new WebSocket(wsUrl.toString());
   connection.socket = ws;
@@ -85,6 +149,7 @@ function connect(connection: Connection) {
 
   ws.onopen = () => {
     console.log(`[WS] connected user=${connection.userId}`);
+    connection.reconnectAttempts = 0;
     connection.openListeners.forEach((listener) => listener());
 
     connection.heartbeatInterval = setInterval(() => {
@@ -111,9 +176,11 @@ function connect(connection: Connection) {
     connection.closeListeners.forEach((listener) => listener());
 
     if (connections.has(connection.userId)) {
+      connection.reconnectAttempts += 1;
+      const delay = nextReconnectDelayMs(connection.reconnectAttempts);
       connection.reconnectTimeout = setTimeout(() => {
-        connect(connection);
-      }, 2000);
+        void connect(connection);
+      }, delay);
     }
   };
 
@@ -137,7 +204,7 @@ function subscribe(
   if (options?.onClose) connection.closeListeners.add(options.onClose);
   if (options?.onError) connection.errorListeners.add(options.onError);
 
-  connect(connection);
+  void connect(connection);
 
   return () => {
     connection.messageListeners.delete(onMessage);

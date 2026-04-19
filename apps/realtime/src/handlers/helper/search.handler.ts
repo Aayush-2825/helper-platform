@@ -33,8 +33,6 @@ const allowedCategories = [
   "security_guard",
   "other",
 ];
-
-type HelperCategory = (typeof allowedCategories)[number];
 const PRESENCE_HEARTBEAT_WINDOW_MINUTES = 10;
 
 function normalizeText(value: unknown): string {
