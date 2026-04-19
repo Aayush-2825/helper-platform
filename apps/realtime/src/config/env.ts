@@ -30,7 +30,10 @@ function validateEnv() {
     NODE_ENV: process.env.NODE_ENV || "development",
     DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
+    AUTH_SECRET: process.env.AUTH_SECRET || "",
+    REALTIME_WS_AUTH_SECRET: process.env.REALTIME_WS_AUTH_SECRET || "",
     CORS_ALLOWED_ORIGINS: parseAllowedOrigins(process.env.CORS_ORIGIN),
+    REALTIME_BROADCAST_SECRET: process.env.REALTIME_BROADCAST_SECRET || "",
   };
 }
 

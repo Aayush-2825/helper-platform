@@ -9,6 +9,9 @@ import { startMatching } from "@/services/matching/matching";
 import { headers } from "next/headers";
 import { randomInt } from "node:crypto";
 
+const MIN_SCHEDULE_LEAD_MINUTES = 15;
+const MAX_SCHEDULE_HORIZON_DAYS = 90;
+
 function emptyToNull(value?: string | null) {
   return value && value.trim() !== "" ? value : null;
 }
@@ -77,6 +80,26 @@ export async function POST(request: NextRequest) {
         { message: "Invalid scheduledFor value." },
         { status: 400, headers: NO_STORE_HEADERS },
       );
+    }
+
+    if (scheduledFor) {
+      const now = Date.now();
+      const minScheduleTime = now + MIN_SCHEDULE_LEAD_MINUTES * 60 * 1000;
+      const maxScheduleTime = now + MAX_SCHEDULE_HORIZON_DAYS * 24 * 60 * 60 * 1000;
+
+      if (scheduledFor.getTime() < minScheduleTime) {
+        return NextResponse.json(
+          { message: `scheduledFor must be at least ${MIN_SCHEDULE_LEAD_MINUTES} minutes in the future.` },
+          { status: 400, headers: NO_STORE_HEADERS },
+        );
+      }
+
+      if (scheduledFor.getTime() > maxScheduleTime) {
+        return NextResponse.json(
+          { message: `scheduledFor cannot be more than ${MAX_SCHEDULE_HORIZON_DAYS} days in the future.` },
+          { status: 400, headers: NO_STORE_HEADERS },
+        );
+      }
     }
 
     // Generate 4-digit OTPs with cryptographically secure randomness.

@@ -1,11 +1,21 @@
 import { headers } from "next/headers";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { booking, bookingCandidate, bookingStatusEvent, helperProfile, user } from "@/db/schema";
+import {
+  booking,
+  bookingCandidate,
+  bookingStatusEvent,
+  helperAvailabilitySlot,
+  helperProfile,
+  user,
+} from "@/db/schema";
 import { auth } from "@/lib/auth/server";
+import { hasAnyMatchingAvailabilitySlot } from "@/lib/helper/availability-slots";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { publishBookingEvent } from "@/lib/realtime/client";
+
+const SCHEDULE_CONFLICT_WINDOW_MINUTES = 120;
 
 export async function POST(
   _request: Request,
@@ -47,9 +57,9 @@ export async function POST(
       );
     }
 
-    if (!profile.isActive || profile.availabilityStatus !== "online") {
+    if (!profile.isActive) {
       return NextResponse.json(
-        { message: "Set your helper profile online before accepting jobs." },
+        { message: "Activate your helper profile before accepting jobs." },
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }
@@ -122,6 +132,71 @@ export async function POST(
         { message: "Booking acceptance window has expired." },
         { status: 400, headers: NO_STORE_HEADERS }
       );
+    }
+
+    const isScheduledBooking =
+      existingBooking.scheduledFor instanceof Date &&
+      !Number.isNaN(existingBooking.scheduledFor.getTime());
+
+    if (!isScheduledBooking && profile.availabilityStatus !== "online") {
+      return NextResponse.json(
+        { message: "Set your helper profile online before accepting immediate jobs." },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (isScheduledBooking && existingBooking.scheduledFor) {
+      const slots = await db.query.helperAvailabilitySlot.findMany({
+        where: and(
+          eq(helperAvailabilitySlot.helperProfileId, profile.id),
+          eq(helperAvailabilitySlot.isActive, true),
+        ),
+        columns: {
+          dayOfWeek: true,
+          startMinute: true,
+          endMinute: true,
+          timezone: true,
+          isActive: true,
+        },
+      });
+
+      if (!hasAnyMatchingAvailabilitySlot(existingBooking.scheduledFor, slots)) {
+        return NextResponse.json(
+          {
+            message:
+              "This scheduled booking is outside your available time slots. Update your availability before accepting.",
+          },
+          { status: 403, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      const windowMs = SCHEDULE_CONFLICT_WINDOW_MINUTES * 60 * 1000;
+      const windowStart = new Date(existingBooking.scheduledFor.getTime() - windowMs);
+      const windowEnd = new Date(existingBooking.scheduledFor.getTime() + windowMs);
+
+      const conflictingBookings = await db.query.booking.findMany({
+        where: and(
+          eq(booking.helperId, session.user.id),
+          inArray(booking.status, ["accepted", "in_progress"]),
+          gte(booking.scheduledFor, windowStart),
+          lte(booking.scheduledFor, windowEnd),
+        ),
+        columns: {
+          id: true,
+          scheduledFor: true,
+          status: true,
+        },
+      });
+
+      if (conflictingBookings.length > 0) {
+        return NextResponse.json(
+          {
+            message:
+              "You already have another accepted/in-progress booking near this scheduled time. Please reject this request or update your availability.",
+          },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
     }
 
     const helperUser = await db.query.user.findFirst({

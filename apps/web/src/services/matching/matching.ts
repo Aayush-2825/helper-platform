@@ -7,10 +7,12 @@ import {
   bookingCandidate,
   bookingStatusEvent,
 } from "@/db/schema";
+import { hasAnyMatchingAvailabilitySlot } from "@/lib/helper/availability-slots";
 import { isMatchableBookingStatus } from "@/lib/bookings/lifecycle";
 import { publishBookingEvent } from "@/lib/realtime/client";
+import { sendBookingPushToHelpers } from "@/lib/notifications/web-push";
 import { db as realtimeDb } from "@repo/db/realtime";
-import { helperPresence } from "@repo/db/schema/realtime";
+import { activeConnections, helperPresence } from "@repo/db/schema/realtime";
 
 type BookingDataForMatching = {
   id: string;
@@ -21,6 +23,8 @@ type BookingDataForMatching = {
   city?: string | null;
   addressLine?: string | null;
   quotedAmount?: number | null;
+  scheduledFor?: Date | string | null;
+  customerName?: string | null;
 };
 
 type MatchedHelperProfile = {
@@ -43,7 +47,6 @@ type HelperServiceCategory =
   | "other";
 
 const PRESENCE_HEARTBEAT_WINDOW_MINUTES = 10;
-const MIN_HELPERS_TO_NOTIFY = 10;
 const REQUEST_TIMEOUT_MINUTES = 10;
 
 function normalizeLocationToken(value: string) {
@@ -90,11 +93,46 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
     const latitude = Number(bookingData.latitude);
     const longitude = Number(bookingData.longitude);
     const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
+    const scheduledFor = parseScheduledDate(bookingData.scheduledFor);
+    const isScheduledBooking = scheduledFor !== null;
     const notifiedHelperIds = new Set<string>();
     const now = new Date();
 
     const radiusSteps = [1, 3, 5, 10, 20, 50, 100];
     let allEligibleHelpers: MatchedHelperProfile[] = [];
+
+    if (isScheduledBooking && scheduledFor) {
+      await publishBookingEvent({
+        bookingId: bookingData.id,
+        customerId: bookingData.customerId,
+        eventType: "matching_update",
+        data: {
+          bookingId: bookingData.id,
+          message: "Finding helpers available at your scheduled time...",
+          scheduledFor: scheduledFor.toISOString(),
+        },
+      });
+
+      const scheduledHelpers = await findScheduledEligibleHelpers(
+        bookingData,
+        scheduledFor,
+        notifiedHelperIds,
+      );
+
+      if (scheduledHelpers.length > 0) {
+        allEligibleHelpers = scheduledHelpers;
+        await createAndNotifyCandidates(bookingData, scheduledHelpers, now);
+      }
+
+      if (allEligibleHelpers.length === 0) {
+        await markBookingExpired(bookingData.id, bookingData.customerId, bookingData.city ?? null, now);
+        console.log("❌ [Matching] No scheduled-time eligible helpers found.");
+      } else {
+        console.log(`✅ [Matching] Scheduled booking notified ${allEligibleHelpers.length} helpers.`);
+      }
+
+      return;
+    }
 
     for (const radius of hasCoordinates ? radiusSteps : []) {
       console.log(`📡 [Matching] Searching within ${radius}km...`);
@@ -148,10 +186,7 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
 
           await createAndNotifyCandidates(bookingData, eligibleRadiusHelpers, now);
 
-          if (allEligibleHelpers.length >= MIN_HELPERS_TO_NOTIFY) {
-            console.log("✅ [Matching] Sufficient helpers found and notified.");
-            break;
-          }
+          console.log("✅ [Matching] Notified current radius helpers.");
         }
       }
 
@@ -170,8 +205,8 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
       }
     }
 
-    if (allEligibleHelpers.length < MIN_HELPERS_TO_NOTIFY && bookingData.city) {
-      console.log(`🏙️ [Matching] Falling back to city-wide search for: ${bookingData.city}`);
+    if (bookingData.city) {
+      console.log(`🏙️ [Matching] Running city-wide fanout for: ${bookingData.city}`);
 
       await publishBookingEvent({
         bookingId: bookingData.id,
@@ -184,38 +219,16 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
         },
       });
 
-      const onlineHelperIds = await findOnlineHelperIds();
-      console.log(`🏙️ [Matching] City fallback online helper ids: ${onlineHelperIds.length}`, onlineHelperIds);
-
-      let cityHelpers: MatchedHelperProfile[] = [];
-      if (onlineHelperIds.length > 0) {
-        cityHelpers = (await db.query.helperProfile.findMany({
-          where: (helper, { eq: eqOp, and: andOp, inArray: inArrayOp }) =>
-            andOp(
-              inArrayOp(helper.userId, onlineHelperIds),
-              eqOp(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
-              eqOp(helper.isActive, true),
-              eqOp(helper.verificationStatus, "approved"),
-            ),
-        })) as MatchedHelperProfile[];
-      }
+      const cityHelpers = await findCityConnectedOrOnlineHelpers(bookingData, notifiedHelperIds);
 
       console.log(
-        `🏙️ [Matching] City fallback eligible before city filter: ${cityHelpers.length}`,
-        cityHelpers.map((helper) => helper.userId),
-      );
-
-      cityHelpers = cityHelpers.filter(
-        (helper) => cityMatches(bookingData.city!, helper.serviceCity) && !notifiedHelperIds.has(helper.userId),
-      );
-
-      console.log(
-        `🏙️ [Matching] City fallback eligible after city/notified filter: ${cityHelpers.length}`,
+        `🏙️ [Matching] City fanout eligible helpers: ${cityHelpers.length}`,
         cityHelpers.map((helper) => helper.userId),
       );
 
       if (cityHelpers.length > 0) {
         allEligibleHelpers = [...allEligibleHelpers, ...cityHelpers];
+        cityHelpers.forEach((helper) => notifiedHelperIds.add(helper.userId));
         await createAndNotifyCandidates(bookingData, cityHelpers, now);
       }
     }
@@ -311,19 +324,9 @@ async function createAndNotifyCandidates(
     await tx.insert(bookingCandidate).values(candidateRecords);
   });
 
-  let customerName = "Customer";
-  try {
-    const customerRow = await db.query.user.findFirst({
-      where: (userRecord, { eq: eqOp }) => eqOp(userRecord.id, bookingData.customerId),
-      columns: { name: true },
-    });
-
-    if (customerRow?.name) {
-      customerName = customerRow.name;
-    }
-  } catch {
-    // Keep the default label if the user lookup fails.
-  }
+  const customerName = bookingData.customerName?.trim().length
+    ? bookingData.customerName
+    : "Customer";
 
   console.log(
     `📨 [Matching] Publishing booking_request to helpers: ${freshHelpers.length}`,
@@ -350,6 +353,20 @@ async function createAndNotifyCandidates(
       acceptanceDeadline: deadline.toISOString(),
       message: `Found ${freshHelpers.length} professional${freshHelpers.length > 1 ? "s" : ""} for your request.`,
     },
+  });
+
+  void sendBookingPushToHelpers(
+    freshHelpers.map((helper) => helper.userId),
+    {
+      bookingId: bookingData.id,
+      categoryId: bookingData.categoryId,
+      city: bookingData.city ?? "Unknown city",
+      addressLine: bookingData.addressLine ?? "",
+      quotedAmount: bookingData.quotedAmount ?? 0,
+      expiresAt: deadline.toISOString(),
+    },
+  ).catch((error) => {
+    console.error("Failed to deliver booking web push notifications:", error);
   });
 }
 
@@ -382,6 +399,8 @@ export async function resumeMatchingIfNeeded(bookingId: string) {
       city: true,
       addressLine: true,
       quotedAmount: true,
+      customerName: true,
+      scheduledFor: true,
       status: true,
       helperId: true,
     },
@@ -420,9 +439,77 @@ export async function resumeMatchingIfNeeded(bookingId: string) {
     city: bookingRow.city,
     addressLine: bookingRow.addressLine,
     quotedAmount: bookingRow.quotedAmount,
+    customerName: bookingRow.customerName,
+    scheduledFor: bookingRow.scheduledFor,
   });
 
   return true;
+}
+
+function parseScheduledDate(scheduledFor?: Date | string | null) {
+  if (!scheduledFor) return null;
+  const parsed = scheduledFor instanceof Date ? scheduledFor : new Date(scheduledFor);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+async function findScheduledEligibleHelpers(
+  bookingData: BookingDataForMatching,
+  scheduledFor: Date,
+  notifiedHelperIds: Set<string>,
+) {
+  let candidateHelpers = (await db.query.helperProfile.findMany({
+    where: (helper, { eq: eqOp, and: andOp }) =>
+      andOp(
+        eqOp(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
+        eqOp(helper.isActive, true),
+        eqOp(helper.verificationStatus, "approved"),
+      ),
+  })) as MatchedHelperProfile[];
+
+  if (bookingData.city) {
+    candidateHelpers = candidateHelpers.filter((helper) => cityMatches(bookingData.city!, helper.serviceCity));
+  }
+
+  if (candidateHelpers.length === 0) {
+    return [];
+  }
+
+  const helperProfileIds = candidateHelpers.map((helper) => helper.id);
+
+  const slotRows = await db.query.helperAvailabilitySlot.findMany({
+    where: (slot, { and: andOp, inArray: inArrayOp, eq: eqOp }) =>
+      andOp(
+        inArrayOp(slot.helperProfileId, helperProfileIds),
+        eqOp(slot.isActive, true),
+      ),
+    columns: {
+      helperProfileId: true,
+      dayOfWeek: true,
+      startMinute: true,
+      endMinute: true,
+      timezone: true,
+      isActive: true,
+    },
+  });
+
+  const slotsByHelperProfileId = new Map<string, typeof slotRows>();
+
+  for (const slot of slotRows) {
+    const slots = slotsByHelperProfileId.get(slot.helperProfileId) ?? [];
+    slots.push(slot);
+    slotsByHelperProfileId.set(slot.helperProfileId, slots);
+  }
+
+  return candidateHelpers.filter((helper) => {
+    if (notifiedHelperIds.has(helper.userId)) return false;
+    const helperSlots = slotsByHelperProfileId.get(helper.id) ?? [];
+    if (helperSlots.length === 0) return false;
+    const isAvailable = hasAnyMatchingAvailabilitySlot(scheduledFor, helperSlots);
+    if (isAvailable) {
+      notifiedHelperIds.add(helper.userId);
+    }
+    return isAvailable;
+  });
 }
 
 async function findNearbyHelperIds(
@@ -468,6 +555,54 @@ async function findOnlineHelperIds() {
     );
 
   return [...new Set(onlineHelpers.map((helper) => helper.helperId))];
+}
+
+async function findActiveWebsiteHelperIds() {
+  const connectedHelpers = await realtimeDb
+    .select({ helperId: activeConnections.userId })
+    .from(activeConnections)
+    .where(
+      and(
+        eq(activeConnections.userRole, "helper"),
+        eq(activeConnections.isActive, true),
+        sql`${activeConnections.disconnectedAt} IS NULL`,
+      ),
+    );
+
+  return [...new Set(connectedHelpers.map((helper) => helper.helperId))];
+}
+
+async function findCityConnectedOrOnlineHelpers(
+  bookingData: BookingDataForMatching,
+  notifiedHelperIds: Set<string>,
+) {
+  if (!bookingData.city) {
+    return [] as MatchedHelperProfile[];
+  }
+
+  const [onlineHelperIds, connectedHelperIds] = await Promise.all([
+    findOnlineHelperIds(),
+    findActiveWebsiteHelperIds(),
+  ]);
+
+  const availableNowHelperIds = [...new Set([...onlineHelperIds, ...connectedHelperIds])];
+  if (availableNowHelperIds.length === 0) {
+    return [] as MatchedHelperProfile[];
+  }
+
+  const cityHelpers = (await db.query.helperProfile.findMany({
+    where: (helper, { eq: eqOp, and: andOp, inArray: inArrayOp }) =>
+      andOp(
+        inArrayOp(helper.userId, availableNowHelperIds),
+        eqOp(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
+        eqOp(helper.isActive, true),
+        eqOp(helper.verificationStatus, "approved"),
+      ),
+  })) as MatchedHelperProfile[];
+
+  return cityHelpers.filter(
+    (helper) => cityMatches(bookingData.city!, helper.serviceCity) && !notifiedHelperIds.has(helper.userId),
+  );
 }
 
 async function isBookingNoLongerMatchable(bookingId: string) {

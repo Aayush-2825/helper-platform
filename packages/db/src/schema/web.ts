@@ -770,6 +770,40 @@ export const notificationEvent = pgTable(
   ],
 );
 
+export const helperWebPushSubscription = pgTable(
+  "helper_web_push_subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    helperProfileId: text("helper_profile_id")
+      .notNull()
+      .references(() => helperProfile.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    expirationTime: timestamp("expiration_time"),
+    userAgent: text("user_agent"),
+    isActive: boolean("is_active").default(true).notNull(),
+    lastUsedAt: timestamp("last_used_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("helperWebPushSubscription_helperProfile_endpoint_uidx").on(
+      table.helperProfileId,
+      table.endpoint,
+    ),
+    index("helperWebPushSubscription_userId_idx").on(table.userId),
+    index("helperWebPushSubscription_helperProfileId_idx").on(table.helperProfileId),
+    index("helperWebPushSubscription_isActive_idx").on(table.isActive),
+  ],
+);
+
 export const userRelations = relations(user, ({ many, one }) => ({
   customerProfile: one(customerProfile, {
     fields: [user.id],
@@ -793,6 +827,7 @@ export const userRelations = relations(user, ({ many, one }) => ({
   raisedDisputes: many(dispute, { relationName: "disputeRaisedBy" }),
   disputeMessages: many(disputeMessage),
   notificationEvents: many(notificationEvent),
+  helperWebPushSubscriptions: many(helperWebPushSubscription),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -888,7 +923,22 @@ export const helperProfileRelations = relations(helperProfile, ({ one, many }) =
   paymentTransactions: many(paymentTransaction),
   payouts: many(payout),
   reviews: many(review),
+  webPushSubscriptions: many(helperWebPushSubscription),
 }));
+
+export const helperWebPushSubscriptionRelations = relations(
+  helperWebPushSubscription,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [helperWebPushSubscription.userId],
+      references: [user.id],
+    }),
+    helperProfile: one(helperProfile, {
+      fields: [helperWebPushSubscription.helperProfileId],
+      references: [helperProfile.id],
+    }),
+  }),
+);
 
 export const helperKycDocumentRelations = relations(
   helperKycDocument,

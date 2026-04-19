@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { CurrentJobPanel } from "@/components/CurrentJobPanel";
 import type { IncomingJob } from "./useIncomingJobs";
 import { RadioTower } from "lucide-react";
+import { useHelperWebPush } from "@/hooks/useHelperWebPush";
 
 function distanceMeters(
   from: { lat: number; lng: number },
@@ -114,6 +115,7 @@ export default function HelperPage() {
 
   const { jobs, addJob, removeJob, replaceJobs } = useIncomingJobs();
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
+  useHelperWebPush(Boolean(userId));
 
   // Track the helper's own live location
   const [workerLocation, setWorkerLocation] = useState<{
