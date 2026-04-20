@@ -690,18 +690,18 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
       </div>
 
       {/* Persistent Bottom Actions */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-lg border-t z-50 md:sticky md:bottom-4 md:rounded-xl md:shadow-lg md:border md:mb-6">
-        <div className="max-w-3xl mx-auto flex gap-3">
+      <div className="fixed bottom-0 left-0 right-0 border-t bg-background/80 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur-lg z-50 md:sticky md:bottom-4 md:rounded-xl md:border md:mb-6 md:p-4">
+        <div className="mx-auto flex max-w-3xl flex-col gap-3 md:flex-row md:items-center">
 
           {role === "helper" && (isAccepted || isInProgress) && (
-            <div className="flex-1 flex flex-col gap-2">
-              <div className="flex gap-2 items-center">
+            <div className="flex w-full flex-col gap-2 md:flex-1">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]{4,6}"
                   maxLength={6}
-                  className="border rounded px-3 py-2 text-lg font-mono tracking-widest w-32 focus:outline-none focus:ring focus:border-primary"
+                  className="w-full rounded border px-3 py-2 text-lg font-mono tracking-widest focus:border-primary focus:outline-none focus:ring sm:w-36"
                   placeholder={isAccepted ? "Enter OTP to Start" : "Enter OTP to Complete"}
                   value={otp}
                   onChange={e => setOtp(e.target.value.replace(/\D/g, ""))}
@@ -709,7 +709,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
                 />
                 {isAccepted ? (
                   <Button
-                    className="gap-2 h-12 text-base font-semibold"
+                    className="h-12 w-full gap-2 text-base font-semibold sm:w-auto"
                     size="lg"
                     disabled={actionLoading || !otp || otp.length < 4}
                     onClick={() => handleAction("start")}
@@ -718,7 +718,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
                   </Button>
                 ) : (
                   <Button
-                    className="gap-2 h-12 text-base font-semibold bg-green-600 hover:bg-green-700"
+                    className="h-12 w-full gap-2 text-base font-semibold bg-green-600 hover:bg-green-700 sm:w-auto"
                     size="lg"
                     disabled={actionLoading || !otp || otp.length < 4}
                     onClick={() => handleAction("complete")}
