@@ -13,6 +13,7 @@ import {
   Activity,
 } from "lucide-react";
 import { useHelperLocation } from "@/hooks/useHelperLocation";
+import { useHelperWebPush } from "@/hooks/useHelperWebPush";
 import { useSession } from "@/lib/auth/session";
 
 const helperLinks = [
@@ -41,6 +42,7 @@ export default function HelperLayout({ children }: { children: React.ReactNode }
   }, []);
 
   useHelperLocation(session?.user.id, inProgressBookingId, !!inProgressBookingId);
+  useHelperWebPush(Boolean(session?.user.id));
 
   const isHelperAccessSetupRoute =
     pathname === "/helper/onboarding" || pathname.startsWith("/helper/verification-pending");

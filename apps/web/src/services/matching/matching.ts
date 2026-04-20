@@ -572,6 +572,22 @@ async function findActiveWebsiteHelperIds() {
   return [...new Set(connectedHelpers.map((helper) => helper.helperId))];
 }
 
+async function findAvailabilityOnlineHelperIds() {
+  const onlineHelpers = await db.query.helperProfile.findMany({
+    where: (helper, { and: andOp, eq: eqOp }) =>
+      andOp(
+        eqOp(helper.availabilityStatus, "online"),
+        eqOp(helper.isActive, true),
+        eqOp(helper.verificationStatus, "approved"),
+      ),
+    columns: {
+      userId: true,
+    },
+  });
+
+  return [...new Set(onlineHelpers.map((helper) => helper.userId))];
+}
+
 async function findCityConnectedOrOnlineHelpers(
   bookingData: BookingDataForMatching,
   notifiedHelperIds: Set<string>,
@@ -580,12 +596,15 @@ async function findCityConnectedOrOnlineHelpers(
     return [] as MatchedHelperProfile[];
   }
 
-  const [onlineHelperIds, connectedHelperIds] = await Promise.all([
+  const [onlineHelperIds, connectedHelperIds, availabilityOnlineHelperIds] = await Promise.all([
     findOnlineHelperIds(),
     findActiveWebsiteHelperIds(),
+    findAvailabilityOnlineHelperIds(),
   ]);
 
-  const availableNowHelperIds = [...new Set([...onlineHelperIds, ...connectedHelperIds])];
+  const availableNowHelperIds = [
+    ...new Set([...onlineHelperIds, ...connectedHelperIds, ...availabilityOnlineHelperIds]),
+  ];
   if (availableNowHelperIds.length === 0) {
     return [] as MatchedHelperProfile[];
   }
