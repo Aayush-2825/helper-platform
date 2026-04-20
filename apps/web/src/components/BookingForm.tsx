@@ -104,6 +104,9 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
   const [submittingBooking, setSubmittingBooking] = useState(false);
   const searchRequestIdRef = useRef(0);
   const activeSearchRequestIdRef = useRef<string | null>(null);
+  const lastSearchSignatureRef = useRef<string | null>(null);
+  const onHelpersFoundRef = useRef(onHelpersFound);
+  const onHelpersSearchingRef = useRef(onHelpersSearching);
   const geocodeCacheRef = useRef<Map<string, { latitude: number; longitude: number }>>(new Map());
   const parsedQuotedAmount = Number(quotedAmount || 0);
   const platformFee = parsedQuotedAmount > 0 ? Math.round(parsedQuotedAmount * 0.08) : 0;
@@ -114,6 +117,14 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
   useEffect(() => {
     setBookingCoords({ latitude, longitude });
   }, [latitude, longitude]);
+
+  useEffect(() => {
+    onHelpersFoundRef.current = onHelpersFound;
+  }, [onHelpersFound]);
+
+  useEffect(() => {
+    onHelpersSearchingRef.current = onHelpersSearching;
+  }, [onHelpersSearching]);
 
   function buildAddressQuery() {
     return [addressLine, area, city, state, postalCode, "India"]
@@ -193,10 +204,10 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
       if (payload.requestId && payload.requestId !== activeSearchRequestIdRef.current) return;
 
       setLiveHelpers(Array.isArray(payload.helpers) ? payload.helpers : []);
-      onHelpersFound?.(Array.isArray(payload.helpers) ? payload.helpers : []);
+      onHelpersFoundRef.current?.(Array.isArray(payload.helpers) ? payload.helpers : []);
       setSearchMessage(typeof payload.message === "string" ? payload.message : "");
       setIsSearchingHelpers(false);
-      onHelpersSearching?.(false);
+      onHelpersSearchingRef.current?.(false);
       return;
     }
 
@@ -205,7 +216,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
       if (payload?.requestId && payload.requestId !== activeSearchRequestIdRef.current) return;
       setSearchMessage(payload?.message || "Unable to search for helpers right now.");
       setIsSearchingHelpers(false);
-      onHelpersSearching?.(false);
+      onHelpersSearchingRef.current?.(false);
     }
   });
 
@@ -256,17 +267,17 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
     await resolveCoordinatesFromAddress();
     setStep(3);
     setLiveHelpers([]);
-    onHelpersFound?.([]);
+    onHelpersFoundRef.current?.([]);
 
     if (serviceTiming === "scheduled") {
       setIsSearchingHelpers(false);
-      onHelpersSearching?.(false);
+      onHelpersSearchingRef.current?.(false);
       setSearchMessage("Scheduled booking will be matched using helper availability slots.");
       return;
     }
 
     setIsSearchingHelpers(true);
-    onHelpersSearching?.(true);
+    onHelpersSearchingRef.current?.(true);
     setSearchMessage("Searching nearby helpers...");
   }
 
@@ -312,11 +323,14 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
   }
 
   useEffect(() => {
-    if (step !== 3) return;
+    if (step !== 3) {
+      lastSearchSignatureRef.current = null;
+      return;
+    }
 
     if (serviceTiming === "scheduled") {
       setIsSearchingHelpers(false);
-      onHelpersSearching?.(false);
+      onHelpersSearchingRef.current?.(false);
       return;
     }
 
@@ -325,6 +339,20 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
       setSearchMessage("Sign in required to search helpers.");
       return;
     }
+
+    const searchSignature = JSON.stringify({
+      userId,
+      categoryID,
+      latitude: bookingCoords.latitude,
+      longitude: bookingCoords.longitude,
+      city,
+      serviceTiming,
+    });
+
+    if (lastSearchSignatureRef.current === searchSignature) {
+      return;
+    }
+    lastSearchSignatureRef.current = searchSignature;
 
     const requestId = `helper_search_${Date.now()}_${searchRequestIdRef.current++}`;
     activeSearchRequestIdRef.current = requestId;
@@ -341,7 +369,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
       city,
       radiusKm: 10,
     });
-  }, [step, userId, categoryID, bookingCoords.latitude, bookingCoords.longitude, city, serviceTiming, onHelpersSearching]);
+  }, [step, userId, categoryID, bookingCoords.latitude, bookingCoords.longitude, city, serviceTiming]);
 
   return (
     <div ref={formRef} className="max-w-xl mx-auto py-8">

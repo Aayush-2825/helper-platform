@@ -433,6 +433,26 @@ export function MyMap({ userId, initialCategoryId, initialSubcategoryId }: { use
     };
   }, []);
 
+  const handleHelpersFound = useCallback((helpers: LiveHelper[]) => {
+    setNearbyHelpers(
+      helpers.map((helper) => ({
+        ...helper,
+        lat: helper.latitude ?? null,
+        lng: helper.longitude ?? null,
+      })),
+    );
+  }, []);
+
+  const handleHelpersSearching = useCallback((isSearching: boolean) => {
+    if (isSearching) {
+      setNearbyHelpers([]);
+    }
+  }, []);
+
+  const handleBookingSuccess = useCallback((id: string) => {
+    setCurrentBookingId(id);
+  }, []);
+
   function handleLocationSelect(loc: GeocodedLocation) {
     setMapCenter({ lat: loc.lat, lng: loc.lng });
     setDraggableMarker({ lat: loc.lat, lng: loc.lng });
@@ -518,21 +538,9 @@ export function MyMap({ userId, initialCategoryId, initialSubcategoryId }: { use
           defaultState={prefillAddress.state}
           defaultPostalCode={prefillAddress.postalCode}
           formRef={formRef}
-          onHelpersFound={(helpers) => {
-            setNearbyHelpers(
-              helpers.map((helper) => ({
-                ...helper,
-                lat: helper.latitude ?? null,
-                lng: helper.longitude ?? null,
-              })),
-            );
-          }}
-          onHelpersSearching={() => {
-            setNearbyHelpers([]);
-          }}
-          onSuccess={(id) => {
-            setCurrentBookingId(id);
-          }}
+          onHelpersFound={handleHelpersFound}
+          onHelpersSearching={handleHelpersSearching}
+          onSuccess={handleBookingSuccess}
         />
       )}
     </div>
