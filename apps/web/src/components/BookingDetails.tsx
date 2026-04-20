@@ -104,6 +104,9 @@ interface BookingDetailsProps {
 
 function formatElapsed(value: Date | string) {
   const start = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(start.getTime())) {
+    return "0m";
+  }
   const diffMs = Math.max(0, Date.now() - start.getTime());
   const totalMinutes = Math.floor(diffMs / 60000);
   const hours = Math.floor(totalMinutes / 60);
@@ -402,10 +405,22 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
   const isSearching = booking.status === "requested" || booking.status === "matched";
   const showCustomerLiveGuide = role === "customer" && (isAccepted || isInProgress);
   const inProgressElapsed = isInProgress && booking.startedAt ? formatElapsed(booking.startedAt) : null;
-  const hasMapCoordinates = booking.latitude != null && booking.longitude != null;
+  const parsedLatitude = Number(booking.latitude);
+  const parsedLongitude = Number(booking.longitude);
+  const hasMapCoordinates = Number.isFinite(parsedLatitude) && Number.isFinite(parsedLongitude);
   const customerLocation = hasMapCoordinates
-    ? { lat: Number(booking.latitude), lng: Number(booking.longitude) }
+    ? { lat: parsedLatitude, lng: parsedLongitude }
     : null;
+  const bookingIdShort = typeof booking.id === "string" ? booking.id.slice(0, 8) : "N/A";
+  const quotedAmount = Number.isFinite(Number(booking.quotedAmount)) ? Number(booking.quotedAmount) : 0;
+  const requestedAtDate = new Date(booking.requestedAt);
+  const requestedAtLabel = Number.isNaN(requestedAtDate.getTime())
+    ? "Unavailable"
+    : requestedAtDate.toLocaleString("en-IN");
+  const scheduledForDate = booking.scheduledFor ? new Date(booking.scheduledFor) : null;
+  const scheduledForLabel = scheduledForDate && !Number.isNaN(scheduledForDate.getTime())
+    ? scheduledForDate.toLocaleString("en-IN")
+    : "Unavailable";
   const canCustomerPay = role === "customer" && booking.status === "completed" && payment?.status !== "captured";
   const paymentStatusLabel = payment ? payment.status.replaceAll("_", " ") : "pending";
 
@@ -471,7 +486,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
         </Link>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold truncate">{booking.category?.name || "Booking Details"}</h1>
-          <p className="text-xs text-muted-foreground font-mono">ID: {booking.id.slice(0, 8)}</p>
+          <p className="text-xs text-muted-foreground font-mono">ID: {bookingIdShort}</p>
         </div>
         <div className="shrink-0">
           <StatusBadge status={booking.status} />
@@ -519,14 +534,14 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
               <Clock className="size-4 text-primary mt-1 shrink-0" />
               <div>
                 <p className="text-sm font-medium">Booking Time</p>
-                <p className="text-sm text-muted-foreground">{new Date(booking.requestedAt).toLocaleString("en-IN")}</p>
+                <p className="text-sm text-muted-foreground">{requestedAtLabel}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <IndianRupee className="size-4 text-primary mt-1 shrink-0" />
               <div>
                 <p className="text-sm font-medium">Quoted Amount</p>
-                <p className="text-lg font-bold">₹{booking.quotedAmount.toLocaleString("en-IN")}</p>
+                <p className="text-lg font-bold">₹{quotedAmount.toLocaleString("en-IN")}</p>
               </div>
             </div>
             {booking.scheduledFor && (
@@ -534,7 +549,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
                 <Clock className="size-4 text-primary mt-1 shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Scheduled For</p>
-                  <p className="text-sm text-muted-foreground">{new Date(booking.scheduledFor).toLocaleString("en-IN")}</p>
+                  <p className="text-sm text-muted-foreground">{scheduledForLabel}</p>
                 </div>
               </div>
             )}
@@ -563,7 +578,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">Amount</p>
-                  <p className="text-2xl font-semibold">₹{(payment?.amount ?? booking.quotedAmount).toLocaleString("en-IN")}</p>
+                  <p className="text-2xl font-semibold">₹{(payment?.amount ?? quotedAmount).toLocaleString("en-IN")}</p>
                 </div>
                 <Badge className={
                   payment?.status === "captured"
