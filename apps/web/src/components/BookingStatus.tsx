@@ -159,8 +159,6 @@ export function BookingStatus({ bookingId, onClose }: BookingStatusProps) {
     const data = msg.data as BookingRealtimeEventData | undefined;
     if (!data || data.bookingId !== bookingId) return;
 
-    console.log("🔔 Booking realtime event received:", data);
-
     const snapshot = data.booking ?? data;
     if (msg.event === "matching_update") {
       if (data.status) {

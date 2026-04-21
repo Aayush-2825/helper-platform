@@ -417,8 +417,7 @@ export function HelperOnboardingWizard({
         await onSuccess(formData);
         clearOnboardingDraft();
       } else {
-        // Default: log and show success
-        console.log("Onboarding data:", formData);
+        // Default: show success
         toast.success("✓ Application submitted successfully! You'll hear from us soon.");
         
         // Clear localStorage after successful submit

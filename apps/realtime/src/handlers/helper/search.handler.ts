@@ -210,9 +210,6 @@ export async function helperSearchHandler(userId: string, data: unknown) {
     for (const radius of progressiveRadiusSteps.length > 0 ? progressiveRadiusSteps : [radiusKm]) {
       attemptedRadiusKm = radius;
       const radiusHelpers = await findNearbyHelpers(categoryID, latitude, longitude, radius);
-      console.log(
-        `🔎 [HelperSearch] requestId=${requestId} radius=${radius}km results=${radiusHelpers.length}`,
-      );
 
       if (radiusHelpers.length > 0) {
         helpers = radiusHelpers;
@@ -221,14 +218,8 @@ export async function helperSearchHandler(userId: string, data: unknown) {
     }
 
     if (helpers.length === 0 && city) {
-      console.log(`🏙️ [HelperSearch] requestId=${requestId} falling back to city=${city}`);
       helpers = await findCityHelpers(categoryID, city);
     }
-
-    console.log(
-      `📤 [HelperSearch] requestId=${requestId} sending results=${helpers.length} to user=${userId}`,
-      helpers.map((helper) => helper.userId),
-    );
 
     broadcastEvent({
       event: "helper_search_results",

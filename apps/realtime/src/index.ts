@@ -123,8 +123,6 @@ function sendToUser(userId: string, message: object) {
     }
   });
 
-  console.log(`[WS] Delivered message to user=${userId} sockets=${deliveredCount}`);
-
   // Clean up closed sockets opportunistically.
   userSockets.forEach((client) => {
     if (client.readyState !== WebSocket.OPEN) {
@@ -186,11 +184,6 @@ export function broadcastEvent({
     data,
   };
 
-  console.log("📡 Broadcasting:", event, targetUserIds ?? "ALL");
-  if (Array.isArray(targetUserIds) && targetUserIds.length > 0) {
-    console.log(`📡 Targeted broadcast count=${targetUserIds.length}`, targetUserIds);
-  }
-
   void persistOutboundEvent({ event, data, targetUserIds });
 
   if (targetUserIds && targetUserIds.length > 0) {
@@ -239,10 +232,6 @@ wss.on("connection", (socket: WebSocket, request) => {
   const existingSockets = clients.get(userId) ?? new Set<WebSocket>();
   existingSockets.add(socket);
   clients.set(userId, existingSockets);
-
-  console.log(
-    `[WS] ${userId} connected. Users: ${clients.size}, sockets: ${getTotalActiveSockets()}`,
-  );
 
   // ✅ Connection ack
   socket.send(
@@ -311,9 +300,6 @@ wss.on("connection", (socket: WebSocket, request) => {
         clients.delete(userId);
       }
     }
-    console.log(
-      `[WS] ${userId} disconnected. Users: ${clients.size}, sockets: ${getTotalActiveSockets()}`,
-    );
   });
 
   socket.on("error", (err) => {

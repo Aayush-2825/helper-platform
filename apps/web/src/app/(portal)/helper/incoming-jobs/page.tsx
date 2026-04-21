@@ -292,7 +292,6 @@ export default function HelperPage() {
   }, [userId, activeBookingId]);
 
   const { connected, error: connectionError } = useWebSocket(userId, (msg) => {
-    console.log("[HelperPortal] WS message received", msg);
 
     if (msg.type === "event" && msg.event === "booking_request") {
       const {
@@ -333,12 +332,6 @@ export default function HelperPage() {
         return;
       }
 
-      console.log("[HelperPortal] booking_request accepted for helper", {
-        helperUserId: userId,
-        bookingId,
-        candidateId: matchingCandidate.candidateId,
-      });
-
       const expiresInSeconds = expiresAt
         ? Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
         : undefined;
@@ -363,7 +356,6 @@ export default function HelperPage() {
     if (msg.type === "event" && msg.event === "booking_update") {
       const data = msg.data as { bookingId?: string } | undefined;
       if (data?.bookingId) {
-        console.log("[HelperPortal] booking_update removing request", data.bookingId);
         removeJob(data.bookingId);
       }
     }
