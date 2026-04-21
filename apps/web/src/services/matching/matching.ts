@@ -86,10 +86,6 @@ function buildDistanceExpression(latitude: number, longitude: number) {
 
 export const startMatching = async (bookingData: BookingDataForMatching) => {
   try {
-    console.log(
-      `🔍 [Matching] Starting progressive match for booking: ${bookingData.id} (${bookingData.categoryId})`,
-    );
-
     const latitude = Number(bookingData.latitude);
     const longitude = Number(bookingData.longitude);
     const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
@@ -126,17 +122,12 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
 
       if (allEligibleHelpers.length === 0) {
         await markBookingExpired(bookingData.id, bookingData.customerId, bookingData.city ?? null, now);
-        console.log("❌ [Matching] No scheduled-time eligible helpers found.");
-      } else {
-        console.log(`✅ [Matching] Scheduled booking notified ${allEligibleHelpers.length} helpers.`);
       }
 
       return;
     }
 
     for (const radius of hasCoordinates ? radiusSteps : []) {
-      console.log(`📡 [Matching] Searching within ${radius}km...`);
-
       await publishBookingEvent({
         bookingId: bookingData.id,
         customerId: bookingData.customerId,
@@ -149,20 +140,12 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
       });
 
       if (await isBookingNoLongerMatchable(bookingData.id)) {
-        console.log(
-          `🛑 [Matching] Booking ${bookingData.id} is no longer matchable. Stopping match loop.`,
-        );
         return;
       }
 
       const nearbyHelperIds = hasCoordinates
         ? await findNearbyHelperIds(latitude, longitude, radius, notifiedHelperIds)
         : [];
-
-      console.log(
-        `📡 [Matching] Radius ${radius}km helper ids from presence: ${nearbyHelperIds.length}`,
-        nearbyHelperIds,
-      );
 
       if (nearbyHelperIds.length > 0) {
         const eligibleRadiusHelpers = (await db.query.helperProfile.findMany({
@@ -175,18 +158,11 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
             ),
         })) as MatchedHelperProfile[];
 
-        console.log(
-          `📡 [Matching] Radius ${radius}km eligible helper profiles: ${eligibleRadiusHelpers.length}`,
-          eligibleRadiusHelpers.map((helper) => helper.userId),
-        );
-
         if (eligibleRadiusHelpers.length > 0) {
           allEligibleHelpers = [...allEligibleHelpers, ...eligibleRadiusHelpers];
           eligibleRadiusHelpers.forEach((helper) => notifiedHelperIds.add(helper.userId));
 
           await createAndNotifyCandidates(bookingData, eligibleRadiusHelpers, now);
-
-          console.log("✅ [Matching] Notified current radius helpers.");
         }
       }
 
@@ -198,16 +174,11 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
       });
 
       if (!currentBooking || !isMatchableBookingStatus(currentBooking.status)) {
-        console.log(
-          `🛑 [Matching] Booking ${bookingData.id} is no longer matchable (status: ${currentBooking?.status}).`,
-        );
         return;
       }
     }
 
     if (bookingData.city) {
-      console.log(`🏙️ [Matching] Running city-wide fanout for: ${bookingData.city}`);
-
       await publishBookingEvent({
         bookingId: bookingData.id,
         customerId: bookingData.customerId,
@@ -221,11 +192,6 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
 
       const cityHelpers = await findCityConnectedOrOnlineHelpers(bookingData, notifiedHelperIds);
 
-      console.log(
-        `🏙️ [Matching] City fanout eligible helpers: ${cityHelpers.length}`,
-        cityHelpers.map((helper) => helper.userId),
-      );
-
       if (cityHelpers.length > 0) {
         allEligibleHelpers = [...allEligibleHelpers, ...cityHelpers];
         cityHelpers.forEach((helper) => notifiedHelperIds.add(helper.userId));
@@ -235,11 +201,8 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
 
     if (allEligibleHelpers.length === 0) {
       await markBookingExpired(bookingData.id, bookingData.customerId, bookingData.city ?? null, now);
-      console.log("❌ [Matching] No eligible helpers found even after expansion.");
       return;
     }
-
-    console.log(`✅ [Matching] Success: total ${allEligibleHelpers.length} helpers notified.`);
   } catch (err) {
     console.error("❌ Matching error:", err);
   }
@@ -260,7 +223,6 @@ async function createAndNotifyCandidates(
   });
 
   if (!existingBooking || !["requested", "matched"].includes(existingBooking.status)) {
-    console.log(`🛑 [Matching] Skip candidate create, booking status is ${existingBooking?.status}`);
     return;
   }
 
@@ -274,7 +236,6 @@ async function createAndNotifyCandidates(
   const freshHelpers = helpers.filter((helper) => !existingHelperProfileIds.has(helper.id));
 
   if (freshHelpers.length === 0) {
-    console.log(`ℹ️ [Matching] No fresh helpers to notify for booking ${bookingData.id}`);
     return;
   }
 
@@ -327,11 +288,6 @@ async function createAndNotifyCandidates(
   const customerName = bookingData.customerName?.trim().length
     ? bookingData.customerName
     : "Customer";
-
-  console.log(
-    `📨 [Matching] Publishing booking_request to helpers: ${freshHelpers.length}`,
-    freshHelpers.map((helper) => helper.userId),
-  );
 
   await publishBookingEvent({
     bookingId: bookingData.id,

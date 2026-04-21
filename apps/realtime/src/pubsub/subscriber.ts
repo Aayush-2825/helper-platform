@@ -8,7 +8,6 @@ export function initSubscriber() {
   sub.on("message", (channel, message) => {
     if (channel === "events") {
       const event = JSON.parse(message);
-      console.log("Received event:", event);
       // Handle the event as needed
     }
   });

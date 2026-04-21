@@ -145,10 +145,7 @@ async function connect(connection: Connection) {
   const ws = new WebSocket(wsUrl.toString());
   connection.socket = ws;
 
-  console.log(`[WS] connecting user=${connection.userId} url=${wsUrl.toString()}`);
-
   ws.onopen = () => {
-    console.log(`[WS] connected user=${connection.userId}`);
     connection.reconnectAttempts = 0;
     connection.openListeners.forEach((listener) => listener());
 
@@ -162,7 +159,6 @@ async function connect(connection: Connection) {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data) as WSMessage;
-      console.log(`[WS] message user=${connection.userId} type=${data.type} event=${data.event ?? "-"}`, data);
       connection.messageListeners.forEach((listener) => listener(data));
     } catch {
       console.warn("[WS] Invalid message");
@@ -230,7 +226,6 @@ function subscribe(
 function sendForUser(userId: string, message: WSMessage): boolean {
   const connection = connections.get(userId);
   if (connection?.socket?.readyState === WebSocket.OPEN) {
-    console.log(`[WS] send user=${userId} type=${message.type}`, message);
     connection.socket.send(JSON.stringify(message));
     return true;
   }

@@ -29,8 +29,7 @@ function makePingHandler(socket: { send: SendFn }) {
         socket.send(JSON.stringify({ type: "pong" }));
         return;
       }
-      // non-ping messages are just logged (unfixed behaviour)
-      console.log("[WS] Message:", data);
+      // non-ping messages are ignored
     } catch {
       console.warn("[WS] Invalid message");
     }

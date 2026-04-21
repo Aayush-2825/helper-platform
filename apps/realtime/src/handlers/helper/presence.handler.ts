@@ -39,7 +39,6 @@ export async function presenceHandler(_userId: string, data: unknown) {
             lastHeartbeat: new Date(),
           },
         });
-      console.log(`👤 [Presence] Updated for helper: ${helperUserId} (${status})`);
     } catch (err) {
       console.error("[presenceHandler] DB upsert failed:", err);
     }
@@ -114,8 +113,6 @@ export async function presenceHandler(_userId: string, data: unknown) {
         );
 
         if (validCandidates.length > 0) {
-          console.log(`📡 [Job-Sync] Notifying helper ${helperUserId} about ${validCandidates.length} pending candidate jobs`);
-
           for (const candidate of validCandidates) {
             const b = candidate.booking;
             broadcastEvent({

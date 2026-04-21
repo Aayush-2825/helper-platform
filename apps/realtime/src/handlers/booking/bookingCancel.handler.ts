@@ -29,7 +29,6 @@ export async function bookingCancelHandler(userId: string, data: unknown) {
       .returning({ id: booking.id, customerId: booking.customerId, helperId: booking.helperId });
 
     if (updated.length > 0) {
-      console.log(`🚫 [Manual-Cancel] User ${userId} cancelled booking ${bookingId}`);
       const bookingRow = updated[0]!;
       const resolvedTargets = new Set<string>([bookingRow.customerId]);
 

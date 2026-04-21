@@ -256,9 +256,22 @@ export async function PATCH(request: NextRequest) {
         }
       }
 
-      const participantIds = [...new Set([existing.raisedByUserId, existing.againstUserId].filter(Boolean))];
+      const participantIds = [
+        ...new Set(
+          [existing.raisedByUserId, existing.againstUserId].filter(
+            (participantId): participantId is string => Boolean(participantId),
+          ),
+        ),
+      ];
 
-      const events = [
+      const events: Array<{
+        id: string;
+        userId: string;
+        channel: string;
+        templateKey: string;
+        status: "queued" | "sent" | "failed";
+        payload: Record<string, unknown>;
+      }> = [
         {
           id: crypto.randomUUID(),
           userId: session.user.id,

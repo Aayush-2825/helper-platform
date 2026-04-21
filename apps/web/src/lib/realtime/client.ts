@@ -157,18 +157,9 @@ export function publishBookingEvent(input: {
     targetUserIds,
   };
 
-  console.log("[RealtimeClient] publishBookingEvent", {
-    bookingId: input.bookingId,
-    eventType: input.eventType,
-    wsEvent,
-    targetUserIds,
-    candidateCount: Array.isArray(data.candidates) ? data.candidates.length : 0,
-  });
-
   // 🔥 Step 3: Dispatch (HTTP if server, WS if client)
   if (typeof window === "undefined") {
     // 🧠 On server, we must use HTTP because there is no per-user WS connection
-    console.log("[RealtimeClient] dispatch via HTTP /api/realtime/broadcast", payload);
     return postJson("/api/realtime/broadcast", payload, getRealtimeBroadcastHeaders())
       .then(async () => {
         if (!shouldNotifyCustomerForMatching) {
@@ -195,12 +186,6 @@ export function publishBookingEvent(input: {
       });
   } else {
     // 🌐 On client, we can use the existing WS connection
-    console.log("[RealtimeClient] dispatch via browser WS", {
-      type: wsEvent,
-      bookingId: input.bookingId,
-      eventType: input.eventType,
-      targetUserIds,
-    });
     wsSend({
       type: wsEvent,
       bookingId: input.bookingId,
