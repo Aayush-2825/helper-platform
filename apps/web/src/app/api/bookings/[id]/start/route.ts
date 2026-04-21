@@ -82,34 +82,42 @@ export async function POST(
       );
     }
 
-    const updatedRows = await db
-      .update(booking)
-      .set({
-        status: "in_progress",
-        startedAt: now,
-        helperPhoneVisibleAt: now,
-        updatedAt: now,
-      })
-      .where(and(eq(booking.id, bookingId), eq(booking.status, "accepted")))
-      .returning();
+    const updatedBooking = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(booking)
+        .set({
+          status: "in_progress",
+          startedAt: now,
+          helperPhoneVisibleAt: now,
+          updatedAt: now,
+        })
+        .where(and(eq(booking.id, bookingId), eq(booking.status, "accepted")))
+        .returning();
 
-    if (updatedRows.length === 0) {
+      if (!row) {
+        return null;
+      }
+
+      await tx.insert(bookingStatusEvent).values({
+        id: crypto.randomUUID(),
+        bookingId,
+        status: "in_progress",
+        actorUserId: session.user.id,
+        note: "Helper started booking",
+        metadata: {
+          startedAt: row.startedAt?.toISOString(),
+        },
+      });
+
+      return row;
+    });
+
+    if (!updatedBooking) {
       return NextResponse.json(
         { message: "Booking not found or not in accepted state." },
         { status: 400, headers: NO_STORE_HEADERS },
       );
     }
-
-    await db.insert(bookingStatusEvent).values({
-      id: crypto.randomUUID(),
-      bookingId,
-      status: "in_progress",
-      actorUserId: session.user.id,
-      note: "Helper started booking",
-      metadata: {
-        startedAt: updatedRows[0].startedAt?.toISOString(),
-      },
-    });
 
     await publishBookingEvent({
       bookingId,
@@ -117,15 +125,15 @@ export async function POST(
       helperId: session.user.id,
       eventType: "in_progress",
       data: {
-        startedAt: updatedRows[0].startedAt?.toISOString(),
-        booking: updatedRows[0],
+        startedAt: updatedBooking.startedAt?.toISOString(),
+        booking: updatedBooking,
       },
     });
 
     return NextResponse.json(
       {
         message: "Booking started successfully.",
-        booking: updatedRows[0],
+        booking: updatedBooking,
       },
       { status: 200, headers: NO_STORE_HEADERS },
     );

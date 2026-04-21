@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { and, eq, gte, inArray, lte, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, ne, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import {
@@ -208,6 +208,34 @@ export async function POST(
     });
 
     const updatedRows = await db.transaction(async (tx) => {
+      if (!isScheduledBooking) {
+        // Serialize immediate-accept attempts per helper to avoid double acceptance races.
+        await tx.execute(
+          sql`select ${helperProfile.id} from ${helperProfile} where ${helperProfile.id} = ${profile.id} for update`,
+        );
+
+        const immediateConflictWindowEnd = new Date(
+          now.getTime() + SCHEDULE_CONFLICT_WINDOW_MINUTES * 60 * 1000,
+        );
+
+        const activeImmediateBookings = await tx.query.booking.findMany({
+          where: and(
+            eq(booking.helperId, session.user.id),
+            inArray(booking.status, ["accepted", "in_progress"]),
+            ne(booking.id, bookingId),
+            or(
+              sql`${booking.scheduledFor} IS NULL`,
+              lte(booking.scheduledFor, immediateConflictWindowEnd),
+            ),
+          ),
+          columns: { id: true },
+        });
+
+        if (activeImmediateBookings.length > 0) {
+          throw new Error("HELPER_ACTIVE_BOOKING_CONFLICT");
+        }
+      }
+
       const rows = await tx
         .update(booking)
         .set({
@@ -291,6 +319,16 @@ export async function POST(
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (err) {
+    if (err instanceof Error && err.message === "HELPER_ACTIVE_BOOKING_CONFLICT") {
+      return NextResponse.json(
+        {
+          message:
+            "You already have an active booking. Complete or reject current jobs before accepting another immediate request.",
+        },
+        { status: 409, headers: NO_STORE_HEADERS },
+      );
+    }
+
     console.error("Accept booking error:", err);
 
     return NextResponse.json(

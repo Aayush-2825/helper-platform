@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
-import { helperProfile } from "@/db/schema";
+import { helperProfile, notificationEvent } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
@@ -32,7 +32,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const existing = await db.query.helperProfile.findFirst({
       where: eq(helperProfile.id, id),
-      columns: { id: true },
+      columns: {
+        id: true,
+        userId: true,
+        availabilityStatus: true,
+      },
     });
 
     if (!existing) {
@@ -42,18 +46,74 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       );
     }
 
-    const [updated] = await db
-      .update(helperProfile)
-      .set({
-        availabilityStatus: parsed.data.availabilityStatus,
-        updatedAt: new Date(),
-      })
-      .where(eq(helperProfile.id, id))
-      .returning({
-        id: helperProfile.id,
-        availabilityStatus: helperProfile.availabilityStatus,
-        updatedAt: helperProfile.updatedAt,
-      });
+    const now = new Date();
+
+    const [updated] = await db.transaction(async (tx) => {
+      const [updatedHelper] = await tx
+        .update(helperProfile)
+        .set({
+          availabilityStatus: parsed.data.availabilityStatus,
+          updatedAt: now,
+        })
+        .where(eq(helperProfile.id, id))
+        .returning({
+          id: helperProfile.id,
+          availabilityStatus: helperProfile.availabilityStatus,
+          updatedAt: helperProfile.updatedAt,
+        });
+
+      if (!updatedHelper) {
+        return [null as unknown as typeof updatedHelper];
+      }
+
+      const events: Array<{
+        id: string;
+        userId: string;
+        channel: string;
+        templateKey: string;
+        status: string;
+        payload: Record<string, unknown>;
+      }> = [
+        {
+          id: crypto.randomUUID(),
+          userId: session.user.id,
+          channel: "admin_audit",
+          templateKey: "admin.helper.availability_updated",
+          status: "queued",
+          payload: {
+            action: "helper_availability_updated",
+            helperProfileId: existing.id,
+            helperUserId: existing.userId,
+            previousAvailabilityStatus: existing.availabilityStatus,
+            nextAvailabilityStatus: parsed.data.availabilityStatus,
+            updatedAt: now.toISOString(),
+          },
+        },
+        {
+          id: crypto.randomUUID(),
+          userId: existing.userId,
+          channel: "in_app",
+          templateKey: "helper.availability_updated",
+          status: "queued",
+          payload: {
+            previousAvailabilityStatus: existing.availabilityStatus,
+            nextAvailabilityStatus: parsed.data.availabilityStatus,
+            message: `Your availability was updated to ${parsed.data.availabilityStatus} by admin.`,
+          },
+        },
+      ];
+
+      await tx.insert(notificationEvent).values(events);
+
+      return [updatedHelper];
+    });
+
+    if (!updated) {
+      return NextResponse.json(
+        { message: "Helper profile not found." },
+        { status: 404, headers: NO_STORE_HEADERS },
+      );
+    }
 
     return NextResponse.json(
       { message: "Helper availability updated.", helper: updated },

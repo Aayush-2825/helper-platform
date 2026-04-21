@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { booking, paymentTransaction } from "@/db/schema";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
+import { canTransitionPaymentStatus } from "@/lib/payments/status";
 import { ensureBookingReceipt } from "@/lib/receipts";
 import { verifyRazorpayWebhookSignature } from "@/lib/payments/razorpay";
 import { publishPaymentUpdate } from "@/lib/realtime/client";
@@ -50,8 +51,17 @@ function mapStatusFromEvent(eventName: string, entity: RazorpayWebhookEntity) {
   return null;
 }
 
+function asMetadataRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const webhookEventId = request.headers.get("x-razorpay-event-id")?.trim() || undefined;
     const signature = request.headers.get("x-razorpay-signature");
     if (!signature) {
       return NextResponse.json(
@@ -124,6 +134,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const existingMetadata = asMetadataRecord(paymentRecord.metadata);
+    const previousWebhookEventId =
+      typeof existingMetadata.webhookEventId === "string"
+        ? existingMetadata.webhookEventId
+        : undefined;
+
+    if (webhookEventId && previousWebhookEventId === webhookEventId) {
+      return NextResponse.json(
+        { message: "Webhook already processed." },
+        { status: 200, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    const bookingRecord = await db.query.booking.findFirst({
+      where: eq(booking.id, paymentRecord.bookingId),
+      columns: {
+        status: true,
+        helperId: true,
+      },
+    });
+
+    if (!bookingRecord) {
+      return NextResponse.json(
+        { message: "Booking not found. Ignored." },
+        { status: 200, headers: NO_STORE_HEADERS },
+      );
+    }
+
     const isAlreadyApplied =
       paymentRecord.status === targetStatus &&
       (!providerPaymentId || paymentRecord.providerPaymentId === providerPaymentId);
@@ -132,6 +170,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { message: "Webhook already processed." },
         { status: 200, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    if (!canTransitionPaymentStatus(paymentRecord.status, targetStatus)) {
+      return NextResponse.json(
+        { message: "Webhook transition rejected." },
+        { status: 409, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    if (targetStatus === "captured" && bookingRecord.status !== "completed") {
+      return NextResponse.json(
+        { message: "Capture deferred until booking is completed." },
+        { status: 409, headers: NO_STORE_HEADERS },
       );
     }
 
@@ -153,23 +205,32 @@ export async function POST(request: NextRequest) {
             ? (paymentEntity.error_description ?? paymentRecord.failureReason ?? null)
             : paymentRecord.failureReason,
         metadata: {
+          ...existingMetadata,
           webhookEvent: eventName,
+          webhookEventId: webhookEventId ?? previousWebhookEventId ?? null,
           webhookProcessedAt: now.toISOString(),
           providerStatus: paymentEntity.status ?? null,
         },
         updatedAt: now,
       })
-      .where(eq(paymentTransaction.id, paymentRecord.id))
+      .where(
+        and(
+          eq(paymentTransaction.id, paymentRecord.id),
+          eq(paymentTransaction.updatedAt, paymentRecord.updatedAt),
+        ),
+      )
       .returning();
+
+    if (!updatedPayment) {
+      return NextResponse.json(
+        { message: "Webhook already processed." },
+        { status: 200, headers: NO_STORE_HEADERS },
+      );
+    }
 
     await ensureBookingReceipt({
       bookingId: paymentRecord.bookingId,
       paymentTransactionId: updatedPayment.id,
-    });
-
-    const bookingRecord = await db.query.booking.findFirst({
-      where: eq(booking.id, paymentRecord.bookingId),
-      columns: { helperId: true },
     });
 
     const targetUserIds = [paymentRecord.customerId, bookingRecord?.helperId]

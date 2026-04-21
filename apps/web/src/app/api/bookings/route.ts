@@ -59,6 +59,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (session.user.role !== "customer" && session.user.role !== "user") {
+      return NextResponse.json(
+        { message: "Only customers can create bookings." },
+        { status: 403, headers: NO_STORE_HEADERS },
+      );
+    }
+
     const body = await request.json();
 
     // ✅ Validate input

@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { booking, bookingStatusEvent } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
@@ -77,29 +77,51 @@ export async function POST(
     }
 
     const now = new Date();
-    const [updatedBooking] = await db
-      .update(booking)
-      .set({
-        status: "cancelled",
-        cancelledAt: now,
-        cancelledBy: "customer",
-        cancellationReason: reason,
-        updatedAt: now,
-      })
-      .where(eq(booking.id, bookingId))
-      .returning();
+    const updatedBooking = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(booking)
+        .set({
+          status: "cancelled",
+          cancelledAt: now,
+          cancelledBy: "customer",
+          cancellationReason: reason,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(booking.id, bookingId),
+            eq(booking.status, existingBooking.status),
+          ),
+        )
+        .returning();
 
-    await db.insert(bookingStatusEvent).values({
-      id: crypto.randomUUID(),
-      bookingId,
-      status: "cancelled",
-      actorUserId: session.user.id,
-      note: "Customer cancelled booking",
-      metadata: {
-        cancelledBy: "customer",
-        reason,
-      },
+      if (!row) {
+        return null;
+      }
+
+      await tx.insert(bookingStatusEvent).values({
+        id: crypto.randomUUID(),
+        bookingId,
+        status: "cancelled",
+        actorUserId: session.user.id,
+        note: "Customer cancelled booking",
+        metadata: {
+          cancelledBy: "customer",
+          reason,
+        },
+      });
+
+      return row;
     });
+
+    if (!updatedBooking) {
+      return apiError({
+        requestId,
+        message: "Booking state changed. Please refresh and try again.",
+        code: "BOOKING_STATE_CONFLICT",
+        status: 409,
+      });
+    }
 
     // Notify realtime
     await publishBookingEvent({

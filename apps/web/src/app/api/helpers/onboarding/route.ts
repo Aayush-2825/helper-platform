@@ -104,6 +104,12 @@ async function getHelperStatus(userId: string) {
   };
 }
 
+function canResubmitOnboarding(
+  verificationStatus: "pending" | "approved" | "rejected" | "resubmission_required" | null,
+) {
+  return verificationStatus === "rejected" || verificationStatus === "resubmission_required";
+}
+
 function getEntry(source: FormData | Record<string, unknown>, key: string): unknown {
   return source instanceof FormData ? source.get(key) : source[key];
 }
@@ -487,7 +493,18 @@ export async function POST(request: NextRequest) {
     }
 
     const existingStatus = await getHelperStatus(session.user.id);
-    if (existingStatus.hasProfile) {
+    const existingProfile = existingStatus.hasProfile
+      ? await db.query.helperProfile.findFirst({
+          where: eq(helperProfile.userId, session.user.id),
+          columns: {
+            id: true,
+            organizationId: true,
+            verificationStatus: true,
+          },
+        })
+      : null;
+
+    if (existingStatus.hasProfile && !canResubmitOnboarding(existingStatus.verificationStatus)) {
       return NextResponse.json(existingStatus, {
         status: 200,
         headers: NO_STORE_HEADERS,
@@ -510,47 +527,92 @@ export async function POST(request: NextRequest) {
     const profilePhotoUrl = await persistUpload(data.profilePhotoUrl, ["helpers", session.user.id, "profile"]);
     const organizationLogoUrl = await persistUpload(data.logoUrl, ["helpers", session.user.id, "assets"]);
 
-    let organizationId: string | null = null;
+    let organizationId: string | null = existingProfile?.organizationId ?? null;
     if (data.helperType === "agency") {
       const businessName = data.businessName || `${session.user.name}'s agency`;
-      const result = await db
-        .insert(organization)
-        .values({
-          id: crypto.randomUUID(),
-          name: businessName,
-          slug: `${businessName.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`,
-          logo: organizationLogoUrl || null,
-          metadata: JSON.stringify({
-            businessAddress: data.businessAddress,
-            gstNumber: data.gstNumber || null,
-            ownerName: data.ownerName || null,
-            workerTypesOffered: data.workerTypesOffered,
-            numberOfWorkers: data.numberOfWorkers ?? null,
-          }),
-        })
-        .returning();
+      if (organizationId) {
+        await db
+          .update(organization)
+          .set({
+            name: businessName,
+            logo: organizationLogoUrl || null,
+            metadata: JSON.stringify({
+              businessAddress: data.businessAddress,
+              gstNumber: data.gstNumber || null,
+              ownerName: data.ownerName || null,
+              workerTypesOffered: data.workerTypesOffered,
+              numberOfWorkers: data.numberOfWorkers ?? null,
+            }),
+          })
+          .where(eq(organization.id, organizationId));
+      } else {
+        const result = await db
+          .insert(organization)
+          .values({
+            id: crypto.randomUUID(),
+            name: businessName,
+            slug: `${businessName.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`,
+            logo: organizationLogoUrl || null,
+            metadata: JSON.stringify({
+              businessAddress: data.businessAddress,
+              gstNumber: data.gstNumber || null,
+              ownerName: data.ownerName || null,
+              workerTypesOffered: data.workerTypesOffered,
+              numberOfWorkers: data.numberOfWorkers ?? null,
+            }),
+          })
+          .returning();
 
-      organizationId = result[0]?.id || null;
+        organizationId = result[0]?.id || null;
+      }
+    } else {
+      organizationId = null;
     }
 
-    const result = await db
-      .insert(helperProfile)
-      .values({
-        id: crypto.randomUUID(),
-        userId: session.user.id,
-        organizationId,
-        primaryCategory: normalizePrimaryCategory(data.primaryCategory),
-        headline: data.bio?.substring(0, 100) || null,
-        bio: data.bio || null,
-        yearsExperience: data.yearsExperience || 0,
-        serviceCity: data.city || null,
-        serviceRadiusKm: data.serviceRadiusKm || 8,
-        verificationStatus: "pending",
-        availabilityStatus: data.isOnline ? "online" : "offline",
-      })
-      .returning();
+    const createdProfile = existingProfile
+      ? (
+          await db
+            .update(helperProfile)
+            .set({
+              organizationId,
+              primaryCategory: normalizePrimaryCategory(data.primaryCategory),
+              headline: data.bio?.substring(0, 100) || null,
+              bio: data.bio || null,
+              yearsExperience: data.yearsExperience || 0,
+              serviceCity: data.city || null,
+              serviceRadiusKm: data.serviceRadiusKm || 8,
+              verificationStatus: "pending",
+              availabilityStatus: "offline",
+              isActive: false,
+              updatedAt: new Date(),
+            })
+            .where(eq(helperProfile.id, existingProfile.id))
+            .returning({ id: helperProfile.id })
+        )[0]
+      : (
+          await db
+            .insert(helperProfile)
+            .values({
+              id: crypto.randomUUID(),
+              userId: session.user.id,
+              organizationId,
+              primaryCategory: normalizePrimaryCategory(data.primaryCategory),
+              headline: data.bio?.substring(0, 100) || null,
+              bio: data.bio || null,
+              yearsExperience: data.yearsExperience || 0,
+              serviceCity: data.city || null,
+              serviceRadiusKm: data.serviceRadiusKm || 8,
+              verificationStatus: "pending",
+              availabilityStatus: data.isOnline ? "online" : "offline",
+            })
+            .returning({ id: helperProfile.id })
+        )[0];
 
-    const createdProfile = result[0];
+    if (existingProfile) {
+      await db
+        .delete(helperKycDocument)
+        .where(eq(helperKycDocument.helperProfileId, existingProfile.id));
+    }
 
     const kycUploads: Array<{
       documentType: string;
@@ -638,7 +700,9 @@ export async function POST(request: NextRequest) {
         ...nextStatus,
         id: createdProfile.id,
         status: "pending",
-        message: "Application submitted successfully. Verification in progress.",
+        message: existingProfile
+          ? "Application resubmitted successfully. Verification is in progress."
+          : "Application submitted successfully. Verification in progress.",
       },
       { status: 201, headers: NO_STORE_HEADERS }
     );

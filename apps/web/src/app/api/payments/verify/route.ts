@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { booking, paymentTransaction } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
+import { canTransitionPaymentStatus } from "@/lib/payments/status";
 import { ensureBookingReceipt } from "@/lib/receipts";
 import { publishPaymentUpdate } from "@/lib/realtime/client";
 import { verifyRazorpayPaymentSignature } from "@/lib/payments/razorpay";
@@ -60,14 +61,56 @@ export async function POST(request: NextRequest) {
 
     const bookingRecord = await db.query.booking.findFirst({
       where: eq(booking.id, paymentRecord.bookingId),
-      columns: { helperId: true },
+      columns: {
+        status: true,
+        helperId: true,
+      },
     });
+
+    if (!bookingRecord) {
+      return NextResponse.json(
+        { message: "Booking not found." },
+        { status: 404, headers: NO_STORE_HEADERS },
+      );
+    }
 
     const targets = [paymentRecord.customerId, bookingRecord?.helperId]
       .filter(Boolean) as string[];
 
+    const isAlreadyCaptured =
+      paymentRecord.status === "captured" &&
+      paymentRecord.providerPaymentId === razorpayPaymentId;
+
+    if (isAlreadyCaptured) {
+      return NextResponse.json(
+        {
+          message: "Payment already verified.",
+          payment: paymentRecord,
+        },
+        { status: 200, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    if (
+      paymentRecord.status === "captured" &&
+      paymentRecord.providerPaymentId &&
+      paymentRecord.providerPaymentId !== razorpayPaymentId
+    ) {
+      return NextResponse.json(
+        { message: "Payment already captured with a different provider payment id." },
+        { status: 409, headers: NO_STORE_HEADERS },
+      );
+    }
+
     if (!isValid) {
-      await db
+      if (!canTransitionPaymentStatus(paymentRecord.status, "failed")) {
+        return NextResponse.json(
+          { message: "Payment verification failed." },
+          { status: 400, headers: NO_STORE_HEADERS },
+        );
+      }
+
+      const [failedPayment] = await db
         .update(paymentTransaction)
         .set({
           status: "failed",
@@ -77,15 +120,28 @@ export async function POST(request: NextRequest) {
           failureReason: "Payment signature verification failed.",
           updatedAt: new Date(),
         })
-        .where(eq(paymentTransaction.id, paymentRecord.id));
+        .where(
+          and(
+            eq(paymentTransaction.id, paymentRecord.id),
+            eq(paymentTransaction.updatedAt, paymentRecord.updatedAt),
+          ),
+        )
+        .returning();
+
+      if (!failedPayment) {
+        return NextResponse.json(
+          { message: "Payment verification failed." },
+          { status: 400, headers: NO_STORE_HEADERS },
+        );
+      }
 
       await publishPaymentUpdate({
-        bookingId: paymentRecord.bookingId,
-        paymentId: paymentRecord.id,
-        status: "failed",
+        bookingId: failedPayment.bookingId,
+        paymentId: failedPayment.id,
+        status: failedPayment.status,
         targetUserIds: targets,
-        amount: paymentRecord.amount,
-        currency: paymentRecord.currency,
+        amount: failedPayment.amount,
+        currency: failedPayment.currency,
         providerOrderId: razorpayOrderId,
         providerPaymentId: razorpayPaymentId,
         failureCode: "INVALID_SIGNATURE",
@@ -95,6 +151,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { message: "Payment verification failed." },
         { status: 400, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    if (!canTransitionPaymentStatus(paymentRecord.status, "captured")) {
+      return NextResponse.json(
+        { message: "Payment transition rejected." },
+        { status: 409, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    if (bookingRecord.status !== "completed") {
+      return NextResponse.json(
+        { message: "Payment cannot be captured before booking completion." },
+        { status: 409, headers: NO_STORE_HEADERS },
       );
     }
 
@@ -109,21 +179,33 @@ export async function POST(request: NextRequest) {
         failureReason: null,
         updatedAt: new Date(),
       })
-      .where(eq(paymentTransaction.id, paymentRecord.id))
+      .where(
+        and(
+          eq(paymentTransaction.id, paymentRecord.id),
+          eq(paymentTransaction.updatedAt, paymentRecord.updatedAt),
+        ),
+      )
       .returning();
 
+    if (!updatedPayment) {
+      return NextResponse.json(
+        { message: "Payment already verified." },
+        { status: 200, headers: NO_STORE_HEADERS },
+      );
+    }
+
     await ensureBookingReceipt({
-      bookingId: paymentRecord.bookingId,
+      bookingId: updatedPayment.bookingId,
       paymentTransactionId: updatedPayment.id,
     });
 
     await publishPaymentUpdate({
-      bookingId: paymentRecord.bookingId,
-      paymentId: paymentRecord.id,
-      status: "captured",
+      bookingId: updatedPayment.bookingId,
+      paymentId: updatedPayment.id,
+      status: updatedPayment.status,
       targetUserIds: targets,
-      amount: paymentRecord.amount,
-      currency: paymentRecord.currency,
+      amount: updatedPayment.amount,
+      currency: updatedPayment.currency,
       providerOrderId: razorpayOrderId,
       providerPaymentId: razorpayPaymentId,
     });

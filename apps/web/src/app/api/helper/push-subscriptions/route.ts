@@ -36,6 +36,10 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
+    if (session.user.role !== "helper") {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403, headers: NO_STORE_HEADERS });
+    }
+
     const profile = await requireHelperProfile(session.user.id);
     if (!profile) {
       return NextResponse.json({ message: "Helper profile not found." }, { status: 404, headers: NO_STORE_HEADERS });
@@ -67,6 +71,10 @@ export async function POST(request: Request) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
+    }
+
+    if (session.user.role !== "helper") {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403, headers: NO_STORE_HEADERS });
     }
 
     const profile = await requireHelperProfile(session.user.id);
@@ -120,6 +128,10 @@ export async function DELETE(request: Request) {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
+    }
+
+    if (session.user.role !== "helper") {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403, headers: NO_STORE_HEADERS });
     }
 
     const profile = await requireHelperProfile(session.user.id);

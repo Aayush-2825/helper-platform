@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
-import { helperKycDocument, helperProfile } from "@/db/schema";
+import { helperKycDocument, helperProfile, notificationEvent } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
@@ -108,39 +108,139 @@ export async function PATCH(request: NextRequest) {
     }
 
     const now = new Date();
-    const nextProfileStatus =
-      parsed.data.status === "approved" ? "approved" : "resubmission_required";
 
-    const [updatedDocument] = await db
-      .update(helperKycDocument)
-      .set({
-        status: parsed.data.status,
-        reviewedByUserId: session.user.id,
-        reviewedAt: now,
-        rejectionReason:
-          parsed.data.status === "approved"
-            ? null
-            : parsed.data.rejectionReason ?? "Verification requires another submission.",
-        updatedAt: now,
-      })
-      .where(eq(helperKycDocument.id, document.id))
-      .returning();
-
-    if (document.helperProfileId) {
-      await db
-        .update(helperProfile)
+    const updated = await db.transaction(async (tx) => {
+      const [updatedDocument] = await tx
+        .update(helperKycDocument)
         .set({
-          verificationStatus: nextProfileStatus,
-          isActive: parsed.data.status === "approved" ? true : document.helperProfile ? document.helperProfile.verificationStatus === "approved" : false,
+          status: parsed.data.status,
+          reviewedByUserId: session.user.id,
+          reviewedAt: now,
+          rejectionReason:
+            parsed.data.status === "approved"
+              ? null
+              : parsed.data.rejectionReason ?? "Verification requires another submission.",
           updatedAt: now,
         })
-        .where(eq(helperProfile.id, document.helperProfileId));
+        .where(eq(helperKycDocument.id, document.id))
+        .returning();
+
+      if (!updatedDocument) {
+        return null;
+      }
+
+      let helperUserId = document.helperProfile?.userId ?? null;
+      let nextProfileStatus: "pending" | "approved" | "resubmission_required" | null = null;
+
+      if (document.helperProfileId) {
+        const profileDocs = await tx.query.helperKycDocument.findMany({
+          where: eq(helperKycDocument.helperProfileId, document.helperProfileId),
+          columns: { status: true },
+        });
+
+        const hasResubmissionRequired = profileDocs.some(
+          (profileDoc) =>
+            profileDoc.status === "rejected" ||
+            profileDoc.status === "resubmission_required",
+        );
+        const allApproved =
+          profileDocs.length > 0 &&
+          profileDocs.every((profileDoc) => profileDoc.status === "approved");
+
+        nextProfileStatus = allApproved
+          ? "approved"
+          : hasResubmissionRequired
+            ? "resubmission_required"
+            : "pending";
+
+        const [updatedProfile] = await tx
+          .update(helperProfile)
+          .set({
+            verificationStatus: nextProfileStatus,
+            isActive: nextProfileStatus === "approved",
+            updatedAt: now,
+          })
+          .where(eq(helperProfile.id, document.helperProfileId))
+          .returning({
+            userId: helperProfile.userId,
+          });
+
+        helperUserId = updatedProfile?.userId ?? helperUserId;
+      }
+
+      const helperNotificationMessage =
+        parsed.data.status === "approved"
+          ? "One of your verification documents was approved. We will notify you once all required documents are approved."
+          : parsed.data.rejectionReason ?? "A verification document needs resubmission.";
+
+      const helperNotificationPayload = {
+        documentId: updatedDocument.id,
+        helperProfileId: updatedDocument.helperProfileId,
+        documentType: updatedDocument.documentType,
+        documentStatus: updatedDocument.status,
+        profileVerificationStatus: nextProfileStatus,
+        rejectionReason: updatedDocument.rejectionReason,
+      };
+
+      const events: Array<{
+        id: string;
+        userId: string;
+        channel: string;
+        templateKey: string;
+        status: string;
+        payload: Record<string, unknown>;
+      }> = [
+        {
+          id: crypto.randomUUID(),
+          userId: session.user.id,
+          channel: "admin_audit",
+          templateKey: "verification.document.reviewed",
+          status: "queued",
+          payload: {
+            action: "verification_document_reviewed",
+            documentId: updatedDocument.id,
+            helperProfileId: updatedDocument.helperProfileId,
+            decision: updatedDocument.status,
+            profileVerificationStatus: nextProfileStatus,
+            reviewedAt: now.toISOString(),
+          },
+        },
+      ];
+
+      if (helperUserId) {
+        events.push({
+          id: crypto.randomUUID(),
+          userId: helperUserId,
+          channel: "in_app",
+          templateKey: "verification.document.updated",
+          status: "queued",
+          payload: {
+            message: helperNotificationMessage,
+            ...helperNotificationPayload,
+          },
+        });
+      }
+
+      await tx.insert(notificationEvent).values(events);
+
+      return {
+        document: updatedDocument,
+        profileVerificationStatus: nextProfileStatus,
+      };
+    });
+
+    if (!updated) {
+      return NextResponse.json(
+        { message: "Verification document not found." },
+        { status: 404, headers: NO_STORE_HEADERS },
+      );
     }
 
     return NextResponse.json(
       {
         message: "Verification updated successfully.",
-        document: updatedDocument,
+        document: updated.document,
+        profileVerificationStatus: updated.profileVerificationStatus,
       },
       { status: 200, headers: NO_STORE_HEADERS },
     );

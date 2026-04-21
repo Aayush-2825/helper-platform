@@ -7,6 +7,8 @@ import { auth } from "@/lib/auth/server";
 import { booking, helperProfile, review } from "@/db/schema";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
+const REVIEW_SUBMISSION_WINDOW_DAYS = 30;
+
 export async function GET() {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -14,6 +16,13 @@ export async function GET() {
       return NextResponse.json(
         { message: "Unauthorized" },
         { status: 401, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    if (session.user.role !== "customer" && session.user.role !== "user") {
+      return NextResponse.json(
+        { message: "Forbidden" },
+        { status: 403, headers: NO_STORE_HEADERS },
       );
     }
 
@@ -52,6 +61,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (session.user.role !== "customer" && session.user.role !== "user") {
+      return NextResponse.json(
+        { message: "Forbidden" },
+        { status: 403, headers: NO_STORE_HEADERS },
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const bookingId = typeof body.bookingId === "string" ? body.bookingId : "";
     const rating = Number(body.rating);
@@ -77,6 +93,7 @@ export async function POST(request: Request) {
         id: true,
         status: true,
         helperProfileId: true,
+        completedAt: true,
       },
     });
 
@@ -98,6 +115,24 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { message: "This booking has no helper profile to review." },
         { status: 400, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    if (!bookingRecord.completedAt) {
+      return NextResponse.json(
+        { message: "Completed bookings must include a completion timestamp." },
+        { status: 409, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    const reviewWindowEndsAt = new Date(bookingRecord.completedAt);
+    reviewWindowEndsAt.setDate(reviewWindowEndsAt.getDate() + REVIEW_SUBMISSION_WINDOW_DAYS);
+    if (Date.now() > reviewWindowEndsAt.getTime()) {
+      return NextResponse.json(
+        {
+          message: `Reviews can only be submitted within ${REVIEW_SUBMISSION_WINDOW_DAYS} days of booking completion.`,
+        },
+        { status: 409, headers: NO_STORE_HEADERS },
       );
     }
 

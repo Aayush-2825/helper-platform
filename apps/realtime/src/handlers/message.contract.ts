@@ -8,12 +8,6 @@ function assertRecord(data: unknown): asserts data is Record<string, unknown> {
 
 function validateMessageByType(data: Record<string, unknown>) {
   switch (data.type) {
-    case "booking_request":
-      validateRequired(data, ["bookingId", "targetUserIds"], "booking_request");
-      break;
-    case "booking_update":
-      validateRequired(data, ["bookingId"], "booking_update");
-      break;
     case "helper_search":
       validateRequired(data, ["categoryID", "latitude", "longitude"], "helper_search");
       break;
@@ -22,9 +16,6 @@ function validateMessageByType(data: Record<string, unknown>) {
       break;
     case "location_update":
       validateRequired(data, ["helperUserId", "bookingId", "latitude", "longitude"], "location_update");
-      break;
-    case "notification":
-      // Intentionally flexible for cross-domain notifications.
       break;
     default:
       throw new ValidationError(`Unsupported message type: ${String(data.type)}`, "UNSUPPORTED_TYPE");
