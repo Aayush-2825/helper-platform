@@ -54,7 +54,7 @@ export async function GET(
             where: eq(helperProfile.userId, session.user.id),
         });
 
-        if (!profile || bookingResult.helperId !== profile.id) {
+      if (!profile || bookingResult.helperProfileId !== profile.id) {
             return NextResponse.json({ message: "Forbidden" }, { status: 403, headers: NO_STORE_HEADERS });
         }
     }

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
-import { helperProfile, user } from "@/db/schema";
+import { helperProfile, notificationEvent, user } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
@@ -60,14 +60,56 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const activate = parsed.data.action === "activate";
 
-    await db
-      .update(helperProfile)
-      .set({
-        isActive: activate,
-        availabilityStatus: "offline",
-        updatedAt: new Date(),
-      })
-      .where(eq(helperProfile.id, helper.id));
+    const now = new Date();
+    await db.transaction(async (tx) => {
+      await tx
+        .update(helperProfile)
+        .set({
+          isActive: activate,
+          availabilityStatus: "offline",
+          updatedAt: now,
+        })
+        .where(eq(helperProfile.id, helper.id));
+
+      const events: Array<{
+        id: string;
+        userId: string;
+        channel: string;
+        templateKey: string;
+        status: string;
+        payload: Record<string, unknown>;
+      }> = [
+        {
+          id: crypto.randomUUID(),
+          userId: session.user.id,
+          channel: "admin_audit",
+          templateKey: "admin.helper.account_status_updated",
+          status: "queued",
+          payload: {
+            action: activate ? "helper_account_activated" : "helper_account_suspended",
+            helperUserId: id,
+            helperProfileId: helper.id,
+            updatedAt: now.toISOString(),
+          },
+        },
+        {
+          id: crypto.randomUUID(),
+          userId: id,
+          channel: "in_app",
+          templateKey: "helper.account_status_updated",
+          status: "queued",
+          payload: {
+            isActive: activate,
+            availabilityStatus: "offline",
+            message: activate
+              ? "Your helper account has been reactivated by admin. Set your availability when ready."
+              : "Your helper account has been suspended by admin. Contact support for details.",
+          },
+        },
+      ];
+
+      await tx.insert(notificationEvent).values(events);
+    });
 
     return NextResponse.json(
       {

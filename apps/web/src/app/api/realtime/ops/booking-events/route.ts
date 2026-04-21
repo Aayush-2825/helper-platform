@@ -1,7 +1,15 @@
 // DEPRECATED: Frontend now sends these events directly over WebSocket via wsSend(). This route is no longer called by the frontend and can be removed in a follow-up cleanup.
+import { authorizeRealtimeOpsRequest, buildRealtimeForwardHeaders } from "@/lib/realtime/ops-auth";
 
 export async function POST(req: Request) {
   try {
+    if (!(await authorizeRealtimeOpsRequest(req))) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401 },
+      );
+    }
+
     const body = await req.json();
 
     const {
@@ -61,9 +69,7 @@ export async function POST(req: Request) {
       `${process.env.REALTIME_BASE_URL || "http://localhost:3001"}/api/realtime/broadcast`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: buildRealtimeForwardHeaders(),
         body: JSON.stringify({
           event: wsEvent,
           data: {

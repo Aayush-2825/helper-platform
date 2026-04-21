@@ -117,6 +117,8 @@ export function publishBookingEvent(input: {
   let wsEvent = "";
   const data = input.data ?? {};
   const hasCandidateTargets = Array.isArray(data.candidates) && data.candidates.length > 0;
+  const shouldNotifyCustomerForMatching =
+    input.eventType === "matching_update" && hasCandidateTargets;
 
   // 🧠 Step 1: Map DB → WS event
   if (input.eventType === "created" || (input.eventType === "matching_update" && hasCandidateTargets)) {
@@ -167,10 +169,30 @@ export function publishBookingEvent(input: {
   if (typeof window === "undefined") {
     // 🧠 On server, we must use HTTP because there is no per-user WS connection
     console.log("[RealtimeClient] dispatch via HTTP /api/realtime/broadcast", payload);
-    return postJson("/api/realtime/broadcast", payload, getRealtimeBroadcastHeaders()).catch((err) => {
-      console.error("❌ Failed to broadcast booking event via HTTP:", err);
-      throw err;
-    });
+    return postJson("/api/realtime/broadcast", payload, getRealtimeBroadcastHeaders())
+      .then(async () => {
+        if (!shouldNotifyCustomerForMatching) {
+          return;
+        }
+
+        await postJson(
+          "/api/realtime/broadcast",
+          {
+            event: "booking_update",
+            data: {
+              bookingId: input.bookingId,
+              eventType: input.eventType,
+              ...data,
+            },
+            targetUserIds: [input.customerId],
+          },
+          getRealtimeBroadcastHeaders(),
+        );
+      })
+      .catch((err) => {
+        console.error("❌ Failed to broadcast booking event via HTTP:", err);
+        throw err;
+      });
   } else {
     // 🌐 On client, we can use the existing WS connection
     console.log("[RealtimeClient] dispatch via browser WS", {
@@ -186,6 +208,16 @@ export function publishBookingEvent(input: {
       targetUserIds,
       ...data,
     });
+
+    if (shouldNotifyCustomerForMatching) {
+      wsSend({
+        type: "booking_update",
+        bookingId: input.bookingId,
+        eventType: input.eventType,
+        targetUserIds: [input.customerId],
+        ...data,
+      });
+    }
   }
 }
 
@@ -243,15 +275,12 @@ export function publishPaymentUpdate(input: {
     targetUserIds: input.targetUserIds,
   };
 
-  if (typeof window === "undefined") {
-    return postJson("/api/realtime/broadcast", payload, getRealtimeBroadcastHeaders()).catch((err) => {
-      console.error("Failed to broadcast payment event via HTTP:", err);
-      throw err;
-    });
+  if (typeof window !== "undefined") {
+    throw new Error("publishPaymentUpdate must be called from a server context");
   }
 
-  wsSend({
-    type: "payment_update",
-    ...payload.data,
+  return postJson("/api/realtime/broadcast", payload, getRealtimeBroadcastHeaders()).catch((err) => {
+    console.error("Failed to broadcast payment event via HTTP:", err);
+    throw err;
   });
 }

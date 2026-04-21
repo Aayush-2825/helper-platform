@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
-import { payout } from "@/db/schema";
+import { helperProfile, notificationEvent, payout } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { apiError, apiSuccess, getRequestId, logApiError } from "@/lib/http/responses";
 import {
@@ -110,19 +110,72 @@ export async function PATCH(
     const now = new Date();
     const shouldSetProcessedAt = nextStatus === "paid" || nextStatus === "failed" || nextStatus === "reversed";
 
-    const [updated] = await db
-      .update(payout)
-      .set({
-        status: nextStatus,
-        providerTransferId: parsed.data.providerTransferId?.trim() ?? existing.providerTransferId,
-        failedReason: payoutStatusRequiresFailureReason(nextStatus)
-          ? parsed.data.failedReason?.trim() ?? existing.failedReason
-          : null,
-        processedAt: shouldSetProcessedAt ? now : null,
-        updatedAt: now,
-      })
-      .where(and(eq(payout.id, id), eq(payout.status, currentStatus)))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const [updatedPayout] = await tx
+        .update(payout)
+        .set({
+          status: nextStatus,
+          providerTransferId: parsed.data.providerTransferId?.trim() ?? existing.providerTransferId,
+          failedReason: payoutStatusRequiresFailureReason(nextStatus)
+            ? parsed.data.failedReason?.trim() ?? existing.failedReason
+            : null,
+          processedAt: shouldSetProcessedAt ? now : null,
+          updatedAt: now,
+        })
+        .where(and(eq(payout.id, id), eq(payout.status, currentStatus)))
+        .returning();
+
+      if (!updatedPayout) {
+        return null;
+      }
+
+      const helper = await tx.query.helperProfile.findFirst({
+        where: eq(helperProfile.id, updatedPayout.helperProfileId),
+        columns: { userId: true },
+      });
+
+      const events = [
+        {
+          id: crypto.randomUUID(),
+          userId: session.user.id,
+          channel: "admin_audit",
+          templateKey: "admin.payout.status_updated",
+          status: "queued",
+          payload: {
+            action: "payout_status_updated",
+            payoutId: updatedPayout.id,
+            previousStatus: currentStatus,
+            nextStatus,
+            helperProfileId: updatedPayout.helperProfileId,
+            requestId,
+            updatedAt: now.toISOString(),
+          },
+        },
+      ];
+
+      if (helper?.userId) {
+        events.push({
+          id: crypto.randomUUID(),
+          userId: helper.userId,
+          channel: "in_app",
+          templateKey: "payout.status_updated",
+          status: "queued",
+          payload: {
+            payoutId: updatedPayout.id,
+            previousStatus: currentStatus,
+            nextStatus,
+            amount: updatedPayout.amount,
+            currency: updatedPayout.currency,
+            failedReason: updatedPayout.failedReason,
+            processedAt: updatedPayout.processedAt?.toISOString() ?? null,
+          },
+        });
+      }
+
+      await tx.insert(notificationEvent).values(events);
+
+      return updatedPayout;
+    });
 
     if (!updated) {
       return apiError({

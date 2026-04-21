@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "dispute_againstUserId_idx" ON "dispute" USING btree ("against_user_id");

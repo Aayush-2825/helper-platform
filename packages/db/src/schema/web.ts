@@ -695,6 +695,7 @@ export const dispute = pgTable(
   (table) => [
     index("dispute_bookingId_idx").on(table.bookingId),
     index("dispute_raisedByUserId_idx").on(table.raisedByUserId),
+    index("dispute_againstUserId_idx").on(table.againstUserId),
     index("dispute_status_createdAt_idx").on(table.status, table.createdAt),
   ],
 );

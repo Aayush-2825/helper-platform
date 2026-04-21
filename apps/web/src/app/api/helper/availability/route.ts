@@ -18,6 +18,10 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
+    if (session.user.role !== "helper") {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403, headers: NO_STORE_HEADERS });
+    }
+
     const body = await request.json();
     const parsed = schema.safeParse(body);
     if (!parsed.success) {

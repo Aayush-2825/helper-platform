@@ -81,33 +81,41 @@ export async function POST(
       );
     }
 
-    const updatedRows = await db
-      .update(booking)
-      .set({
-        status: "completed",
-        completedAt: now,
-        updatedAt: now,
-      })
-      .where(and(eq(booking.id, bookingId), eq(booking.status, "in_progress")))
-      .returning();
+    const updatedBooking = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(booking)
+        .set({
+          status: "completed",
+          completedAt: now,
+          updatedAt: now,
+        })
+        .where(and(eq(booking.id, bookingId), eq(booking.status, "in_progress")))
+        .returning();
 
-    if (updatedRows.length === 0) {
+      if (!row) {
+        return null;
+      }
+
+      await tx.insert(bookingStatusEvent).values({
+        id: crypto.randomUUID(),
+        bookingId,
+        status: "completed",
+        actorUserId: session.user.id,
+        note: "Helper completed booking",
+        metadata: {
+          completedAt: row.completedAt?.toISOString(),
+        },
+      });
+
+      return row;
+    });
+
+    if (!updatedBooking) {
       return NextResponse.json(
         { message: "Booking not found or not in in_progress state." },
         { status: 400, headers: NO_STORE_HEADERS },
       );
     }
-
-    await db.insert(bookingStatusEvent).values({
-      id: crypto.randomUUID(),
-      bookingId,
-      status: "completed",
-      actorUserId: session.user.id,
-      note: "Helper completed booking",
-      metadata: {
-        completedAt: updatedRows[0].completedAt?.toISOString(),
-      },
-    });
 
     await publishBookingEvent({
       bookingId,
@@ -115,15 +123,15 @@ export async function POST(
       helperId: session.user.id,
       eventType: "completed",
       data: {
-        completedAt: updatedRows[0].completedAt?.toISOString(),
-        booking: updatedRows[0],
+        completedAt: updatedBooking.completedAt?.toISOString(),
+        booking: updatedBooking,
       },
     });
 
     return NextResponse.json(
       {
         message: "Booking completed successfully.",
-        booking: updatedRows[0],
+        booking: updatedBooking,
       },
       { status: 200, headers: NO_STORE_HEADERS },
     );
