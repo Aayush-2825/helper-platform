@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { runDocExpiryCron } from "@/lib/kyc/doc-expiry";
 
-export const runtime = "nodejs";
-
 async function handle(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   const expected = process.env.CRON_SECRET;
