@@ -10,6 +10,18 @@ type ServiceAccount = {
   token_uri?: string;
 };
 
+function normalizeJsonEnvValue(raw: string) {
+  const trimmed = raw.trim();
+  if (
+    (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+    (trimmed.startsWith("\"") && trimmed.endsWith("\""))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+
+  return trimmed;
+}
+
 function base64Url(input: string | Buffer) {
   return Buffer.from(input)
     .toString("base64")
@@ -19,12 +31,25 @@ function base64Url(input: string | Buffer) {
 }
 
 function parseServiceAccount(): ServiceAccount {
-  const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  const json = raw ? normalizeJsonEnvValue(raw) : raw;
   if (!json) {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is required for video KYC scheduling.");
   }
 
-  const parsed = JSON.parse(json) as ServiceAccount;
+  let parsed: ServiceAccount;
+  try {
+    parsed = JSON.parse(json) as ServiceAccount;
+  } catch (error) {
+    const hasNewlines = json.includes("\n") || json.includes("\r");
+    throw new Error(
+      `Invalid GOOGLE_SERVICE_ACCOUNT_JSON JSON: ${(error as Error).message}${
+        hasNewlines
+          ? " (Tip: the service account JSON must be a single line; the private_key should contain escaped newlines like \\\\n, not actual line breaks.)"
+          : ""
+      }`,
+    );
+  }
   if (!parsed.client_email || !parsed.private_key) {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is missing client_email/private_key.");
   }
@@ -87,7 +112,8 @@ function getAdminCalendarId(adminEmail: string) {
   const raw = process.env.KYC_ADMIN_CALENDAR_MAP;
   if (raw) {
     try {
-      const parsed = JSON.parse(raw) as Record<string, string>;
+      const normalized = normalizeJsonEnvValue(raw);
+      const parsed = JSON.parse(normalized) as Record<string, string>;
       const mapped = parsed?.[adminEmail];
       if (mapped) {
         return mapped;
