@@ -86,6 +86,8 @@ function hasUploadValue(value: unknown) {
 interface HelperOnboardingWizardProps {
   onSuccess?: (data: CompleteOnboarding) => void | Promise<void>;
   onCancel?: () => void;
+  initialStep?: number;
+  initialPayload?: Partial<CompleteOnboarding>;
 }
 
 /**
@@ -96,6 +98,8 @@ interface HelperOnboardingWizardProps {
 export function HelperOnboardingWizard({
   onSuccess,
   onCancel,
+  initialStep = 0,
+  initialPayload,
 }: HelperOnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,7 +109,7 @@ export function HelperOnboardingWizard({
     schema: completeOnboardingSchema,
     mode: "onChange",
     defaultValues: {
-      currentStep: 0,
+      currentStep: initialStep,
       completedSteps: [],
       helperType: "individual",
       pricingType: "fixed",
@@ -119,6 +123,7 @@ export function HelperOnboardingWizard({
       languages: ["english"],
       serviceRadiusKm: 8,
       yearsExperience: 0,
+      ...initialPayload,
     },
   });
 
@@ -333,6 +338,24 @@ export function HelperOnboardingWizard({
     return !firstInvalidField;
   };
 
+  const persistDraftToServer = async (stepIndex: number) => {
+    try {
+      await fetch("/api/helpers/onboarding/draft", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          step_index: stepIndex,
+          payload: form.getValues(),
+        }),
+      });
+    } catch {
+      // Local storage remains the fallback if network save fails.
+    }
+  };
+
   // Validate and move to next step
   const goToNextStep = async () => {
     let isValid = false;
@@ -374,6 +397,7 @@ export function HelperOnboardingWizard({
         completedSteps.add(currentStep);
         form.setValue("completedSteps", Array.from(completedSteps));
         form.saveToStorage(form.getValues());
+        await persistDraftToServer(nextStep);
       }
     } else {
       toast.error("Please fill all required fields");
@@ -568,7 +592,10 @@ export function HelperOnboardingWizard({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => form.saveToStorage(form.getValues())}
+                onClick={() => {
+                  form.saveToStorage(form.getValues());
+                  void persistDraftToServer(currentStep);
+                }}
                 className="flex-1 sm:flex-none"
                 title="Save progress to browser"
                 aria-label="Save progress"

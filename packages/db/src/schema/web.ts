@@ -21,11 +21,13 @@ import {
   disputeStatusEnum,
   helperAvailabilityStatusEnum,
   helperServiceCategoryEnum,
+  helperVideoKycStatusEnum,
   helperVerificationStatusEnum,
   paymentMethodEnum,
   paymentStatusEnum,
   payoutStatusEnum,
   reviewModerationStatusEnum,
+  videoKycSessionStatusEnum,
 } from "./enums.js";
 
 export const user = pgTable("user", {
@@ -266,6 +268,12 @@ export const helperProfile = pgTable(
     availabilityStatus:
       helperAvailabilityStatusEnum("availability_status").default("offline").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
+    blockResubmission: boolean("block_resubmission").default(false).notNull(),
+    lastResubmittedAt: timestamp("last_resubmitted_at"),
+    submittedAt: timestamp("submitted_at"),
+    videoKycStatus: helperVideoKycStatusEnum("video_kyc_status")
+      .default("not_required")
+      .notNull(),
     averageRating: numeric("average_rating", { precision: 3, scale: 2 })
       .default("0.00")
       .notNull(),
@@ -292,6 +300,20 @@ export const helperProfile = pgTable(
   ],
 );
 
+export const helperOnboardingDraft = pgTable(
+  "helper_onboarding_draft",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    stepIndex: integer("step_index").default(0).notNull(),
+    payload: jsonb("payload").default({}).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("helperOnboardingDraft_userId_uidx").on(table.userId)],
+);
+
 export const helperKycDocument = pgTable(
   "helper_kyc_document",
   {
@@ -309,6 +331,7 @@ export const helperKycDocument = pgTable(
     reviewedAt: timestamp("reviewed_at"),
     rejectionReason: text("rejection_reason"),
     expiresAt: timestamp("expires_at"),
+    supersededAt: timestamp("superseded_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -318,6 +341,31 @@ export const helperKycDocument = pgTable(
   (table) => [
     index("helperKycDocument_helperProfileId_idx").on(table.helperProfileId),
     index("helperKycDocument_status_idx").on(table.status),
+  ],
+);
+
+export const videoKycSession = pgTable(
+  "video_kyc_session",
+  {
+    id: text("id").primaryKey(),
+    helperProfileId: text("helper_profile_id")
+      .notNull()
+      .references(() => helperProfile.id, { onDelete: "cascade" }),
+    meetLink: text("meet_link").notNull(),
+    calendarEventId: text("calendar_event_id").notNull(),
+    scheduledAt: timestamp("scheduled_at").notNull(),
+    status: videoKycSessionStatusEnum("status").default("scheduled").notNull(),
+    attemptNumber: integer("attempt_number").default(1).notNull(),
+    adminUserId: text("admin_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    adminNotes: text("admin_notes"),
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("videoKycSession_helperProfileId_idx").on(table.helperProfileId),
+    index("videoKycSession_status_scheduledAt_idx").on(table.status, table.scheduledAt),
   ],
 );
 
@@ -810,6 +858,10 @@ export const userRelations = relations(user, ({ many, one }) => ({
     fields: [user.id],
     references: [customerProfile.userId],
   }),
+  onboardingDraft: one(helperOnboardingDraft, {
+    fields: [user.id],
+    references: [helperOnboardingDraft.userId],
+  }),
   helperProfile: one(helperProfile, {
     fields: [user.id],
     references: [helperProfile.userId],
@@ -917,6 +969,7 @@ export const helperProfileRelations = relations(helperProfile, ({ one, many }) =
     references: [organization.id],
   }),
   kycDocuments: many(helperKycDocument),
+  videoKycSessions: many(videoKycSession),
   offerings: many(helperServiceOffering),
   availabilitySlots: many(helperAvailabilitySlot),
   bookingCandidates: many(bookingCandidate),
@@ -926,6 +979,16 @@ export const helperProfileRelations = relations(helperProfile, ({ one, many }) =
   reviews: many(review),
   webPushSubscriptions: many(helperWebPushSubscription),
 }));
+
+export const helperOnboardingDraftRelations = relations(
+  helperOnboardingDraft,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [helperOnboardingDraft.userId],
+      references: [user.id],
+    }),
+  }),
+);
 
 export const helperWebPushSubscriptionRelations = relations(
   helperWebPushSubscription,
@@ -954,6 +1017,17 @@ export const helperKycDocumentRelations = relations(
     }),
   }),
 );
+
+export const videoKycSessionRelations = relations(videoKycSession, ({ one }) => ({
+  helperProfile: one(helperProfile, {
+    fields: [videoKycSession.helperProfileId],
+    references: [helperProfile.id],
+  }),
+  adminUser: one(user, {
+    fields: [videoKycSession.adminUserId],
+    references: [user.id],
+  }),
+}));
 
 export const serviceCategoryRelations = relations(serviceCategory, ({ many }) => ({
   subcategories: many(serviceSubcategory),

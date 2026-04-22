@@ -22,11 +22,13 @@ function serializeDate(value: Date | null) {
 
 function canReceiveJobs(profile: {
   verificationStatus: "pending" | "approved" | "rejected" | "resubmission_required";
+  videoKycStatus: "not_required" | "pending_schedule" | "scheduled" | "passed" | "failed";
   availabilityStatus: "online" | "offline" | "busy";
   isActive: boolean;
 }) {
   return (
     profile.verificationStatus === "approved" &&
+    profile.videoKycStatus === "passed" &&
     profile.availabilityStatus === "online" &&
     profile.isActive
   );
@@ -54,6 +56,7 @@ export async function GET() {
         primaryCategory: true,
         serviceCity: true,
         verificationStatus: true,
+        videoKycStatus: true,
         availabilityStatus: true,
         isActive: true,
         completedJobs: true,

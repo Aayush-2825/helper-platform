@@ -7,6 +7,11 @@ import { HelperOnboardingWizard } from "@/components/onboarding/HelperOnboarding
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { type CompleteOnboarding, clearOnboardingDraft } from "@/types/onboarding";
 
+interface DraftState {
+  step_index: number;
+  payload: Partial<CompleteOnboarding>;
+}
+
 function appendFormDataValue(formData: FormData, key: string, value: unknown) {
   if (value === undefined || value === null) {
     return;
@@ -88,7 +93,7 @@ function getStringProp(obj: unknown, key: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
-export function HelperOnboardingClientPage() {
+export function HelperOnboardingClientPage({ initialDraft }: { initialDraft: DraftState | null }) {
   const router = useRouter();
   const [submissionError, setSubmissionError] = useState<string | null>(null);
 
@@ -109,6 +114,10 @@ export function HelperOnboardingClientPage() {
     }
 
     clearOnboardingDraft();
+    await fetch("/api/helpers/onboarding/draft", {
+      method: "DELETE",
+      credentials: "include",
+    }).catch(() => null);
 
     const landingPath = getStringProp(json, "landingPath");
     if (landingPath) {
@@ -138,6 +147,8 @@ export function HelperOnboardingClientPage() {
       ) : null}
 
       <HelperOnboardingWizard
+        initialStep={initialDraft?.step_index ?? 0}
+        initialPayload={initialDraft?.payload ?? undefined}
         onSuccess={handleSubmit}
         onCancel={() => {
           router.push("/account/settings");

@@ -5,6 +5,22 @@ export const helperVerificationStatusEnum = pgEnum(
   ["pending", "approved", "rejected", "resubmission_required"],
 );
 
+export const helperVideoKycStatusEnum = pgEnum("helper_video_kyc_status", [
+  "not_required",
+  "pending_schedule",
+  "scheduled",
+  "passed",
+  "failed",
+]);
+
+export const videoKycSessionStatusEnum = pgEnum("video_kyc_session_status", [
+  "scheduled",
+  "passed",
+  "failed",
+  "no_show",
+  "cancelled",
+]);
+
 export const helperAvailabilityStatusEnum = pgEnum(
   "helper_availability_status",
   ["online", "offline", "busy"],

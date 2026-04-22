@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import {
   AlertCircle,
   ArrowRight,
@@ -13,12 +13,13 @@ import {
   ExternalLink,
   FileText,
   MapPin,
+  Video,
   ShieldCheck,
   TriangleAlert,
   XCircle,
 } from "lucide-react";
 import { db } from "@/db";
-import { helperProfile } from "@/db/schema";
+import { helperKycDocument, helperProfile, videoKycSession } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -75,8 +76,8 @@ function getVerificationAlert(status: "pending" | "approved" | "rejected" | "res
     case "approved":
       return {
         icon: ShieldCheck,
-        title: "Your helper profile is approved",
-        description: "You can now go online, receive bookings, and manage your helper operations from the portal.",
+        title: "Your documents are approved",
+        description: "Final activation now depends on video KYC completion.",
       };
     case "rejected":
       return {
@@ -138,6 +139,9 @@ export default async function HelperVerificationPage() {
       primaryCategory: true,
       serviceCity: true,
       verificationStatus: true,
+      videoKycStatus: true,
+      submittedAt: true,
+      isActive: true,
       availabilityStatus: true,
       yearsExperience: true,
       createdAt: true,
@@ -149,18 +153,6 @@ export default async function HelperVerificationPage() {
           name: true,
         },
       },
-      kycDocuments: {
-        columns: {
-          id: true,
-          documentType: true,
-          documentNumber: true,
-          fileUrl: true,
-          status: true,
-          rejectionReason: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      },
     },
   });
 
@@ -168,15 +160,49 @@ export default async function HelperVerificationPage() {
     redirect("/helper/onboarding");
   }
 
-  const documents = [...profile.kycDocuments].sort(
+  const documents = (
+    await db.query.helperKycDocument.findMany({
+      where: and(
+        eq(helperKycDocument.helperProfileId, profile.id),
+        isNull(helperKycDocument.supersededAt),
+      ),
+      columns: {
+        id: true,
+        documentType: true,
+        documentNumber: true,
+        fileUrl: true,
+        status: true,
+        rejectionReason: true,
+        expiresAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: desc(helperKycDocument.createdAt),
+    })
+  ).sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
   );
+
+  const latestVideoKycSession = await db.query.videoKycSession.findFirst({
+    where: eq(videoKycSession.helperProfileId, profile.id),
+    orderBy: desc(videoKycSession.createdAt),
+    columns: {
+      meetLink: true,
+      scheduledAt: true,
+      attemptNumber: true,
+      status: true,
+    },
+  });
 
   const approvedDocuments = documents.filter((document) => document.status === "approved").length;
   const pendingDocuments = documents.filter((document) => document.status === "pending").length;
   const blockedDocuments = documents.filter(
     (document) => document.status === "rejected" || document.status === "resubmission_required"
   ).length;
+  const isFullyVerified =
+    profile.verificationStatus === "approved" &&
+    profile.videoKycStatus === "passed" &&
+    profile.isActive;
 
   const statusAlert = getVerificationAlert(profile.verificationStatus);
   const AlertIcon = statusAlert.icon;
@@ -213,6 +239,9 @@ export default async function HelperVerificationPage() {
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p>
               <span className="font-medium text-foreground">Status:</span> {formatStatus(profile.verificationStatus)}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">Video KYC:</span> {profile.videoKycStatus.replaceAll("_", " ")}
             </p>
             <p>
               <span className="font-medium text-foreground">Last update:</span> {formatDate(profile.updatedAt)}
@@ -311,6 +340,9 @@ export default async function HelperVerificationPage() {
                         <p>
                           <span className="font-medium text-foreground">Last reviewed:</span> {formatDate(document.updatedAt)}
                         </p>
+                        <p>
+                          <span className="font-medium text-foreground">Expires at:</span> {formatDate(document.expiresAt ?? null)}
+                        </p>
                         {document.rejectionReason ? (
                           <p className="text-destructive">
                             <span className="font-medium">Review note:</span> {document.rejectionReason}
@@ -340,17 +372,54 @@ export default async function HelperVerificationPage() {
         <Card className="surface-card border-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
+              <Video className="h-4 w-4 text-primary" />
+              Video KYC
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              <span className="font-medium text-foreground">Status:</span> {profile.videoKycStatus.replaceAll("_", " ")}
+            </p>
+            {latestVideoKycSession ? (
+              <>
+                <p>
+                  <span className="font-medium text-foreground">Scheduled at:</span> {formatDate(latestVideoKycSession.scheduledAt)}
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Attempt:</span> {latestVideoKycSession.attemptNumber}
+                </p>
+                {latestVideoKycSession.status === "scheduled" ? (
+                  <Link
+                    href={latestVideoKycSession.meetLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={buttonVariants({ size: "sm" })}
+                  >
+                    Join call
+                    <ExternalLink data-icon="inline-end" />
+                  </Link>
+                ) : null}
+              </>
+            ) : (
+              <p>No call is scheduled yet. We will notify you after document review completes.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="surface-card border-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
               <MapPin className="h-4 w-4 text-primary" />
               Next step
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            {profile.verificationStatus === "approved" ? (
-              <p>Your account is verified. Continue to the helper dashboard and start accepting live work.</p>
+            {isFullyVerified ? (
+              <p>Your account is fully verified. Continue to the helper dashboard and start accepting live work.</p>
             ) : (
               <p>
-                Your verification is still in progress. Keep this page bookmarked to monitor document status and
-                review notes.
+                Your verification flow is still in progress. Keep this page bookmarked to monitor document status,
+                video KYC scheduling, and review notes.
               </p>
             )}
           </CardContent>

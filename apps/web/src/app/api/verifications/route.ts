@@ -1,11 +1,15 @@
 ﻿import { headers } from "next/headers";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
 import { helperKycDocument, helperProfile, notificationEvent } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
+import { computeProfileStatus } from "@/lib/kyc/status";
+import { scheduleVideoKYC } from "@/lib/kyc/video-kyc";
+import { enqueueHelperNotification } from "@/lib/notifications/helper-events";
+import type { NotificationPayload } from "@/lib/notifications/helper-events";
 
 const updateVerificationSchema = z.object({
   documentId: z.string().min(1),
@@ -13,7 +17,7 @@ const updateVerificationSchema = z.object({
   rejectionReason: z.string().trim().min(1).optional(),
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
 
@@ -21,7 +25,10 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
+    const includeHistory = request.nextUrl.searchParams.get("include_history") === "true";
+
     const documents = await db.query.helperKycDocument.findMany({
+      where: includeHistory ? undefined : isNull(helperKycDocument.supersededAt),
       orderBy: desc(helperKycDocument.createdAt),
       with: {
         helperProfile: {
@@ -33,6 +40,7 @@ export async function GET() {
             verificationStatus: true,
             availabilityStatus: true,
             isActive: true,
+            submittedAt: true,
             updatedAt: true,
           },
           with: {
@@ -57,7 +65,25 @@ export async function GET() {
     });
 
     return NextResponse.json(
-      { documents },
+      {
+        documents: documents.map((document) => {
+          const submittedAt = document.helperProfile?.submittedAt ?? null;
+          const hoursInQueue =
+            submittedAt instanceof Date
+              ? Math.max(0, (Date.now() - submittedAt.getTime()) / (1000 * 60 * 60))
+              : null;
+
+          return {
+            ...document,
+            helperProfile: document.helperProfile
+              ? {
+                  ...document.helperProfile,
+                  hoursInQueue,
+                }
+              : undefined,
+          };
+        }),
+      },
       { status: 200, headers: NO_STORE_HEADERS },
     );
   } catch (error) {
@@ -88,7 +114,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     const document = await db.query.helperKycDocument.findFirst({
-      where: eq(helperKycDocument.id, parsed.data.documentId),
+      where: and(
+        eq(helperKycDocument.id, parsed.data.documentId),
+        isNull(helperKycDocument.supersededAt),
+      ),
       with: {
         helperProfile: {
           columns: {
@@ -130,34 +159,37 @@ export async function PATCH(request: NextRequest) {
       }
 
       let helperUserId = document.helperProfile?.userId ?? null;
-      let nextProfileStatus: "pending" | "approved" | "resubmission_required" | null = null;
+      let nextProfileStatus:
+        | "pending"
+        | "approved"
+        | "resubmission_required"
+        | "rejected"
+        | null = null;
+      let shouldScheduleVideoKyc = false;
 
       if (document.helperProfileId) {
         const profileDocs = await tx.query.helperKycDocument.findMany({
-          where: eq(helperKycDocument.helperProfileId, document.helperProfileId),
+          where: and(
+            eq(helperKycDocument.helperProfileId, document.helperProfileId),
+            isNull(helperKycDocument.supersededAt),
+          ),
           columns: { status: true },
         });
 
-        const hasResubmissionRequired = profileDocs.some(
-          (profileDoc) =>
-            profileDoc.status === "rejected" ||
-            profileDoc.status === "resubmission_required",
-        );
-        const allApproved =
-          profileDocs.length > 0 &&
-          profileDocs.every((profileDoc) => profileDoc.status === "approved");
-
-        nextProfileStatus = allApproved
-          ? "approved"
-          : hasResubmissionRequired
-            ? "resubmission_required"
-            : "pending";
+        const computed = computeProfileStatus(profileDocs.map((profileDoc) => profileDoc.status));
+        nextProfileStatus = computed.verificationStatus;
+        shouldScheduleVideoKyc =
+          computed.verificationStatus === "approved" &&
+          document.helperProfile?.verificationStatus !== "approved";
 
         const [updatedProfile] = await tx
           .update(helperProfile)
           .set({
             verificationStatus: nextProfileStatus,
-            isActive: nextProfileStatus === "approved",
+            isActive: computed.isActive,
+            blockResubmission: computed.blockResubmission,
+            videoKycStatus:
+              nextProfileStatus === "approved" ? "pending_schedule" : "not_required",
             updatedAt: now,
           })
           .where(eq(helperProfile.id, document.helperProfileId))
@@ -167,20 +199,6 @@ export async function PATCH(request: NextRequest) {
 
         helperUserId = updatedProfile?.userId ?? helperUserId;
       }
-
-      const helperNotificationMessage =
-        parsed.data.status === "approved"
-          ? "One of your verification documents was approved. We will notify you once all required documents are approved."
-          : parsed.data.rejectionReason ?? "A verification document needs resubmission.";
-
-      const helperNotificationPayload = {
-        documentId: updatedDocument.id,
-        helperProfileId: updatedDocument.helperProfileId,
-        documentType: updatedDocument.documentType,
-        documentStatus: updatedDocument.status,
-        profileVerificationStatus: nextProfileStatus,
-        rejectionReason: updatedDocument.rejectionReason,
-      };
 
       const events: Array<{
         id: string;
@@ -207,25 +225,32 @@ export async function PATCH(request: NextRequest) {
         },
       ];
 
-      if (helperUserId) {
-        events.push({
-          id: crypto.randomUUID(),
-          userId: helperUserId,
-          channel: "in_app",
-          templateKey: "verification.document.updated",
-          status: "queued",
-          payload: {
-            message: helperNotificationMessage,
-            ...helperNotificationPayload,
-          },
-        });
-      }
-
       await tx.insert(notificationEvent).values(events);
+
+      const helperNotification: NotificationPayload | null = helperUserId
+        ? {
+            helperUserId,
+            event:
+              parsed.data.status === "approved"
+                ? "doc_approved"
+                : parsed.data.status === "rejected"
+                  ? "doc_rejected"
+                  : "doc_resubmission_required",
+            meta: {
+              docTypes: [updatedDocument.documentType],
+              rejectionReasons: updatedDocument.rejectionReason
+                ? [updatedDocument.rejectionReason]
+                : undefined,
+            },
+          }
+        : null;
 
       return {
         document: updatedDocument,
         profileVerificationStatus: nextProfileStatus,
+        helperProfileId: document.helperProfileId,
+        shouldScheduleVideoKyc,
+        helperNotification,
       };
     });
 
@@ -234,6 +259,14 @@ export async function PATCH(request: NextRequest) {
         { message: "Verification document not found." },
         { status: 404, headers: NO_STORE_HEADERS },
       );
+    }
+
+    if (updated.shouldScheduleVideoKyc && updated.helperProfileId) {
+      await scheduleVideoKYC(updated.helperProfileId);
+    }
+
+    if (updated.helperNotification) {
+      await enqueueHelperNotification(updated.helperNotification);
     }
 
     return NextResponse.json(
