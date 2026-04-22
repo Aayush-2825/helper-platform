@@ -1,7 +1,7 @@
 import { createSign } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { helperProfile, user, videoKycSession } from "@/db/schema";
+import { helperProfile, videoKycSession } from "@/db/schema";
 import { enqueueHelperNotification } from "@/lib/notifications/helper-events";
 
 type ServiceAccount = {
@@ -77,54 +77,45 @@ async function getGoogleAccessToken() {
   return data.access_token;
 }
 
-function getNextBusinessDayTenAmIst() {
-  const now = new Date();
-  const istNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const day = istNow.getDay();
-  const addDays = day === 5 ? 3 : day === 6 ? 2 : 1;
-
-  const scheduled = new Date(istNow);
-  scheduled.setDate(istNow.getDate() + addDays);
-  scheduled.setHours(10, 0, 0, 0);
-
-  const end = new Date(scheduled);
-  end.setMinutes(end.getMinutes() + 20);
-
-  return { start: scheduled, end };
+function addMinutes(date: Date, minutes: number) {
+  const updated = new Date(date);
+  updated.setMinutes(updated.getMinutes() + minutes);
+  return updated;
 }
 
-export async function scheduleVideoKYC(helperProfileId: string, attemptNumber = 1) {
-  const profile = await db.query.helperProfile.findFirst({
-    where: eq(helperProfile.id, helperProfileId),
-    columns: {
-      id: true,
-      userId: true,
-    },
-    with: {
-      user: {
-        columns: {
-          name: true,
-          email: true,
-        },
-      },
-    },
-  });
-
-  if (!profile?.user?.email) {
-    throw new Error("Cannot schedule video KYC without helper email.");
+function getAdminCalendarId(adminEmail: string) {
+  const raw = process.env.KYC_ADMIN_CALENDAR_MAP;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, string>;
+      const mapped = parsed?.[adminEmail];
+      if (mapped) {
+        return mapped;
+      }
+    } catch (error) {
+      throw new Error(`Invalid KYC_ADMIN_CALENDAR_MAP JSON: ${(error as Error).message}`);
+    }
   }
 
-  const calendarId = process.env.GOOGLE_KYC_CALENDAR_ID;
-  const adminEmail = process.env.KYC_ADMIN_EMAIL;
-  if (!calendarId || !adminEmail) {
-    throw new Error("Missing GOOGLE_KYC_CALENDAR_ID or KYC_ADMIN_EMAIL.");
+  const fallback = process.env.GOOGLE_KYC_CALENDAR_ID;
+  if (!fallback) {
+    throw new Error("Missing GOOGLE_KYC_CALENDAR_ID (or KYC_ADMIN_CALENDAR_MAP for this admin).");
   }
 
-  const { start, end } = getNextBusinessDayTenAmIst();
+  return fallback;
+}
+
+async function createGoogleMeetEvent(params: {
+  calendarId: string;
+  summary: string;
+  description: string;
+  start: Date;
+  end: Date;
+  attendees: Array<{ email: string }>;
+}) {
   const accessToken = await getGoogleAccessToken();
-
   const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?conferenceDataVersion=1`,
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events?conferenceDataVersion=1`,
     {
       method: "POST",
       headers: {
@@ -132,11 +123,11 @@ export async function scheduleVideoKYC(helperProfileId: string, attemptNumber = 
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        summary: `KYC Verification - ${profile.user.name ?? "Helper"}`,
-        description: "Identity verification call for helper onboarding.",
-        start: { dateTime: start.toISOString(), timeZone: "Asia/Kolkata" },
-        end: { dateTime: end.toISOString(), timeZone: "Asia/Kolkata" },
-        attendees: [{ email: profile.user.email }, { email: adminEmail }],
+        summary: params.summary,
+        description: params.description,
+        start: { dateTime: params.start.toISOString() },
+        end: { dateTime: params.end.toISOString() },
+        attendees: params.attendees,
         conferenceData: {
           createRequest: {
             requestId: crypto.randomUUID(),
@@ -169,15 +160,114 @@ export async function scheduleVideoKYC(helperProfileId: string, attemptNumber = 
     throw new Error("Google Calendar event response is missing meeting details.");
   }
 
+  return {
+    calendarEventId,
+    meetLink,
+    scheduledAt: eventPayload.start?.dateTime ? new Date(eventPayload.start.dateTime) : params.start,
+  };
+}
+
+async function updateGoogleEventTime(params: {
+  calendarId: string;
+  calendarEventId: string;
+  start: Date;
+  end: Date;
+}) {
+  const accessToken = await getGoogleAccessToken();
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events/${encodeURIComponent(params.calendarEventId)}?sendUpdates=all`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        start: { dateTime: params.start.toISOString() },
+        end: { dateTime: params.end.toISOString() },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Failed to reschedule Google Meet video KYC: ${details}`);
+  }
+
+  const payload = (await response.json()) as { start?: { dateTime?: string } };
+  return payload.start?.dateTime ? new Date(payload.start.dateTime) : params.start;
+}
+
+async function deleteGoogleEvent(params: { calendarId: string; calendarEventId: string }) {
+  const accessToken = await getGoogleAccessToken();
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events/${encodeURIComponent(params.calendarEventId)}?sendUpdates=all`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Failed to cancel Google Meet video KYC: ${details}`);
+  }
+}
+
+export async function scheduleVideoKYC(params: {
+  helperProfileId: string;
+  scheduledAt: Date;
+  attemptNumber: number;
+  adminEmail: string;
+  adminUserId?: string;
+  durationMinutes?: number;
+}) {
+  const profile = await db.query.helperProfile.findFirst({
+    where: eq(helperProfile.id, params.helperProfileId),
+    columns: {
+      id: true,
+      userId: true,
+    },
+    with: {
+      user: {
+        columns: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  if (!profile?.user?.email) {
+    throw new Error("Cannot schedule video KYC without helper email.");
+  }
+
+  const durationMinutes = params.durationMinutes ?? 20;
+  const start = params.scheduledAt;
+  const end = addMinutes(start, durationMinutes);
+
+  const calendarId = getAdminCalendarId(params.adminEmail);
+  const event = await createGoogleMeetEvent({
+    calendarId,
+    summary: `KYC Verification - ${profile.user.name ?? "Helper"}`,
+    description: "Identity verification call for helper onboarding.",
+    start,
+    end,
+    attendees: [{ email: profile.user.email }, { email: params.adminEmail }],
+  });
+
   await db.transaction(async (tx) => {
     await tx.insert(videoKycSession).values({
       id: crypto.randomUUID(),
-      helperProfileId,
-      meetLink,
-      calendarEventId,
-      scheduledAt: eventPayload.start?.dateTime ? new Date(eventPayload.start.dateTime) : start,
-      attemptNumber,
+      helperProfileId: params.helperProfileId,
+      meetLink: event.meetLink,
+      calendarEventId: event.calendarEventId,
+      scheduledAt: event.scheduledAt,
+      attemptNumber: params.attemptNumber,
       status: "scheduled",
+      adminUserId: params.adminUserId ?? null,
     });
 
     await tx
@@ -186,17 +276,148 @@ export async function scheduleVideoKYC(helperProfileId: string, attemptNumber = 
         videoKycStatus: "scheduled",
         updatedAt: new Date(),
       })
-      .where(eq(helperProfile.id, helperProfileId));
+      .where(eq(helperProfile.id, params.helperProfileId));
   });
 
   await enqueueHelperNotification({
     helperUserId: profile.userId,
     event: "video_kyc_scheduled",
     meta: {
-      meetLink,
-      scheduledAt: eventPayload.start?.dateTime ?? start.toISOString(),
+      meetLink: event.meetLink,
+      scheduledAt: event.scheduledAt.toISOString(),
     },
   });
+}
+
+export async function rescheduleVideoKYC(params: {
+  sessionId: string;
+  scheduledAt: Date;
+  adminEmail: string;
+  adminUserId?: string;
+  durationMinutes?: number;
+  adminNotes?: string;
+}) {
+  const session = await db.query.videoKycSession.findFirst({
+    where: eq(videoKycSession.id, params.sessionId),
+    columns: {
+      id: true,
+      status: true,
+      calendarEventId: true,
+      helperProfileId: true,
+      attemptNumber: true,
+      adminUserId: true,
+    },
+  });
+
+  if (!session) {
+    throw new Error("Video KYC session not found.");
+  }
+
+  if (session.status !== "scheduled") {
+    throw new Error("Only scheduled sessions can be rescheduled.");
+  }
+
+  const durationMinutes = params.durationMinutes ?? 20;
+  const start = params.scheduledAt;
+  const end = addMinutes(start, durationMinutes);
+  const calendarId = getAdminCalendarId(params.adminEmail);
+  const nextScheduledAt = await updateGoogleEventTime({
+    calendarId,
+    calendarEventId: session.calendarEventId,
+    start,
+    end,
+  });
+
+  await db
+    .update(videoKycSession)
+    .set({
+      scheduledAt: nextScheduledAt,
+      adminNotes: params.adminNotes ?? null,
+      adminUserId: params.adminUserId ?? session.adminUserId ?? null,
+    })
+    .where(eq(videoKycSession.id, session.id));
+
+  const profile = await db.query.helperProfile.findFirst({
+    where: eq(helperProfile.id, session.helperProfileId),
+    columns: {
+      userId: true,
+    },
+  });
+
+  if (profile?.userId) {
+    await enqueueHelperNotification({
+      helperUserId: profile.userId,
+      event: "video_kyc_rescheduled",
+      meta: {
+        scheduledAt: nextScheduledAt.toISOString(),
+      },
+    });
+  }
+}
+
+export async function cancelVideoKYC(params: {
+  sessionId: string;
+  adminEmail: string;
+  adminUserId?: string;
+  adminNotes?: string;
+}) {
+  const session = await db.query.videoKycSession.findFirst({
+    where: eq(videoKycSession.id, params.sessionId),
+    columns: {
+      id: true,
+      status: true,
+      calendarEventId: true,
+      helperProfileId: true,
+      attemptNumber: true,
+      adminUserId: true,
+    },
+  });
+
+  if (!session) {
+    throw new Error("Video KYC session not found.");
+  }
+
+  if (session.status !== "scheduled") {
+    throw new Error("Only scheduled sessions can be cancelled.");
+  }
+
+  const calendarId = getAdminCalendarId(params.adminEmail);
+  await deleteGoogleEvent({ calendarId, calendarEventId: session.calendarEventId });
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(videoKycSession)
+      .set({
+        status: "cancelled",
+        completedAt: new Date(),
+        adminNotes: params.adminNotes ?? null,
+        adminUserId: params.adminUserId ?? session.adminUserId ?? null,
+      })
+      .where(eq(videoKycSession.id, session.id));
+
+    await tx
+      .update(helperProfile)
+      .set({
+        videoKycStatus: "pending_schedule",
+        updatedAt: new Date(),
+      })
+      .where(eq(helperProfile.id, session.helperProfileId));
+  });
+
+  const profile = await db.query.helperProfile.findFirst({
+    where: eq(helperProfile.id, session.helperProfileId),
+    columns: {
+      userId: true,
+    },
+  });
+
+  if (profile?.userId) {
+    await enqueueHelperNotification({
+      helperUserId: profile.userId,
+      event: "video_kyc_cancelled",
+      meta: { adminNotes: params.adminNotes },
+    });
+  }
 }
 
 export async function getLatestVideoKycSession(helperProfileId: string) {

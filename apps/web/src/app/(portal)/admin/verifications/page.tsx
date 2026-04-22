@@ -49,6 +49,15 @@ type VerificationDocument = {
 
 type VerificationStatus = VerificationDocument["status"];
 
+type PendingVideoKycHelper = {
+  id: string;
+  updatedAt: string;
+  user?: {
+    name: string;
+    email: string;
+  };
+};
+
 type VideoKycSession = {
   id: string;
   meetLink: string;
@@ -78,9 +87,27 @@ function formatDate(value?: string | null): string {
   });
 }
 
+function toDateTimeLocalValue(value?: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const pad = (input: number) => String(input).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export default function AdminVerificationsPage() {
   const [documents, setDocuments] = useState<VerificationDocument[]>([]);
   const [videoSessions, setVideoSessions] = useState<VideoKycSession[]>([]);
+  const [pendingVideoHelpers, setPendingVideoHelpers] = useState<PendingVideoKycHelper[]>([]);
+  const [pendingVideoSchedule, setPendingVideoSchedule] = useState<Record<string, string>>({});
+  const [rescheduleVideoSchedule, setRescheduleVideoSchedule] = useState<Record<string, string>>({});
+  const [videoAdminNotes, setVideoAdminNotes] = useState<Record<string, string>>({});
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<VerificationStatus | "all">("all");
@@ -91,6 +118,9 @@ export default function AdminVerificationsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [updatingVideoId, setUpdatingVideoId] = useState<string | null>(null);
+  const [schedulingHelperId, setSchedulingHelperId] = useState<string | null>(null);
+  const [reschedulingVideoId, setReschedulingVideoId] = useState<string | null>(null);
+  const [cancellingVideoId, setCancellingVideoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -140,8 +170,12 @@ export default function AdminVerificationsPage() {
         throw new Error("Could not load video KYC sessions.");
       }
 
-      const data = (await response.json()) as { sessions?: VideoKycSession[] };
+      const data = (await response.json()) as {
+        sessions?: VideoKycSession[];
+        pendingHelpers?: PendingVideoKycHelper[];
+      };
       setVideoSessions(data.sessions ?? []);
+      setPendingVideoHelpers(data.pendingHelpers ?? []);
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "Unable to load video KYC sessions.");
     } finally {
@@ -284,6 +318,7 @@ export default function AdminVerificationsPage() {
         body: JSON.stringify({
           session_id: sessionId,
           outcome,
+          admin_notes: videoAdminNotes[sessionId]?.trim() || undefined,
         }),
       });
 
@@ -299,6 +334,117 @@ export default function AdminVerificationsPage() {
       setError(updateError instanceof Error ? updateError.message : "Unable to update video KYC.");
     } finally {
       setUpdatingVideoId(null);
+    }
+  };
+
+  const scheduleVideoKyc = async (helperProfileId: string) => {
+    setSchedulingHelperId(helperProfileId);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const selected = pendingVideoSchedule[helperProfileId];
+      if (!selected) {
+        throw new Error("Pick a date/time before scheduling.");
+      }
+
+      const scheduledDate = new Date(selected);
+      if (Number.isNaN(scheduledDate.getTime())) {
+        throw new Error("Invalid date/time selected.");
+      }
+
+      const scheduledAtIso = scheduledDate.toISOString();
+      const response = await fetch("/api/verifications/video-kyc/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ helper_profile_id: helperProfileId, scheduled_at: scheduledAtIso }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Could not schedule video KYC.");
+      }
+
+      setSuccess("Video KYC scheduled.");
+      await fetchVideoSessions();
+      await fetchDocuments(true);
+    } catch (scheduleError) {
+      setError(scheduleError instanceof Error ? scheduleError.message : "Unable to schedule video KYC.");
+    } finally {
+      setSchedulingHelperId(null);
+    }
+  };
+
+  const rescheduleVideoKyc = async (sessionId: string) => {
+    setReschedulingVideoId(sessionId);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const selected = rescheduleVideoSchedule[sessionId];
+      if (!selected) {
+        throw new Error("Pick a date/time before rescheduling.");
+      }
+
+      const scheduledDate = new Date(selected);
+      if (Number.isNaN(scheduledDate.getTime())) {
+        throw new Error("Invalid date/time selected.");
+      }
+
+      const response = await fetch("/api/verifications/video-kyc/reschedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          session_id: sessionId,
+          scheduled_at: scheduledDate.toISOString(),
+          admin_notes: videoAdminNotes[sessionId]?.trim() || undefined,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Could not reschedule video KYC.");
+      }
+
+      setSuccess("Video KYC rescheduled.");
+      await fetchVideoSessions();
+    } catch (rescheduleError) {
+      setError(rescheduleError instanceof Error ? rescheduleError.message : "Unable to reschedule video KYC.");
+    } finally {
+      setReschedulingVideoId(null);
+    }
+  };
+
+  const cancelVideoKyc = async (sessionId: string) => {
+    setCancellingVideoId(sessionId);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch("/api/verifications/video-kyc/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          session_id: sessionId,
+          admin_notes: videoAdminNotes[sessionId]?.trim() || undefined,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Could not cancel video KYC.");
+      }
+
+      setSuccess("Video KYC cancelled.");
+      await fetchVideoSessions();
+      await fetchDocuments(true);
+    } catch (cancelError) {
+      setError(cancelError instanceof Error ? cancelError.message : "Unable to cancel video KYC.");
+    } finally {
+      setCancellingVideoId(null);
     }
   };
 
@@ -579,6 +725,48 @@ export default function AdminVerificationsPage() {
         <Card className="surface-card-strong border-none">
           <CardContent className="space-y-4 p-5 sm:p-6">
             <h2 className="text-xl font-heading font-bold">Scheduled Video KYC Calls</h2>
+            {!videoLoading && pendingVideoHelpers.length > 0 ? (
+              <div className="space-y-3 rounded-3xl border border-border/60 bg-card/40 p-4">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold">Needs scheduling</p>
+                    <p className="text-sm text-muted-foreground">Helpers approved for documents but missing a scheduled video call.</p>
+                  </div>
+                  <Badge variant="secondary" className="w-fit">{pendingVideoHelpers.length}</Badge>
+                </div>
+                <div className="grid gap-3">
+                  {pendingVideoHelpers.map((helper) => (
+                    <div key={helper.id} className="rounded-2xl border border-border/60 bg-background/40 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="space-y-1">
+                          <p className="font-semibold">{helper.user?.name ?? helper.id}</p>
+                          <p className="text-sm text-muted-foreground">{helper.user?.email ?? "No email"}</p>
+                          <p className="text-xs text-muted-foreground">Last updated {formatDate(helper.updatedAt)}</p>
+                        </div>
+                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+                          <Input
+                            type="datetime-local"
+                            value={pendingVideoSchedule[helper.id] ?? ""}
+                            onChange={(event) =>
+                              setPendingVideoSchedule((current) => ({ ...current, [helper.id]: event.target.value }))
+                            }
+                            className="h-10 rounded-xl sm:w-56"
+                          />
+                          <Button
+                            className="rounded-xl font-semibold"
+                            onClick={() => void scheduleVideoKyc(helper.id)}
+                            disabled={schedulingHelperId === helper.id || !pendingVideoSchedule[helper.id]}
+                          >
+                            {schedulingHelperId === helper.id ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Clock3 className="mr-2 size-4" />}
+                            Schedule
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {videoLoading ? (
               <div className="grid gap-3">
                 {[1, 2, 3].map((item) => (
@@ -602,32 +790,70 @@ export default function AdminVerificationsPage() {
                           Open Meet link
                         </a>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          className="rounded-xl"
-                          onClick={() => void updateVideoSession(session.id, "passed")}
-                          disabled={updatingVideoId === session.id}
-                        >
-                          <CheckCircle2 className="mr-2 size-4" />
-                          Pass
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          className="rounded-xl"
-                          onClick={() => void updateVideoSession(session.id, "failed")}
-                          disabled={updatingVideoId === session.id}
-                        >
-                          <XCircle className="mr-2 size-4" />
-                          Fail
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="rounded-xl"
-                          onClick={() => void updateVideoSession(session.id, "no_show")}
-                          disabled={updatingVideoId === session.id}
-                        >
-                          No-show
-                        </Button>
+                      <div className="flex w-full flex-col gap-2 lg:w-auto lg:items-end">
+                        <div className="flex w-full flex-col gap-2 sm:flex-row lg:justify-end">
+                          <Input
+                            type="datetime-local"
+                            value={rescheduleVideoSchedule[session.id] ?? toDateTimeLocalValue(session.scheduledAt)}
+                            onChange={(event) =>
+                              setRescheduleVideoSchedule((current) => ({ ...current, [session.id]: event.target.value }))
+                            }
+                            className="h-10 rounded-xl sm:w-56"
+                          />
+                          <Input
+                            value={videoAdminNotes[session.id] ?? ""}
+                            onChange={(event) =>
+                              setVideoAdminNotes((current) => ({ ...current, [session.id]: event.target.value }))
+                            }
+                            placeholder="Notes (optional)"
+                            className="h-10 rounded-xl sm:w-56"
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2 lg:justify-end">
+                          <Button
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() => void rescheduleVideoKyc(session.id)}
+                            disabled={reschedulingVideoId === session.id}
+                          >
+                            {reschedulingVideoId === session.id ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Clock3 className="mr-2 size-4" />}
+                            Reschedule
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() => void cancelVideoKyc(session.id)}
+                            disabled={cancellingVideoId === session.id}
+                          >
+                            {cancellingVideoId === session.id ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                            Cancel
+                          </Button>
+                          <Button
+                            className="rounded-xl"
+                            onClick={() => void updateVideoSession(session.id, "passed")}
+                            disabled={updatingVideoId === session.id}
+                          >
+                            <CheckCircle2 className="mr-2 size-4" />
+                            Pass
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            className="rounded-xl"
+                            onClick={() => void updateVideoSession(session.id, "failed")}
+                            disabled={updatingVideoId === session.id}
+                          >
+                            <XCircle className="mr-2 size-4" />
+                            Fail
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() => void updateVideoSession(session.id, "no_show")}
+                            disabled={updatingVideoId === session.id}
+                          >
+                            No-show
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>

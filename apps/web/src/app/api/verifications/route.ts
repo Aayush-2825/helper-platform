@@ -7,7 +7,6 @@ import { helperKycDocument, helperProfile, notificationEvent } from "@/db/schema
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { computeProfileStatus } from "@/lib/kyc/status";
-import { scheduleVideoKYC } from "@/lib/kyc/video-kyc";
 import { enqueueHelperNotification } from "@/lib/notifications/helper-events";
 import type { NotificationPayload } from "@/lib/notifications/helper-events";
 
@@ -165,7 +164,6 @@ export async function PATCH(request: NextRequest) {
         | "resubmission_required"
         | "rejected"
         | null = null;
-      let shouldScheduleVideoKyc = false;
 
       if (document.helperProfileId) {
         const profileDocs = await tx.query.helperKycDocument.findMany({
@@ -178,9 +176,6 @@ export async function PATCH(request: NextRequest) {
 
         const computed = computeProfileStatus(profileDocs.map((profileDoc) => profileDoc.status));
         nextProfileStatus = computed.verificationStatus;
-        shouldScheduleVideoKyc =
-          computed.verificationStatus === "approved" &&
-          document.helperProfile?.verificationStatus !== "approved";
 
         const [updatedProfile] = await tx
           .update(helperProfile)
@@ -249,7 +244,6 @@ export async function PATCH(request: NextRequest) {
         document: updatedDocument,
         profileVerificationStatus: nextProfileStatus,
         helperProfileId: document.helperProfileId,
-        shouldScheduleVideoKyc,
         helperNotification,
       };
     });
@@ -259,10 +253,6 @@ export async function PATCH(request: NextRequest) {
         { message: "Verification document not found." },
         { status: 404, headers: NO_STORE_HEADERS },
       );
-    }
-
-    if (updated.shouldScheduleVideoKyc && updated.helperProfileId) {
-      await scheduleVideoKYC(updated.helperProfileId);
     }
 
     if (updated.helperNotification) {
@@ -285,4 +275,3 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
-
