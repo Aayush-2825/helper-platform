@@ -34,12 +34,26 @@
     "CLOUDINARY_API_KEY",
     "CLOUDINARY_API_SECRET",
     "ENCRYPTION_KEY",
-    "AUTH_SECRET"
+    "AUTH_SECRET",
+    "CRON_SECRET",
+    "GOOGLE_SERVICE_ACCOUNT_JSON",
+    "GOOGLE_KYC_CALENDAR_ID",
+    "KYC_ADMIN_EMAIL",
+    "EMAIL_PROVIDER_API_KEY"
+    
   ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "env": ["PORT", "DATABASE_URL", "DATABASE_URL_WEB", "DATABASE_URL_REALTIME", "REDIS_URL", "CORS_ORIGIN", "NODE_ENV"],
+      "env": [
+        "PORT",
+        "DATABASE_URL",
+        "DATABASE_URL_WEB",
+        "DATABASE_URL_REALTIME",
+        "REDIS_URL",
+        "CORS_ORIGIN",
+        "NODE_ENV"
+      ],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
@@ -48,11 +62,27 @@
     },
     "check-types": {
       "dependsOn": ["^check-types"],
-      "env": ["PORT", "DATABASE_URL", "DATABASE_URL_WEB", "DATABASE_URL_REALTIME", "REDIS_URL", "CORS_ORIGIN", "NODE_ENV"]
+      "env": [
+        "PORT",
+        "DATABASE_URL",
+        "DATABASE_URL_WEB",
+        "DATABASE_URL_REALTIME",
+        "REDIS_URL",
+        "CORS_ORIGIN",
+        "NODE_ENV"
+      ]
     },
     "dev": {
       "cache": false,
-      "env": ["PORT", "DATABASE_URL", "DATABASE_URL_WEB", "DATABASE_URL_REALTIME", "REDIS_URL", "CORS_ORIGIN", "NODE_ENV"],
+      "env": [
+        "PORT",
+        "DATABASE_URL",
+        "DATABASE_URL_WEB",
+        "DATABASE_URL_REALTIME",
+        "REDIS_URL",
+        "CORS_ORIGIN",
+        "NODE_ENV"
+      ],
       "persistent": true
     }
   }
