@@ -1,6 +1,9 @@
 import { headers } from "next/headers";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
+import { db } from "@/db";
+import { helperOnboardingDraft } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { getHelperLandingPath } from "@/lib/helper/routing";
 import { HelperOnboardingClientPage } from "../helper-onboarding-client";
@@ -25,5 +28,24 @@ export default async function HelperOnboardingPage() {
     redirect(landingPath);
   }
 
-  return <HelperOnboardingClientPage />;
+  const draft = await db.query.helperOnboardingDraft.findFirst({
+    where: eq(helperOnboardingDraft.userId, session.user.id),
+    columns: {
+      stepIndex: true,
+      payload: true,
+    },
+  });
+
+  return (
+    <HelperOnboardingClientPage
+      initialDraft={
+        draft
+          ? {
+              step_index: draft.stepIndex,
+              payload: (draft.payload as Record<string, unknown>) ?? {},
+            }
+          : null
+      }
+    />
+  );
 }

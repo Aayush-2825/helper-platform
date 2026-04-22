@@ -1,12 +1,19 @@
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { helperKycDocument, helperProfile, organization, user } from "@/db/schema";
+import {
+  helperKycDocument,
+  helperOnboardingDraft,
+  helperProfile,
+  organization,
+  user,
+} from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { getHelperLandingPath } from "@/lib/helper/routing";
+import { enqueueHelperNotification } from "@/lib/notifications/helper-events";
 
 const PHONE_REGEX = /^[0-9]{10}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -82,6 +89,8 @@ async function getHelperStatus(userId: string) {
     columns: {
       id: true,
       verificationStatus: true,
+      isActive: true,
+      videoKycStatus: true,
     },
   });
 
@@ -100,7 +109,10 @@ async function getHelperStatus(userId: string) {
     profileId: profile.id,
     verificationStatus: profile.verificationStatus,
     landingPath: await getHelperLandingPath(userId),
-    canStartService: profile.verificationStatus === "approved",
+    canStartService:
+      profile.verificationStatus === "approved" &&
+      profile.videoKycStatus === "passed" &&
+      profile.isActive,
   };
 }
 
@@ -500,6 +512,8 @@ export async function POST(request: NextRequest) {
             id: true,
             organizationId: true,
             verificationStatus: true,
+            blockResubmission: true,
+            lastResubmittedAt: true,
           },
         })
       : null;
@@ -509,6 +523,28 @@ export async function POST(request: NextRequest) {
         status: 200,
         headers: NO_STORE_HEADERS,
       });
+    }
+
+    if (existingProfile?.blockResubmission) {
+      return NextResponse.json(
+        { error: "Resubmission blocked. Contact support." },
+        { status: 403, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    if (existingProfile?.lastResubmittedAt) {
+      const hoursSince =
+        (Date.now() - new Date(existingProfile.lastResubmittedAt).getTime()) / 36e5;
+      if (hoursSince < 24) {
+        const retryAfter = Math.ceil(24 - hoursSince);
+        return NextResponse.json(
+          {
+            error: "Too soon to resubmit",
+            retry_after_hours: retryAfter,
+          },
+          { status: 429, headers: NO_STORE_HEADERS },
+        );
+      }
     }
 
     const data = await parseOnboardingPayload(request);
@@ -584,6 +620,10 @@ export async function POST(request: NextRequest) {
               verificationStatus: "pending",
               availabilityStatus: "offline",
               isActive: false,
+              blockResubmission: false,
+              lastResubmittedAt: new Date(),
+              submittedAt: new Date(),
+              videoKycStatus: "not_required",
               updatedAt: new Date(),
             })
             .where(eq(helperProfile.id, existingProfile.id))
@@ -604,14 +644,27 @@ export async function POST(request: NextRequest) {
               serviceRadiusKm: data.serviceRadiusKm || 8,
               verificationStatus: "pending",
               availabilityStatus: data.isOnline ? "online" : "offline",
+              isActive: false,
+              blockResubmission: false,
+              submittedAt: new Date(),
+              videoKycStatus: "not_required",
             })
             .returning({ id: helperProfile.id })
         )[0];
 
     if (existingProfile) {
       await db
-        .delete(helperKycDocument)
-        .where(eq(helperKycDocument.helperProfileId, existingProfile.id));
+        .update(helperKycDocument)
+        .set({
+          supersededAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(helperKycDocument.helperProfileId, existingProfile.id),
+            isNull(helperKycDocument.supersededAt),
+          ),
+        );
     }
 
     const kycUploads: Array<{
@@ -692,6 +745,16 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       })
       .where(eq(user.id, session.user.id));
+
+    await db.delete(helperOnboardingDraft).where(eq(helperOnboardingDraft.userId, session.user.id));
+
+    await enqueueHelperNotification({
+      helperUserId: session.user.id,
+      event: "docs_submitted",
+      meta: {
+        docTypes: kycUploads.map((doc) => doc.documentType),
+      },
+    });
 
     const nextStatus = await getHelperStatus(session.user.id);
 

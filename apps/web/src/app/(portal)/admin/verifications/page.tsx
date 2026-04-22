@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, BadgeCheck, Clock3, Loader2, RefreshCcw, Search, ShieldCheck } from "lucide-react";
+import { AlertCircle, BadgeCheck, CheckCircle2, Clock3, Loader2, RefreshCcw, Search, ShieldCheck, Video, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,6 +30,8 @@ type VerificationDocument = {
     verificationStatus: string;
     availabilityStatus: string;
     isActive: boolean;
+    submittedAt?: string | null;
+    hoursInQueue?: number | null;
     updatedAt: string;
     user?: {
       id: string;
@@ -47,6 +49,22 @@ type VerificationDocument = {
 
 type VerificationStatus = VerificationDocument["status"];
 
+type VideoKycSession = {
+  id: string;
+  meetLink: string;
+  scheduledAt: string;
+  attemptNumber: number;
+  status: "scheduled" | "passed" | "failed" | "no_show" | "cancelled";
+  helperProfile?: {
+    id: string;
+    userId: string;
+    user?: {
+      name: string;
+      email: string;
+    };
+  };
+};
+
 function formatDate(value?: string | null): string {
   if (!value) {
     return "—";
@@ -62,12 +80,17 @@ function formatDate(value?: string | null): string {
 
 export default function AdminVerificationsPage() {
   const [documents, setDocuments] = useState<VerificationDocument[]>([]);
+  const [videoSessions, setVideoSessions] = useState<VideoKycSession[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<VerificationStatus | "all">("all");
+  const [activeTab, setActiveTab] = useState<"documents" | "video-kyc">("documents");
+  const [includeHistory, setIncludeHistory] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [videoLoading, setVideoLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [updatingVideoId, setUpdatingVideoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -86,7 +109,7 @@ export default function AdminVerificationsPage() {
     }
 
     try {
-      const response = await fetch("/api/verifications", { credentials: "include" });
+      const response = await fetch(`/api/verifications?include_history=${includeHistory}`, { credentials: "include" });
       if (!response.ok) {
         throw new Error("Could not load verification queue.");
       }
@@ -107,12 +130,34 @@ export default function AdminVerificationsPage() {
 
   useEffect(() => {
     void fetchDocuments();
+  }, [includeHistory]);
+
+  const fetchVideoSessions = async () => {
+    setVideoLoading(true);
+    try {
+      const response = await fetch("/api/verifications/video-kyc", { credentials: "include" });
+      if (!response.ok) {
+        throw new Error("Could not load video KYC sessions.");
+      }
+
+      const data = (await response.json()) as { sessions?: VideoKycSession[] };
+      setVideoSessions(data.sessions ?? []);
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : "Unable to load video KYC sessions.");
+    } finally {
+      setVideoLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchVideoSessions();
   }, []);
 
   const filteredDocuments = useMemo(() => {
     const search = query.trim().toLowerCase();
 
-    return documents.filter((document) => {
+    return documents
+      .filter((document) => {
       if (statusFilter !== "all" && document.status !== statusFilter) {
         return false;
       }
@@ -136,7 +181,16 @@ export default function AdminVerificationsPage() {
         .toLowerCase();
 
       return haystack.includes(search);
-    });
+        })
+        .sort((a, b) => {
+          const hoursA = a.helperProfile?.hoursInQueue ?? -1;
+          const hoursB = b.helperProfile?.hoursInQueue ?? -1;
+          if (hoursB !== hoursA) {
+            return hoursB - hoursA;
+          }
+
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
   }, [documents, query, statusFilter]);
 
   const selectedDocument = useMemo(
@@ -160,6 +214,22 @@ export default function AdminVerificationsPage() {
     approved: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300",
     rejected: "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300",
     resubmission_required: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300",
+  };
+
+  const getQueueSlaClass = (hoursInQueue?: number | null) => {
+    if (typeof hoursInQueue !== "number") {
+      return "text-muted-foreground";
+    }
+
+    if (hoursInQueue > 72) {
+      return "text-rose-600 dark:text-rose-300";
+    }
+
+    if (hoursInQueue > 48) {
+      return "text-amber-600 dark:text-amber-300";
+    }
+
+    return "text-muted-foreground";
   };
 
   const updateDocument = async () => {
@@ -198,6 +268,40 @@ export default function AdminVerificationsPage() {
     }
   };
 
+  const updateVideoSession = async (
+    sessionId: string,
+    outcome: "passed" | "failed" | "no_show",
+  ) => {
+    setUpdatingVideoId(sessionId);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch("/api/verifications/video-kyc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          session_id: sessionId,
+          outcome,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Could not update video KYC outcome.");
+      }
+
+      setSuccess("Video KYC session updated.");
+      await fetchVideoSessions();
+      await fetchDocuments(true);
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Unable to update video KYC.");
+    } finally {
+      setUpdatingVideoId(null);
+    }
+  };
+
   const summary = useMemo(() => {
     return {
       pending: documents.filter((document) => document.status === "pending").length,
@@ -213,8 +317,40 @@ export default function AdminVerificationsPage() {
         <div className="space-y-2">
           <h1 className="text-3xl font-heading font-black tracking-tight">Verification Queue</h1>
           <p className="text-sm text-muted-foreground">Review KYC documents, approve helpers, and request resubmissions when needed.</p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              variant={activeTab === "documents" ? "default" : "outline"}
+              className="h-9 rounded-xl"
+              onClick={() => setActiveTab("documents")}
+            >
+              Documents
+            </Button>
+            <Button
+              variant={activeTab === "video-kyc" ? "default" : "outline"}
+              className="h-9 rounded-xl"
+              onClick={() => setActiveTab("video-kyc")}
+            >
+              <Video className="mr-2 size-4" />
+              Video KYC
+            </Button>
+            {activeTab === "documents" ? (
+              <Button
+                variant={includeHistory ? "default" : "outline"}
+                className="h-9 rounded-xl"
+                onClick={() => setIncludeHistory((current) => !current)}
+              >
+                {includeHistory ? "Showing full history" : "Show full history"}
+              </Button>
+            ) : null}
+          </div>
         </div>
-        <Button variant="outline" className="h-11 rounded-2xl font-semibold" onClick={() => void fetchDocuments(true)}>
+        <Button
+          variant="outline"
+          className="h-11 rounded-2xl font-semibold"
+          onClick={() =>
+            void (activeTab === "documents" ? fetchDocuments(true) : fetchVideoSessions())
+          }
+        >
           {refreshing ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCcw className="mr-2 size-4" />}
           Refresh
         </Button>
@@ -261,6 +397,7 @@ export default function AdminVerificationsPage() {
         </Card>
       </div>
 
+      {activeTab === "documents" ? (
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="surface-card-strong border-none">
           <CardContent className="space-y-5 p-5 sm:p-6">
@@ -329,6 +466,9 @@ export default function AdminVerificationsPage() {
                           <p>{document.helperProfile?.user?.email ?? "No email"}</p>
                           <p>Added {formatDate(document.createdAt)}</p>
                           <p>{document.documentNumber ?? "No document number"}</p>
+                          <p className={cn("font-semibold", getQueueSlaClass(document.helperProfile?.hoursInQueue))}>
+                            Queue: {typeof document.helperProfile?.hoursInQueue === "number" ? `${document.helperProfile.hoursInQueue.toFixed(1)}h` : "—"}
+                          </p>
                         </div>
                       </div>
                     </button>
@@ -360,6 +500,14 @@ export default function AdminVerificationsPage() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Current status:</span> {selectedDocument.status.replaceAll("_", " ")}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Hours in queue:</span>{" "}
+                    <span className={cn("font-semibold", getQueueSlaClass(selectedDocument.helperProfile?.hoursInQueue))}>
+                      {typeof selectedDocument.helperProfile?.hoursInQueue === "number"
+                        ? `${selectedDocument.helperProfile.hoursInQueue.toFixed(1)}h`
+                        : "—"}
+                    </span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">File:</span>{" "}
@@ -427,6 +575,68 @@ export default function AdminVerificationsPage() {
           </CardContent>
         </Card>
       </div>
+      ) : (
+        <Card className="surface-card-strong border-none">
+          <CardContent className="space-y-4 p-5 sm:p-6">
+            <h2 className="text-xl font-heading font-bold">Scheduled Video KYC Calls</h2>
+            {videoLoading ? (
+              <div className="grid gap-3">
+                {[1, 2, 3].map((item) => (
+                  <div key={item} className="h-24 animate-pulse rounded-2xl bg-muted/60" />
+                ))}
+              </div>
+            ) : videoSessions.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-border/70 p-10 text-center text-sm text-muted-foreground">
+                No scheduled video KYC sessions.
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {videoSessions.map((session) => (
+                  <div key={session.id} className="rounded-2xl border border-border/60 bg-card/40 p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="space-y-1">
+                        <p className="font-semibold">{session.helperProfile?.user?.name ?? session.helperProfile?.id}</p>
+                        <p className="text-sm text-muted-foreground">{session.helperProfile?.user?.email ?? "No email"}</p>
+                        <p className="text-sm text-muted-foreground">Scheduled {formatDate(session.scheduledAt)} • Attempt {session.attemptNumber}</p>
+                        <a href={session.meetLink} target="_blank" rel="noreferrer" className="text-sm text-primary underline-offset-4 hover:underline">
+                          Open Meet link
+                        </a>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          className="rounded-xl"
+                          onClick={() => void updateVideoSession(session.id, "passed")}
+                          disabled={updatingVideoId === session.id}
+                        >
+                          <CheckCircle2 className="mr-2 size-4" />
+                          Pass
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          className="rounded-xl"
+                          onClick={() => void updateVideoSession(session.id, "failed")}
+                          disabled={updatingVideoId === session.id}
+                        >
+                          <XCircle className="mr-2 size-4" />
+                          Fail
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => void updateVideoSession(session.id, "no_show")}
+                          disabled={updatingVideoId === session.id}
+                        >
+                          No-show
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

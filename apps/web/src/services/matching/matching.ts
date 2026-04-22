@@ -155,6 +155,7 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
               eqOp(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
               eqOp(helper.isActive, true),
               eqOp(helper.verificationStatus, "approved"),
+              eqOp(helper.videoKycStatus, "passed"),
             ),
         })) as MatchedHelperProfile[];
 
@@ -419,6 +420,7 @@ async function findScheduledEligibleHelpers(
         eqOp(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
         eqOp(helper.isActive, true),
         eqOp(helper.verificationStatus, "approved"),
+        eqOp(helper.videoKycStatus, "passed"),
       ),
   })) as MatchedHelperProfile[];
 
@@ -535,6 +537,7 @@ async function findAvailabilityOnlineHelperIds() {
         eqOp(helper.availabilityStatus, "online"),
         eqOp(helper.isActive, true),
         eqOp(helper.verificationStatus, "approved"),
+        eqOp(helper.videoKycStatus, "passed"),
       ),
     columns: {
       userId: true,
@@ -572,6 +575,7 @@ async function findCityConnectedOrOnlineHelpers(
         eqOp(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
         eqOp(helper.isActive, true),
         eqOp(helper.verificationStatus, "approved"),
+        eqOp(helper.videoKycStatus, "passed"),
       ),
   })) as MatchedHelperProfile[];
 

@@ -34,7 +34,7 @@ export async function getAuthSession() {
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { helperProfile, helperKycDocument, user, organization, member } from "@/db/schema";
 import { uploadFile, FileManifest } from "@/lib/storage/file-upload";
@@ -330,7 +330,12 @@ export async function getHelperKycDocuments(profileId: string) {
     return await db
       .select()
       .from(helperKycDocument)
-      .where(eq(helperKycDocument.helperProfileId, profileId));
+      .where(
+        and(
+          eq(helperKycDocument.helperProfileId, profileId),
+          isNull(helperKycDocument.supersededAt),
+        ),
+      );
   } catch (error) {
     console.error("Error fetching KYC documents:", error);
     return [];

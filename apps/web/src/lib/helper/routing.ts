@@ -8,6 +8,8 @@ export async function getHelperLandingPath(userId: string): Promise<string> {
     columns: {
       id: true,
       verificationStatus: true,
+      videoKycStatus: true,
+      isActive: true,
     },
   });
 
@@ -15,9 +17,13 @@ export async function getHelperLandingPath(userId: string): Promise<string> {
     return "/helper/onboarding";
   }
 
-  if (profile.verificationStatus === "approved") {
+  if (
+    profile.verificationStatus === "approved" &&
+    profile.videoKycStatus === "passed" &&
+    profile.isActive
+  ) {
     return "/helper";
   }
 
-  return `/helper/verification-pending?id=${profile.id}`;
+  return "/helper/verification";
 }

@@ -38,6 +38,7 @@ export async function POST(
       columns: {
         id: true,
         verificationStatus: true,
+        videoKycStatus: true,
         availabilityStatus: true,
         isActive: true,
       },
@@ -53,6 +54,13 @@ export async function POST(
     if (profile.verificationStatus !== "approved") {
       return NextResponse.json(
         { message: "Finish verification before accepting jobs." },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (profile.videoKycStatus !== "passed") {
+      return NextResponse.json(
+        { message: "Complete video KYC before accepting jobs." },
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }

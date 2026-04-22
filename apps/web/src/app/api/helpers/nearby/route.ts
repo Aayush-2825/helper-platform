@@ -31,8 +31,12 @@ export async function GET(request: NextRequest) {
     const cityParam = request.nextUrl.searchParams.get("city");
     const effectiveStatus = (statusParam ?? "online") as "online" | "offline" | "busy";
 
-    // Build conditions: always require approved, optionally filter by status and city
-    const conditions = [eq(helperProfile.verificationStatus, "approved")];
+    // Only fully activated helpers should be discoverable.
+    const conditions = [
+      eq(helperProfile.verificationStatus, "approved"),
+      eq(helperProfile.videoKycStatus, "passed"),
+      eq(helperProfile.isActive, true),
+    ];
 
     if (statusParam !== "all") {
       conditions.push(eq(helperProfile.availabilityStatus, effectiveStatus));

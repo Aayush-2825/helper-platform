@@ -13,6 +13,13 @@ type BookingPushPayload = {
   expiresAt?: string;
 };
 
+type GenericPushPayload = {
+  title: string;
+  body: string;
+  url?: string;
+  data?: Record<string, unknown>;
+};
+
 type WebPushSubscriptionPayload = {
   endpoint: string;
   keys: {
@@ -91,6 +98,71 @@ export async function sendBookingPushToHelpers(helperUserIds: string[], payload:
     quotedAmount: payload.quotedAmount,
     expiresAt: payload.expiresAt,
     url: `/helper/incoming-jobs?bookingId=${encodeURIComponent(payload.bookingId)}`,
+  });
+
+  await Promise.allSettled(
+    subscriptions.map(async (subscription) => {
+      const pushSubscription: WebPushSubscriptionPayload = {
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: subscription.p256dh,
+          auth: subscription.auth,
+        },
+      };
+
+      try {
+        await webpush.sendNotification(pushSubscription, body);
+        await db
+          .update(helperWebPushSubscription)
+          .set({
+            lastUsedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(helperWebPushSubscription.id, subscription.id));
+      } catch (error) {
+        const statusCode = (error as { statusCode?: number })?.statusCode;
+        if (statusCode === 404 || statusCode === 410) {
+          await db
+            .update(helperWebPushSubscription)
+            .set({
+              isActive: false,
+              updatedAt: new Date(),
+            })
+            .where(eq(helperWebPushSubscription.id, subscription.id));
+        }
+      }
+    }),
+  );
+}
+
+export async function sendGenericPushToUsers(userIds: string[], payload: GenericPushPayload) {
+  if (!ensureConfigured()) {
+    return;
+  }
+
+  const uniqueUserIds = [...new Set(userIds.filter(Boolean))];
+  if (uniqueUserIds.length === 0) {
+    return;
+  }
+
+  const subscriptions = await db.query.helperWebPushSubscription.findMany({
+    where: and(
+      inArray(helperWebPushSubscription.userId, uniqueUserIds),
+      eq(helperWebPushSubscription.isActive, true),
+    ),
+    columns: {
+      id: true,
+      endpoint: true,
+      p256dh: true,
+      auth: true,
+    },
+  });
+
+  const body = JSON.stringify({
+    title: payload.title,
+    body: payload.body,
+    url: payload.url ?? "/helper/verification",
+    ...payload.data,
   });
 
   await Promise.allSettled(
