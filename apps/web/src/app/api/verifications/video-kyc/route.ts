@@ -1,12 +1,11 @@
 import { headers } from "next/headers";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
 import { helperProfile, videoKycSession } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
-import { scheduleVideoKYC } from "@/lib/kyc/video-kyc";
 import { enqueueHelperNotification } from "@/lib/notifications/helper-events";
 
 const updateVideoKycSchema = z.object({
@@ -43,7 +42,28 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ sessions }, { status: 200, headers: NO_STORE_HEADERS });
+    const pendingHelpers = await db.query.helperProfile.findMany({
+      where: and(
+        eq(helperProfile.videoKycStatus, "pending_schedule"),
+        eq(helperProfile.verificationStatus, "approved"),
+      ),
+      columns: {
+        id: true,
+        userId: true,
+        updatedAt: true,
+      },
+      with: {
+        user: {
+          columns: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: asc(helperProfile.updatedAt),
+    });
+
+    return NextResponse.json({ sessions, pendingHelpers }, { status: 200, headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error("Video KYC list error:", error);
     return NextResponse.json({ message: "Internal server error" }, { status: 500, headers: NO_STORE_HEADERS });
@@ -127,7 +147,19 @@ export async function POST(request: NextRequest) {
       });
     } else {
       if (kycSession.attemptNumber < 3) {
-        await scheduleVideoKYC(kycSession.helperProfileId, kycSession.attemptNumber + 1);
+        await db
+          .update(helperProfile)
+          .set({
+            videoKycStatus: "pending_schedule",
+            updatedAt: new Date(),
+          })
+          .where(eq(helperProfile.id, kycSession.helperProfileId));
+
+        await enqueueHelperNotification({
+          helperUserId: kycSession.helperProfile.userId,
+          event: "video_kyc_no_show",
+          meta: { adminNotes: parsed.data.admin_notes },
+        });
       } else {
         await db
           .update(helperProfile)

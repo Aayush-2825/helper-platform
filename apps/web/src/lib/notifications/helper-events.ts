@@ -10,6 +10,9 @@ export type HelperNotificationEvent =
   | "doc_rejected"
   | "doc_resubmission_required"
   | "video_kyc_scheduled"
+  | "video_kyc_rescheduled"
+  | "video_kyc_cancelled"
+  | "video_kyc_no_show"
   | "video_kyc_passed"
   | "video_kyc_failed"
   | "doc_expiring_soon"
@@ -68,6 +71,24 @@ function getTemplate(payload: NotificationPayload): NotificationTemplate {
         subject: `Your video verification is scheduled: ${payload.meta.scheduledAt ?? "Scheduled"} - ${payload.meta.meetLink ?? ""}`,
         message: `Your video KYC call has been scheduled for ${payload.meta.scheduledAt ?? "the selected time"}.`,
         templateKey: "helper.video_kyc_scheduled",
+      };
+    case "video_kyc_rescheduled":
+      return {
+        subject: `Your video verification was rescheduled: ${payload.meta.scheduledAt ?? "Updated"}`,
+        message: `Your video KYC call was rescheduled for ${payload.meta.scheduledAt ?? "the updated time"}. Please check the verification page for details.`,
+        templateKey: "helper.video_kyc_rescheduled",
+      };
+    case "video_kyc_cancelled":
+      return {
+        subject: "Your video verification call was cancelled",
+        message: `Your video KYC call was cancelled. ${payload.meta.adminNotes ?? "We will notify you once a new time is scheduled."}`,
+        templateKey: "helper.video_kyc_cancelled",
+      };
+    case "video_kyc_no_show":
+      return {
+        subject: "We missed you on your video verification call",
+        message: `Your video KYC session was marked as no-show. ${payload.meta.adminNotes ?? "We will notify you once a new time is scheduled."}`,
+        templateKey: "helper.video_kyc_no_show",
       };
     case "video_kyc_passed":
       return {

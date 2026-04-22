@@ -398,10 +398,15 @@ export default async function HelperVerificationPage() {
                     Join call
                     <ExternalLink data-icon="inline-end" />
                   </Link>
-                ) : null}
+                ) : (
+                  <p>
+                    Your last video KYC session is marked as{" "}
+                    <span className="font-medium text-foreground">{latestVideoKycSession.status.replaceAll("_", " ")}</span>. We will notify you once a new call is scheduled.
+                  </p>
+                )}
               </>
             ) : (
-              <p>No call is scheduled yet. We will notify you after document review completes.</p>
+              <p>No call is scheduled yet. We will notify you once an admin schedules your video KYC call.</p>
             )}
           </CardContent>
         </Card>
