@@ -15,6 +15,7 @@
     "db:generate:realtime": "pnpm --filter @repo/db generate:realtime",
     "db:generate": "pnpm db:generate:web && pnpm db:generate:realtime",
     "dev": "turbo run dev",
+    "env:google-sa": "tsx scripts/env-google-service-account.ts --path",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types"
