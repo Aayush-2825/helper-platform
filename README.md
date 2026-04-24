@@ -56,6 +56,19 @@ REDIS_URL=redis://localhost:6379
 
 You can use only DATABASE_URL for local development if both schemas share one database.
 
+## Video KYC (Live Call)
+
+The platform schedules helper onboarding video KYC calls via Google Calendar/Meet (with a Jitsi fallback if Meet link creation is delayed).
+
+- Helper flow: `/helper/verification` → **Schedule video KYC** → `/helper/video-kyc` → join via `/helper/video-kyc/join`
+- Helper API endpoints: `apps/web/src/app/api/helpers/video-kyc/*`
+
+Env vars (see `.env.example`):
+
+- `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_KYC_CALENDAR_ID`, `GOOGLE_WORKSPACE_DELEGATED_USER_EMAIL`
+- Optional: `KYC_ADMIN_CALENDAR_MAP`, `VIDEO_KYC_HOST_EMAIL`
+- Slot policy: `VIDEO_KYC_*` (hours, interval, lead time, join window)
+
 ## Common Commands
 
 Workspace:

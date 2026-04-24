@@ -103,6 +103,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Video KYC session not found." }, { status: 404, headers: NO_STORE_HEADERS });
     }
 
+    if (kycSession.status !== "scheduled") {
+      return NextResponse.json(
+        { message: "Only scheduled sessions can be marked as passed/failed/no-show." },
+        { status: 400, headers: NO_STORE_HEADERS },
+      );
+    }
+
     await db
       .update(videoKycSession)
       .set({

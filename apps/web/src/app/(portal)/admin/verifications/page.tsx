@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { CalendarStatus } from "@/components/admin/CalendarStatus";
 
 type VerificationDocument = {
   id: string;
@@ -724,7 +725,10 @@ export default function AdminVerificationsPage() {
       ) : (
         <Card className="surface-card-strong border-none">
           <CardContent className="space-y-4 p-5 sm:p-6">
-            <h2 className="text-xl font-heading font-bold">Scheduled Video KYC Calls</h2>
+            <div className="flex flex-col gap-4">
+              <h2 className="text-xl font-heading font-bold">Scheduled Video KYC Calls</h2>
+              <CalendarStatus />
+            </div>
             {!videoLoading && pendingVideoHelpers.length > 0 ? (
               <div className="space-y-3 rounded-3xl border border-border/60 bg-card/40 p-4">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">

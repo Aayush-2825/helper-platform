@@ -55,7 +55,7 @@ export async function GET() {
     where: eq(videoKycSession.helperProfileId, profile.id),
     orderBy: desc(videoKycSession.createdAt),
     columns: {
-      meetLink: true,
+      id: true,
       scheduledAt: true,
       attemptNumber: true,
       status: true,
@@ -76,7 +76,7 @@ export async function GET() {
       })),
       video_kyc_session: latestSession
         ? {
-            meet_link: latestSession.meetLink,
+            id: latestSession.id,
             scheduled_at: latestSession.scheduledAt.toISOString(),
             attempt_number: latestSession.attemptNumber,
             status: latestSession.status,

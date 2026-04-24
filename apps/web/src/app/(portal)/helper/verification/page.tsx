@@ -187,6 +187,7 @@ export default async function HelperVerificationPage() {
     where: eq(videoKycSession.helperProfileId, profile.id),
     orderBy: desc(videoKycSession.createdAt),
     columns: {
+      id: true,
       meetLink: true,
       scheduledAt: true,
       attemptNumber: true,
@@ -390,9 +391,7 @@ export default async function HelperVerificationPage() {
                 </p>
                 {latestVideoKycSession.status === "scheduled" ? (
                   <Link
-                    href={latestVideoKycSession.meetLink}
-                    target="_blank"
-                    rel="noreferrer"
+                    href={`/helper/video-kyc/join?session_id=${encodeURIComponent(latestVideoKycSession.id)}`}
                     className={buttonVariants({ size: "sm" })}
                   >
                     Join call
@@ -406,7 +405,17 @@ export default async function HelperVerificationPage() {
                 )}
               </>
             ) : (
-              <p>No call is scheduled yet. We will notify you once an admin schedules your video KYC call.</p>
+              <div className="space-y-2">
+                <p>No call is scheduled yet.</p>
+                {profile.videoKycStatus === "pending_schedule" && profile.verificationStatus === "approved" ? (
+                  <Link href="/helper/video-kyc" className={buttonVariants({ size: "sm" })}>
+                    Schedule video KYC
+                    <ArrowRight data-icon="inline-end" />
+                  </Link>
+                ) : (
+                  <p>We will notify you once scheduling is enabled for your profile.</p>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
