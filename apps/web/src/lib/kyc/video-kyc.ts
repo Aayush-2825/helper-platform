@@ -60,6 +60,7 @@ function parseServiceAccount(): ServiceAccount {
 async function getGoogleAccessToken() {
   const serviceAccount = parseServiceAccount();
   const tokenUri = serviceAccount.token_uri ?? "https://oauth2.googleapis.com/token";
+  const delegatedUser = process.env.GOOGLE_WORKSPACE_DELEGATED_USER_EMAIL?.trim();
   const now = Math.floor(Date.now() / 1000);
 
   const header = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
@@ -70,6 +71,7 @@ async function getGoogleAccessToken() {
       aud: tokenUri,
       exp: now + 3600,
       iat: now,
+      ...(delegatedUser ? { sub: delegatedUser } : {}),
     }),
   );
 
@@ -108,6 +110,41 @@ function addMinutes(date: Date, minutes: number) {
   return updated;
 }
 
+function normalizeCalendarId(value: string) {
+  const normalized = normalizeJsonEnvValue(value).trim();
+  if (!normalized) {
+    throw new Error("Google Calendar ID is empty.");
+  }
+  return normalized;
+}
+
+async function readGoogleApiError(response: Response) {
+  const raw = await response.text();
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      error?: { message?: string; code?: number; errors?: Array<{ reason?: string; message?: string }> };
+    };
+    return {
+      raw,
+      code: parsed.error?.code,
+      reason: parsed.error?.errors?.[0]?.reason,
+      message: parsed.error?.message,
+    };
+  } catch {
+    return { raw };
+  }
+}
+
+function buildCalendarNotFoundMessage(calendarId: string, details: string) {
+  return [
+    `Failed to schedule Google Meet video KYC: Calendar '${calendarId}' was not found or is not accessible by the configured service account.`,
+    "Verify GOOGLE_KYC_CALENDAR_ID (or KYC_ADMIN_CALENDAR_MAP) points to an existing calendar, and share that calendar with the service account client_email.",
+    "If using Google Workspace domain-wide delegation, set GOOGLE_WORKSPACE_DELEGATED_USER_EMAIL and grant Calendar API scopes in Admin Console.",
+    `Google response: ${details}`,
+  ].join(" ");
+}
+
 function getAdminCalendarId(adminEmail: string) {
   const raw = process.env.KYC_ADMIN_CALENDAR_MAP;
   if (raw) {
@@ -116,7 +153,7 @@ function getAdminCalendarId(adminEmail: string) {
       const parsed = JSON.parse(normalized) as Record<string, string>;
       const mapped = parsed?.[adminEmail];
       if (mapped) {
-        return mapped;
+        return normalizeCalendarId(mapped);
       }
     } catch (error) {
       throw new Error(`Invalid KYC_ADMIN_CALENDAR_MAP JSON: ${(error as Error).message}`);
@@ -128,7 +165,27 @@ function getAdminCalendarId(adminEmail: string) {
     throw new Error("Missing GOOGLE_KYC_CALENDAR_ID (or KYC_ADMIN_CALENDAR_MAP for this admin).");
   }
 
-  return fallback;
+  return normalizeCalendarId(fallback);
+}
+
+async function ensureCalendarAccessible(accessToken: string, calendarId: string) {
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const details = await readGoogleApiError(response);
+    if (response.status === 404 || details.reason === "notFound") {
+      throw new Error(buildCalendarNotFoundMessage(calendarId, details.raw));
+    }
+    throw new Error(`Failed to access Google Calendar '${calendarId}': ${details.raw}`);
+  }
 }
 
 async function createGoogleMeetEvent(params: {
@@ -140,8 +197,9 @@ async function createGoogleMeetEvent(params: {
   attendees: Array<{ email: string }>;
 }) {
   const accessToken = await getGoogleAccessToken();
+  await ensureCalendarAccessible(accessToken, params.calendarId);
   const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events?conferenceDataVersion=1`,
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events?conferenceDataVersion=1&sendUpdates=all`,
     {
       method: "POST",
       headers: {
@@ -160,14 +218,16 @@ async function createGoogleMeetEvent(params: {
             conferenceSolutionKey: { type: "hangoutsMeet" },
           },
         },
-        sendUpdates: "all",
       }),
     },
   );
 
   if (!response.ok) {
-    const details = await response.text();
-    throw new Error(`Failed to schedule Google Meet video KYC: ${details}`);
+    const details = await readGoogleApiError(response);
+    if (response.status === 404 || details.reason === "notFound") {
+      throw new Error(buildCalendarNotFoundMessage(params.calendarId, details.raw));
+    }
+    throw new Error(`Failed to schedule Google Meet video KYC: ${details.raw}`);
   }
 
   const eventPayload = (await response.json()) as {
