@@ -19,13 +19,13 @@ import { authClient } from "@/lib/auth/client";
 import { useSession } from "@/lib/auth/session";
 import { showFormError, showFormSuccess } from "@/lib/ui/form-feedback";
 import { twoFactorPasswordSchema, type TwoFactorPasswordFormValues } from "@/lib/validation/account";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@repo/ui/components/ui/alert";
+import { Badge } from "@repo/ui/components/ui/badge";
+import { Button, buttonVariants } from "@repo/ui/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@repo/ui/components/ui/field";
+import { Input } from "@repo/ui/components/ui/input";
+import { Separator } from "@repo/ui/components/ui/separator";
 
 type HelperStatus = {
   hasProfile: boolean;
@@ -192,8 +192,12 @@ export default function AccountSettings() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <p className="text-sm text-muted-foreground">Loading account settings...</p>
+      <div className="min-h-screen p-4 py-6 sm:p-6 lg:p-8">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+          <div className="surface-card h-16 animate-pulse rounded-3xl" />
+          <div className="surface-card h-72 animate-pulse rounded-4xl" />
+          <div className="surface-card h-80 animate-pulse rounded-4xl" />
+        </div>
       </div>
     );
   }
@@ -387,7 +391,7 @@ export default function AccountSettings() {
                   <div className="flex justify-center rounded-lg bg-muted p-4">
                     <img
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(totpURI)}`}
-                      alt="QR Code"
+                      alt="Two-factor authentication QR code"
                       className="h-48 w-48"
                     />
                   </div>

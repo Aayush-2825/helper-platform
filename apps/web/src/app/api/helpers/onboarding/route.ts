@@ -1,12 +1,12 @@
-import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, gte, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   helperKycDocument,
   helperOnboardingDraft,
   helperProfile,
+  notificationEvent,
   organization,
   user,
 } from "@/db/schema";
@@ -20,6 +20,9 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const UPI_REGEX = /^[a-zA-Z0-9.-]{3,}@[a-zA-Z]{3,}$/;
 const TIME_REGEX = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+const OBJECT_KEY_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9/_\-.]{2,255}$/;
+const IDEMPOTENCY_KEY_REGEX = /^[a-zA-Z0-9:_\-.]{8,200}$/;
+const MAX_SUBMISSIONS_PER_HOUR = 3;
 const SUPPORTED_HELPER_CATEGORIES = new Set([
   "driver",
   "electrician",
@@ -32,7 +35,7 @@ const SUPPORTED_HELPER_CATEGORIES = new Set([
   "other",
 ]);
 
-type UploadValue = File | string | null;
+type UploadValue = string | null;
 
 type OnboardingPayload = {
   helperType?: "individual" | "agency";
@@ -69,6 +72,9 @@ type OnboardingPayload = {
   ownerIdDocumentType?: string;
   ownerIdDocumentUrl: UploadValue;
   workerDeclarationAgreed: boolean;
+  dpdpConsentGiven: boolean;
+  dpdpConsentAt?: string;
+  dpdpConsentVersion?: string;
   accountHolderName?: string;
   bankAccountNumber?: string;
   ifscCode?: string;
@@ -200,10 +206,6 @@ function parseWorkingHours(value: unknown) {
 }
 
 function parseUpload(value: unknown): UploadValue {
-  if (value instanceof File) {
-    return value.size > 0 ? value : null;
-  }
-
   if (typeof value !== "string") {
     return null;
   }
@@ -253,6 +255,9 @@ async function parseOnboardingPayload(request: NextRequest): Promise<OnboardingP
     ownerIdDocumentType: parseText(getEntry(source, "ownerIdDocumentType")),
     ownerIdDocumentUrl: parseUpload(getEntry(source, "ownerIdDocumentUrl")),
     workerDeclarationAgreed: parseBoolean(getEntry(source, "workerDeclarationAgreed")),
+    dpdpConsentGiven: parseBoolean(getEntry(source, "dpdpConsentGiven")),
+    dpdpConsentAt: parseText(getEntry(source, "dpdpConsentAt")),
+    dpdpConsentVersion: parseText(getEntry(source, "dpdpConsentVersion")),
     accountHolderName: parseText(getEntry(source, "accountHolderName")),
     bankAccountNumber: parseText(getEntry(source, "bankAccountNumber")),
     ifscCode: parseText(getEntry(source, "ifscCode"))?.toUpperCase(),
@@ -264,6 +269,35 @@ async function parseOnboardingPayload(request: NextRequest): Promise<OnboardingP
 
 function hasUpload(value: UploadValue) {
   return Boolean(value);
+}
+
+function isValidObjectKey(value: string) {
+  if (!OBJECT_KEY_REGEX.test(value)) {
+    return false;
+  }
+
+  return !value.includes("://");
+}
+
+function parseTimeToMinutes(value: string) {
+  const [hoursRaw, minutesRaw] = value.split(":");
+  const hours = Number.parseInt(hoursRaw ?? "", 10);
+  const minutes = Number.parseInt(minutesRaw ?? "", 10);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function validateUploadReference(value: UploadValue, fieldLabel: string, errors: string[]) {
+  if (!value) {
+    return;
+  }
+
+  if (typeof value === "string" && !isValidObjectKey(value)) {
+    errors.push(`${fieldLabel} must be a valid uploaded object key.`);
+  }
 }
 
 function validateOnboardingPayload(data: OnboardingPayload) {
@@ -289,8 +323,17 @@ function validateOnboardingPayload(data: OnboardingPayload) {
     errors.push("Select at least one language.");
   }
 
-  if (data.serviceRadiusKm === undefined || data.serviceRadiusKm < 1 || data.serviceRadiusKm > 50) {
+  if (
+    data.serviceRadiusKm === undefined ||
+    !Number.isInteger(data.serviceRadiusKm) ||
+    data.serviceRadiusKm < 1 ||
+    data.serviceRadiusKm > 50
+  ) {
     errors.push("Service radius must be between 1 and 50 km.");
+  }
+
+  if (data.yearsExperience === undefined || !Number.isInteger(data.yearsExperience) || data.yearsExperience < 0) {
+    errors.push("Years of experience must be an integer 0 or above.");
   }
 
   if (!data.pricingType) {
@@ -303,8 +346,19 @@ function validateOnboardingPayload(data: OnboardingPayload) {
 
   if (!TIME_REGEX.test(data.workingHours.start) || !TIME_REGEX.test(data.workingHours.end)) {
     errors.push("Choose valid working hours.");
-  } else if (data.workingHours.end <= data.workingHours.start) {
-    errors.push("Working hours must end after they start.");
+  } else {
+    const startMinutes = parseTimeToMinutes(data.workingHours.start);
+    const endMinutes = parseTimeToMinutes(data.workingHours.end);
+    if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+      errors.push("Working hours must end after they start.");
+    }
+  }
+
+  if (
+    (data.pricingType === "hourly" || data.pricingType === "fixed") &&
+    (data.basePrice === undefined || !Number.isInteger(data.basePrice) || data.basePrice <= 0)
+  ) {
+    errors.push("Base price is required for hourly/fixed pricing and must be a positive integer.");
   }
 
   if (!data.accountHolderName || data.accountHolderName.length < 2) {
@@ -327,6 +381,10 @@ function validateOnboardingPayload(data: OnboardingPayload) {
     errors.push("Accept the terms and commission agreement before submitting.");
   }
 
+  if (!data.dpdpConsentGiven || !data.dpdpConsentAt || !data.dpdpConsentVersion) {
+    errors.push("DPDP consent is required before uploading and submitting KYC documents.");
+  }
+
   if (data.helperType === "individual") {
     if (!data.fullName || data.fullName.length < 2) {
       errors.push("Enter your full name.");
@@ -341,6 +399,15 @@ function validateOnboardingPayload(data: OnboardingPayload) {
       errors.push("Upload your government ID document before submitting.");
     }
   }
+
+  validateUploadReference(data.idDocumentUrl, "ID document", errors);
+  validateUploadReference(data.addressProofUrl, "Address proof", errors);
+  validateUploadReference(data.selfieUrl, "Selfie", errors);
+  validateUploadReference(data.businessRegistrationUrl, "Business registration", errors);
+  validateUploadReference(data.gstDocumentUrl, "GST document", errors);
+  validateUploadReference(data.ownerIdDocumentUrl, "Owner ID document", errors);
+  validateUploadReference(data.profilePhotoUrl, "Profile photo", errors);
+  validateUploadReference(data.logoUrl, "Logo", errors);
 
   if (data.helperType === "agency") {
     if (!data.businessName || data.businessName.length < 2) {
@@ -378,75 +445,41 @@ function validateOnboardingPayload(data: OnboardingPayload) {
   return errors;
 }
 
-function getCloudinaryServerConfig() {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
-  const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
-  const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
-
-  if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error(
-      "Missing Cloudinary server env. Required: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET"
+async function hasSubmissionRateLimitExceeded(userId: string) {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const [result] = await db
+    .select({ count: count() })
+    .from(notificationEvent)
+    .where(
+      and(
+        eq(notificationEvent.userId, userId),
+        eq(notificationEvent.templateKey, "helper.docs_submitted"),
+        gte(notificationEvent.createdAt, oneHourAgo),
+      ),
     );
-  }
 
-  return { cloudName, apiKey, apiSecret };
+  return (result?.count ?? 0) >= MAX_SUBMISSIONS_PER_HOUR;
 }
 
-function buildCloudinarySignature(
-  params: Record<string, string | number>,
-  apiSecret: string
-) {
-  const payload = Object.keys(params)
-    .sort()
-    .map((key) => `${key}=${params[key]}`)
-    .join("&");
-
-  return createHash("sha1")
-    .update(`${payload}${apiSecret}`)
-    .digest("hex");
-}
-
-async function uploadToCloudinary(upload: File, folderSegments: string[]) {
-  const { cloudName, apiKey, apiSecret } = getCloudinaryServerConfig();
-  const folder = `helper-platform/${folderSegments.join("/")}`;
-  const timestamp = Math.floor(Date.now() / 1000);
-  const signature = buildCloudinarySignature({ folder, timestamp }, apiSecret);
-
-  const formData = new FormData();
-  formData.append("file", upload);
-  formData.append("folder", folder);
-  formData.append("api_key", apiKey);
-  formData.append("timestamp", String(timestamp));
-  formData.append("signature", signature);
-
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
-    method: "POST",
-    body: formData,
+async function isDuplicateIdempotencyKey(userId: string, idempotencyKey: string) {
+  const existing = await db.query.notificationEvent.findFirst({
+    where: and(
+      eq(notificationEvent.userId, userId),
+      eq(notificationEvent.templateKey, "helper.docs_submitted"),
+      sql`coalesce(${notificationEvent.payload}->>'submissionIdempotencyKey', '') = ${idempotencyKey}`,
+    ),
+    columns: { id: true },
   });
 
-  if (!response.ok) {
-    const details = await response.text();
-    throw new Error(`Cloudinary upload failed: ${details}`);
-  }
-
-  const data = (await response.json()) as { secure_url?: string };
-  if (!data.secure_url) {
-    throw new Error("Cloudinary upload failed: secure_url missing in response");
-  }
-
-  return data.secure_url;
+  return Boolean(existing);
 }
 
-async function persistUpload(upload: UploadValue, folderSegments: string[]) {
-  if (typeof upload === "string") {
-    return upload;
-  }
-
-  if (!(upload instanceof File)) {
+function persistUpload(upload: UploadValue) {
+  if (!upload) {
     return null;
   }
 
-  return uploadToCloudinary(upload, folderSegments);
+  return isValidObjectKey(upload) ? upload : null;
 }
 
 function normalizePrimaryCategory(category: string | undefined) {
@@ -504,6 +537,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const idempotencyKey = request.headers.get("idempotency-key")?.trim() ?? "";
+    if (!IDEMPOTENCY_KEY_REGEX.test(idempotencyKey)) {
+      return NextResponse.json(
+        { message: "Idempotency-Key header is required and must be valid." },
+        { status: 400, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    if (await hasSubmissionRateLimitExceeded(session.user.id)) {
+      return NextResponse.json(
+        { message: "Submission rate limit exceeded. Please try again later." },
+        { status: 429, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    if (await isDuplicateIdempotencyKey(session.user.id, idempotencyKey)) {
+      const existing = await getHelperStatus(session.user.id);
+      return NextResponse.json(
+        {
+          ...existing,
+          message: "Duplicate submission ignored.",
+          idempotentReplay: true,
+        },
+        { status: 200, headers: NO_STORE_HEADERS },
+      );
+    }
+
     const existingStatus = await getHelperStatus(session.user.id);
     const existingProfile = existingStatus.hasProfile
       ? await db.query.helperProfile.findFirst({
@@ -536,11 +596,11 @@ export async function POST(request: NextRequest) {
       const hoursSince =
         (Date.now() - new Date(existingProfile.lastResubmittedAt).getTime()) / 36e5;
       if (hoursSince < 24) {
-        const retryAfter = Math.ceil(24 - hoursSince);
+        const retryAfterDate = new Date(new Date(existingProfile.lastResubmittedAt).getTime() + 24 * 60 * 60 * 1000);
         return NextResponse.json(
           {
             error: "Too soon to resubmit",
-            retry_after_hours: retryAfter,
+            retryAfter: Math.floor(retryAfterDate.getTime() / 1000),
           },
           { status: 429, headers: NO_STORE_HEADERS },
         );
@@ -560,8 +620,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const profilePhotoUrl = await persistUpload(data.profilePhotoUrl, ["helpers", session.user.id, "profile"]);
-    const organizationLogoUrl = await persistUpload(data.logoUrl, ["helpers", session.user.id, "assets"]);
+    const profilePhotoUrl = persistUpload(data.profilePhotoUrl);
+    const organizationLogoUrl = persistUpload(data.logoUrl);
 
     let organizationId: string | null = existingProfile?.organizationId ?? null;
     if (data.helperType === "agency") {
@@ -623,7 +683,7 @@ export async function POST(request: NextRequest) {
               blockResubmission: false,
               lastResubmittedAt: new Date(),
               submittedAt: new Date(),
-              videoKycStatus: "not_required",
+              videoKycStatus: "pending_schedule",
               updatedAt: new Date(),
             })
             .where(eq(helperProfile.id, existingProfile.id))
@@ -647,7 +707,7 @@ export async function POST(request: NextRequest) {
               isActive: false,
               blockResubmission: false,
               submittedAt: new Date(),
-              videoKycStatus: "not_required",
+              videoKycStatus: "pending_schedule",
             })
             .returning({ id: helperProfile.id })
         )[0];
@@ -717,7 +777,7 @@ export async function POST(request: NextRequest) {
           ];
 
     for (const document of kycUploads) {
-      const storedFileUrl = await persistUpload(document.upload, ["helpers", createdProfile.id, "kyc"]);
+      const storedFileUrl = persistUpload(document.upload);
       if (!storedFileUrl) {
         continue;
       }
@@ -753,6 +813,9 @@ export async function POST(request: NextRequest) {
       event: "docs_submitted",
       meta: {
         docTypes: kycUploads.map((doc) => doc.documentType),
+        submissionIdempotencyKey: idempotencyKey,
+        dpdpConsentAt: data.dpdpConsentAt,
+        dpdpConsentVersion: data.dpdpConsentVersion,
       },
     });
 

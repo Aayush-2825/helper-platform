@@ -1,9 +1,9 @@
-﻿import { headers } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { getHomeRouteForRole } from "@/lib/auth/roles";
-import { SignInClientPage } from "@/components/auth/signin-client-page";
+import { SignInClientPage } from "@features/auth/components/signin-client-page";
 
 interface SignInPageProps {
   searchParams?: Promise<{

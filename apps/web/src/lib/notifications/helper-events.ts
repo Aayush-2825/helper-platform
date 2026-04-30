@@ -28,6 +28,9 @@ export interface NotificationPayload {
     scheduledAt?: string;
     expiresAt?: string;
     adminNotes?: string;
+    submissionIdempotencyKey?: string;
+    dpdpConsentAt?: string;
+    dpdpConsentVersion?: string;
   };
 }
 

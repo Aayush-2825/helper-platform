@@ -1,52 +1,26 @@
 import express from "express";
 import http from "http";
-import WebSocket, { WebSocketServer } from "ws";
-import type { IncomingMessage } from "http";
-import type { Duplex } from "stream";
+import cors from "cors";
+import { sql } from "drizzle-orm";
+
 import router from "./routes/helpers.js";
 import realtimeRouter from "./routes/realtime.js";
-import cors from "cors";
-import { routeMessage } from "./handlers/index.js";
 import { webDb } from "./db/index.js";
-import { booking } from "./db/schema.js";
-import { and, inArray, lt, sql } from "drizzle-orm";
 import { env } from "./config/env.js";
-import { ValidationError } from "./utils/validation.js";
-import {
-  flushQueuedNotificationsForUser,
-  persistOutboundEvent,
-} from "./services/event-persistence.service.js";
-import { verifyWsAuthToken } from "./lib/ws-auth.js";
+import { logger } from "./services/logger.js";
+import { initWsServer } from "./ws/server.js";
+import { startBackgroundJobs } from "./services/jobs.js";
 
-const PORT = env.PORT;
+const PORT = env.PORT || 3001;
 
 const app = express();
 
-function normalizeOrigin(origin: string): string {
-  return origin.trim().replace(/\/$/, "");
-}
-
-function isAllowedOrigin(origin?: string | null): boolean {
-  if (!origin || origin.trim().length === 0) {
-    return false;
-  }
-
-  const normalizedOrigin = normalizeOrigin(origin);
-  return env.CORS_ALLOWED_ORIGINS.some(
-    (allowedOrigin) => normalizeOrigin(allowedOrigin) === normalizedOrigin,
-  );
-}
-
-function rejectSocketUpgrade(request: IncomingMessage, socket: Duplex): void {
-  socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
-  socket.destroy();
-  console.warn(`[WS] Rejected connection from origin: ${request.headers.origin ?? "unknown"}`);
-}
-
+/**
+ * Health Check Logic
+ */
 const healthCheck = async (_req: express.Request, res: express.Response) => {
   try {
     await webDb.execute(sql`SELECT 1`);
-
     return res.status(200).json({
       status: "ok",
       service: "realtime",
@@ -55,8 +29,7 @@ const healthCheck = async (_req: express.Request, res: express.Response) => {
       uptimeSeconds: Math.round(process.uptime()),
     });
   } catch (error) {
-    console.error("[Health] Realtime health check failed:", error);
-
+    logger.error("[HealthCheck] Failed", { error });
     return res.status(503).json({
       status: "degraded",
       service: "realtime",
@@ -66,337 +39,55 @@ const healthCheck = async (_req: express.Request, res: express.Response) => {
   }
 };
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || isAllowedOrigin(origin)) {
-        callback(null, true);
-        return;
-      }
-
-      callback(new Error(`Origin not allowed by CORS: ${origin}`));
-    },
-    methods: ["GET", "POST"],
-    credentials: true,
-  }),
-);
-
+// =========================
+// MIDDLEWARE
+// =========================
+app.use(cors({
+  origin: env.CORS_ALLOWED_ORIGINS || "*",
+  methods: ["GET", "POST"],
+  credentials: true,
+}));
 app.use(express.json());
+
+// =========================
+// ROUTES
+// =========================
 app.get("/health", healthCheck);
 app.get("/api/realtime/health", healthCheck);
 app.use("/api/helpers", router);
 app.use("/api/realtime", realtimeRouter);
 
+// =========================
+// SERVER START
+// =========================
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
 
-server.on("upgrade", (request, socket) => {
-  if (!isAllowedOrigin(request.headers.origin)) {
-    rejectSocketUpgrade(request, socket);
-  }
-});
+// 1. Initialize WebSocket Server
+initWsServer(server);
 
-/**
- * 🔥 Map<userId, sockets>
- */
-const clients = new Map<string, Set<WebSocket>>();
+// 2. Start Background Jobs
+startBackgroundJobs();
 
-// =========================
-// ✅ UTIL FUNCTIONS
-// =========================
-
-function sendToUser(userId: string, message: object) {
-  const userSockets = clients.get(userId);
-
-  if (!userSockets || userSockets.size === 0) {
-    console.warn(`[WS] No active sockets for target user=${userId}`);
-    return;
-  }
-
-  const payload = JSON.stringify(message);
-  let deliveredCount = 0;
-
-  userSockets.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
-      deliveredCount += 1;
-    }
-  });
-
-  // Clean up closed sockets opportunistically.
-  userSockets.forEach((client) => {
-    if (client.readyState !== WebSocket.OPEN) {
-      userSockets.delete(client);
-    }
-  });
-
-  if (userSockets.size === 0) {
-    clients.delete(userId);
-  }
-}
-
-function broadcastToAll(message: object) {
-  const payload = JSON.stringify(message);
-
-  clients.forEach((userSockets, userId) => {
-    userSockets.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(payload);
-      }
-    });
-
-    userSockets.forEach((client) => {
-      if (client.readyState !== WebSocket.OPEN) {
-        userSockets.delete(client);
-      }
-    });
-
-    if (userSockets.size === 0) {
-      clients.delete(userId);
-    }
-  });
-}
-
-function getTotalActiveSockets() {
-  let total = 0;
-  clients.forEach((userSockets) => {
-    total += userSockets.size;
-  });
-  return total;
-}
-
-// =========================
-// 🔥 CORE EVENT DISPATCHER
-// =========================
-
-export function broadcastEvent({
-  event,
-  data,
-  targetUserIds,
-}: {
-  event: string;
-  data: Record<string, unknown>;
-  targetUserIds?: string[];
-}) {
-  const message = {
-    type: "event",
-    event,
-    data,
-  };
-
-  void persistOutboundEvent({ event, data, targetUserIds });
-
-  if (targetUserIds && targetUserIds.length > 0) {
-    targetUserIds.forEach((userId) => {
-      sendToUser(userId, message);
-    });
-  } else {
-    broadcastToAll(message);
-  }
-}
-
-// =========================
-// 🌐 WS CONNECTION
-// =========================
-
-wss.on("connection", (socket: WebSocket, request) => {
-  if (!isAllowedOrigin(request.headers.origin)) {
-    console.warn(`[WS] Origin rejected after handshake: ${request.headers.origin ?? "unknown"}`);
-    socket.close(1008, "Origin not allowed");
-    return;
-  }
-
-  const url = new URL(request.url || "", "http://localhost");
-  const userId = url.searchParams.get("userId");
-  const wsToken = url.searchParams.get("token");
-
-  if (!userId) {
-    console.warn("[WS] Missing userId → rejected");
-    socket.close(1008, "Missing userId");
-    return;
-  }
-
-  const wsSecret = env.REALTIME_WS_AUTH_SECRET || env.AUTH_SECRET || "";
-  if (!wsSecret) {
-    console.error("[WS] Missing websocket auth secret, refusing connection.");
-    socket.close(1011, "WebSocket auth unavailable");
-    return;
-  }
-
-  if (!wsToken || !verifyWsAuthToken(wsToken, userId, wsSecret)) {
-    console.warn(`[WS] Invalid token for user=${userId}. Connection rejected.`);
-    socket.close(1008, "Invalid websocket auth token");
-    return;
-  }
-
-  const existingSockets = clients.get(userId) ?? new Set<WebSocket>();
-  existingSockets.add(socket);
-  clients.set(userId, existingSockets);
-
-  // ✅ Connection ack
-  socket.send(
-    JSON.stringify({
-      type: "connected",
-      userId,
-      timestamp: new Date().toISOString(),
-    }),
-  );
-
-  void flushQueuedNotificationsForUser(userId, (queuedMessage) => {
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(queuedMessage));
-    }
-  });
-
-  // =========================
-  // 📩 MESSAGE HANDLER
-  // =========================
-
-  socket.on("message", (raw) => {
-    try {
-      const data = JSON.parse(raw.toString());
-
-      // ❤️ Handle heartbeat
-      if (data.type === "ping") {
-        socket.send(JSON.stringify({ type: "pong" }));
-        return;
-      }
-
-      // 🛡️ Wrap handler in try-catch to prevent crashes
-      try {
-        routeMessage(userId, data);
-      } catch (handlerErr) {
-        console.error(`[WS] Handler error for ${userId} (${data.type}):`, handlerErr);
-        const isValidationError = handlerErr instanceof ValidationError;
-        socket.send(
-          JSON.stringify({
-            type: "error",
-            message: isValidationError ? handlerErr.message : "Failed to process message",
-            code: isValidationError ? handlerErr.code : "HANDLER_ERROR",
-            requestType: data.type,
-          })
-        );
-      }
-    } catch (err) {
-      console.warn("[WS] Invalid message JSON", err);
-      socket.send(
-        JSON.stringify({
-          type: "error",
-          message: "Invalid message format",
-        })
-      );
-    }
-  });
-
-  // =========================
-  // 🔌 CLEANUP
-  // =========================
-
-  socket.on("close", async () => {
-    const userSockets = clients.get(userId);
-    if (userSockets) {
-      userSockets.delete(socket);
-      if (userSockets.size === 0) {
-        clients.delete(userId);
-      }
-    }
-  });
-
-  socket.on("error", (err) => {
-    console.error(`[WS] Error for ${userId}:`, err);
-  });
-});
-
-// =========================
-// 🚀 START SERVER
-// =========================
-
-const stopSignals = ["SIGTERM", "SIGINT"];
-
-let isShuttingDown = false;
-
-const gracefulShutdown = async (signal: string) => {
-  if (isShuttingDown) {
-    console.log(`[Server] Shutdown already in progress (${signal}), forcing exit...`);
-    process.exit(1);
-  }
-
-  isShuttingDown = true;
-  console.log(`[Server] Received ${signal}, starting graceful shutdown...`);
-
-  // Close all WebSocket connections
-  wss.clients.forEach((client) => {
-    client.close(1001, "Server shutting down");
-  });
-
-  // Close HTTP server
+// 3. Graceful Shutdown
+const gracefulShutdown = (signal: string) => {
+  logger.info(`[Server] Received ${signal}, closing...`);
   server.close(() => {
-    console.log("[Server] HTTP server closed");
+    logger.info("[Server] HTTP server closed");
     process.exit(0);
   });
-
-  // Force shutdown after 10 seconds
+  
   setTimeout(() => {
-    console.error("[Server] Forced shutdown after 10s timeout");
+    logger.error("[Server] Forced shutdown after timeout");
     process.exit(1);
   }, 10000);
 };
 
-stopSignals.forEach((signal) => {
-  process.on(signal, () => gracefulShutdown(signal));
-});
-
-// Handle uncaught exceptions
-process.on("uncaughtException", (err) => {
-  console.error("[Server] Uncaught exception:", err);
-  gracefulShutdown("UNCAUGHT_EXCEPTION");
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("[Server] Unhandled rejection at:", promise, "reason:", reason);
-});
-
-// =========================
-// 🕒 BOOKING EXPIRATION JOB (runs every 30s)
-// =========================
-
-setInterval(async () => {
-  try {
-    const now = new Date();
-    const expired = await webDb
-      .update(booking)
-      .set({ status: "expired", updatedAt: now })
-      .where(
-        and(
-          inArray(booking.status, ["requested", "matched"]),
-          lt(booking.acceptanceDeadline, now)
-        )
-      )
-      .returning({ id: booking.id, customerId: booking.customerId });
-
-    if (expired.length > 0) {
-      console.log(`🕒 [Expiration] Marked ${expired.length} bookings as expired`);
-      expired.forEach((b) => {
-        broadcastEvent({
-          event: "booking_update",
-          data: { bookingId: b.id, status: "expired", eventType: "expired" },
-          targetUserIds: [b.customerId],
-        });
-      });
-    }
-  } catch (err) {
-    // Silence error if booking table doesn't exist yet or other DB issues
-    if (process.env.NODE_ENV === "development") {
-      // console.warn("🕒 [Expiration] Job skipped (likely DB or table not ready)");
-    } else {
-      console.error("❌ [Expiration] Job failed:", err);
-    }
-  }
-}, 30000);
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 server.listen(PORT, () => {
-  console.log(`[Server] ✅ Express + WS running on port ${PORT}`);
-  console.log(`[Server] 📡 WebSocket server ready`);
-  console.log(`[Server] 🔄 Auto-expiration job started (30s interval)`);
-  console.log(`[Server] 🛡️ Graceful shutdown configured`);
+  logger.info(`[Server] ✅ Realtime service running on port ${PORT}`);
 });
+
+// Re-export broadcastEvent for backward compatibility
+export { broadcastEvent } from "./ws/dispatch.js";

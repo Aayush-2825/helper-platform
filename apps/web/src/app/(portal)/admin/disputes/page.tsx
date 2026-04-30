@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CircleAlert, CircleCheckBig, Loader2, MessageSquare, RefreshCcw, Scale, Search } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@repo/ui/components/ui/badge";
+import { Button } from "@repo/ui/components/ui/button";
+import { Card, CardContent } from "@repo/ui/components/ui/card";
+import { Input } from "@repo/ui/components/ui/input";
+import { Textarea } from "@repo/ui/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 type DisputeRecord = {
@@ -273,14 +273,21 @@ export default function AdminDisputesPage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <label htmlFor="admin-disputes-search" className="sr-only">Search disputes</label>
                 <Input
+                  id="admin-disputes-search"
+                  aria-label="Search disputes"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search disputes, bookings, users, or reason codes..."
                   className="h-12 pl-11"
                 />
               </div>
+              <label htmlFor="admin-disputes-status" className="sr-only">
+                Filter disputes by status
+              </label>
               <select
+                id="admin-disputes-status"
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as DisputeStatus | "all")}
                 className="h-12 rounded-2xl border border-border/50 bg-card/60 px-4 text-sm font-medium outline-none transition-all focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
@@ -452,7 +459,7 @@ export default function AdminDisputesPage() {
                 </div>
               </>
             ) : (
-              <div className="flex items-center justify-center rounded-3xl border border-dashed border-border/70 p-8 text-center text-sm text-muted-foreground" style={{ minHeight: "25.5rem" }}>
+              <div className="flex min-h-102 items-center justify-center rounded-3xl border border-dashed border-border/70 p-8 text-center text-sm text-muted-foreground">
                 Select a dispute to review its details and resolution controls.
               </div>
             )}

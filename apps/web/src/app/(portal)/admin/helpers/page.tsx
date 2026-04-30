@@ -12,18 +12,19 @@ import {
   Search,
   Star,
 } from "lucide-react";
-import { AdminDataTable } from "@/components/admin/admin-data-table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { AdminDataTable } from "@features/admin/components/admin-data-table";
+import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@repo/ui/components/ui/button";
+import { ConfirmationDialog } from "@/components/dialogs/confirmation-dialog";
+import { Card, CardContent } from "@repo/ui/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+} from "@repo/ui/components/ui/dropdown-menu";
+import { Input } from "@repo/ui/components/ui/input";
+// 'cn' utility intentionally not used in this file
 
 type HelperStatus = "active" | "pending" | "suspended";
 
@@ -97,6 +98,11 @@ async function fetchHelpers(params: {
 
 export default function AdminHelpersPage() {
   const queryClient = useQueryClient();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmDescription, setConfirmDescription] = useState<string | undefined>(undefined);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [verificationStatus, setVerificationStatus] = useState<
     "all" | "pending" | "approved" | "rejected" | "resubmission_required"
@@ -182,44 +188,23 @@ export default function AdminHelpersPage() {
         ),
       },
       {
-        id: "verification",
-        header: "Verification",
-        cell: ({ row }) => (
-          <Badge
-            className={cn(
-              "rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]",
-              row.original.verificationStatus === "approved" &&
-                "border-green-200 bg-green-100 text-green-800 dark:border-green-600/40 dark:bg-green-600/20 dark:text-green-300",
-              row.original.verificationStatus === "pending" &&
-                "border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-600/40 dark:bg-amber-600/20 dark:text-amber-300",
-              row.original.verificationStatus === "resubmission_required" &&
-                "border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-600/40 dark:bg-blue-600/20 dark:text-blue-300",
-              row.original.verificationStatus === "rejected" &&
-                "border-destructive/30 bg-destructive/10 text-destructive",
-            )}
-          >
-            {row.original.verificationStatus.replaceAll("_", " ")}
-          </Badge>
-        ),
-      },
+            id: "verification",
+            header: "Verification",
+            cell: ({ row }) => {
+              const v = row.original.verificationStatus;
+              const status: "success" | "pending" | "error" | "info" =
+                v === "approved" ? "success" : v === "pending" ? "pending" : v === "rejected" ? "error" : "info";
+              return <StatusBadge status={status} label={v.replaceAll("_", " ")} />;
+            },
+          },
       {
         id: "availability",
         header: "Availability",
-        cell: ({ row }) => (
-          <Badge
-            className={cn(
-              "rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]",
-              row.original.availabilityStatus === "online" &&
-                "border-green-200 bg-green-100 text-green-800 dark:border-green-600/40 dark:bg-green-600/20 dark:text-green-300",
-              row.original.availabilityStatus === "busy" &&
-                "border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-600/40 dark:bg-amber-600/20 dark:text-amber-300",
-              row.original.availabilityStatus === "offline" &&
-                "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600/40 dark:bg-slate-600/20 dark:text-slate-300",
-            )}
-          >
-            {row.original.availabilityStatus}
-          </Badge>
-        ),
+        cell: ({ row }) => {
+          const a = row.original.availabilityStatus;
+          const status: "success" | "warning" | "info" = a === "online" ? "success" : a === "busy" ? "warning" : "info";
+          return <StatusBadge status={status} label={a} />;
+        },
       },
       {
         id: "actions",
@@ -229,7 +214,13 @@ export default function AdminHelpersPage() {
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={(props) => (
-                  <Button {...props} variant="ghost" size="icon" className="rounded-xl size-9 hover:bg-primary/5">
+                  <Button
+                    {...props}
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-xl size-9 hover:bg-primary/5"
+                    aria-label={`Open actions for ${row.original.name ?? row.original.id}`}
+                  >
                     <MoreHorizontal className="size-5" />
                   </Button>
                 )}
@@ -237,9 +228,19 @@ export default function AdminHelpersPage() {
               <DropdownMenuContent align="end" className="rounded-2xl border-none shadow-2xl">
                 <DropdownMenuItem
                   className="cursor-pointer gap-2 p-3 font-semibold"
-                  onClick={() =>
-                    availabilityMutation.mutate({ helperId: row.original.id, availabilityStatus: "online" })
-                  }
+                  onClick={() => {
+                    setConfirmTitle("Set helper online");
+                    setConfirmDescription("This will mark the helper as available (online). Proceed?");
+                    setConfirmAction(() => async () => {
+                      try {
+                        setConfirmLoading(true);
+                        await availabilityMutation.mutateAsync({ helperId: row.original.id, availabilityStatus: "online" });
+                      } finally {
+                        setConfirmLoading(false);
+                      }
+                    });
+                    setConfirmOpen(true);
+                  }}
                   disabled={availabilityMutation.isPending}
                 >
                   <CheckCircle2 className="size-4" />
@@ -247,9 +248,19 @@ export default function AdminHelpersPage() {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer p-3 font-semibold"
-                  onClick={() =>
-                    availabilityMutation.mutate({ helperId: row.original.id, availabilityStatus: "offline" })
-                  }
+                  onClick={() => {
+                    setConfirmTitle("Set helper offline");
+                    setConfirmDescription("This will mark the helper as offline. The helper will not receive new jobs.");
+                    setConfirmAction(() => async () => {
+                      try {
+                        setConfirmLoading(true);
+                        await availabilityMutation.mutateAsync({ helperId: row.original.id, availabilityStatus: "offline" });
+                      } finally {
+                        setConfirmLoading(false);
+                      }
+                    });
+                    setConfirmOpen(true);
+                  }}
                   disabled={availabilityMutation.isPending}
                 >
                   Set Offline
@@ -322,19 +333,26 @@ export default function AdminHelpersPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setPage(1);
-                }}
-                placeholder="Search by name, email, city, category, or helper ID..."
-                className="h-12 pl-11"
-              />
+                <label htmlFor="admin-helpers-search" className="sr-only">Search helpers</label>
+                <Input
+                  id="admin-helpers-search"
+                  aria-label="Search helpers"
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Search by name, email, city, category, or helper ID..."
+                  className="h-12 pl-11"
+                />
             </div>
 
             <div className="flex gap-3">
+              <label htmlFor="admin-helpers-verification-status" className="sr-only">
+                Filter helpers by verification status
+              </label>
               <select
+                id="admin-helpers-verification-status"
                 value={verificationStatus}
                 onChange={(event) => {
                   setVerificationStatus(
@@ -356,7 +374,11 @@ export default function AdminHelpersPage() {
                 <option value="rejected">Rejected</option>
               </select>
 
+              <label htmlFor="admin-helpers-activity" className="sr-only">
+                Filter helpers by activity
+              </label>
               <select
+                id="admin-helpers-activity"
                 value={activeFilter}
                 onChange={(event) => {
                   setActiveFilter(event.target.value as "all" | "true" | "false");
@@ -384,6 +406,24 @@ export default function AdminHelpersPage() {
           />
         </CardContent>
       </Card>
+
+          <ConfirmationDialog
+            open={confirmOpen}
+            onOpenChange={(open) => setConfirmOpen(open)}
+            title={confirmTitle}
+            description={confirmDescription}
+            actionLabel="Confirm"
+            cancelLabel="Cancel"
+            onConfirm={async () => {
+              if (!confirmAction) return;
+              await confirmAction();
+              setConfirmOpen(false);
+              queryClient.invalidateQueries({ queryKey: ["admin", "helpers"] });
+            }}
+            onCancel={() => setConfirmOpen(false)}
+            isDestructive={false}
+            isLoading={confirmLoading}
+          />
     </div>
   );
 }

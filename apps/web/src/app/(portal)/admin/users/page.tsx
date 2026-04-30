@@ -14,17 +14,17 @@ import {
   ShieldX,
   UserRoundPlus,
 } from "lucide-react";
-import { AdminDataTable } from "@/components/admin/admin-data-table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { AdminDataTable } from "@features/admin/components/admin-data-table";
+import { Badge } from "@repo/ui/components/ui/badge";
+import { Button } from "@repo/ui/components/ui/button";
+import { Card, CardContent } from "@repo/ui/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+} from "@repo/ui/components/ui/dropdown-menu";
+import { Input } from "@repo/ui/components/ui/input";
 import { cn } from "@/lib/utils";
 
 type UserRole = "admin" | "helper" | "customer";
@@ -230,13 +230,20 @@ export default function AdminUsersPage() {
         cell: ({ row }) => {
           const isHelper = row.original.role === "helper";
           const isSuspended = row.original.status === "suspended";
+          const actionLabel = `Open actions for ${row.original.name ?? row.original.email ?? row.original.id}`;
 
           return (
             <div className="flex justify-end">
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={(props) => (
-                    <Button {...props} variant="ghost" size="icon" className="rounded-xl size-9 hover:bg-primary/5">
+                    <Button
+                      {...props}
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-xl size-9 hover:bg-primary/5"
+                      aria-label={actionLabel}
+                    >
                       <MoreHorizontal className="size-5" />
                     </Button>
                   )}
@@ -307,7 +314,10 @@ export default function AdminUsersPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <label htmlFor="admin-users-search" className="sr-only">Search users</label>
               <Input
+                id="admin-users-search"
+                aria-label="Search users"
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value);
@@ -318,7 +328,11 @@ export default function AdminUsersPage() {
               />
             </div>
 
+            <label htmlFor="admin-users-role" className="sr-only">
+              Filter users by role
+            </label>
             <select
+              id="admin-users-role"
               value={roleFilter}
               onChange={(event) => {
                 setRoleFilter(event.target.value as "all" | "admin" | "helper" | "customer");

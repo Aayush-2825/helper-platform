@@ -1,4 +1,4 @@
-﻿import { headers } from "next/headers";
+import { headers } from "next/headers";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -183,8 +183,7 @@ export async function PATCH(request: NextRequest) {
             verificationStatus: nextProfileStatus,
             isActive: computed.isActive,
             blockResubmission: computed.blockResubmission,
-            videoKycStatus:
-              nextProfileStatus === "approved" ? "pending_schedule" : "not_required",
+            videoKycStatus: "pending_schedule",
             updatedAt: now,
           })
           .where(eq(helperProfile.id, document.helperProfileId))

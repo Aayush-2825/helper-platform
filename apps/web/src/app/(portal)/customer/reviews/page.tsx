@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import type { Booking } from "@/components/BookingCard";
+import { Button } from "@repo/ui/components/ui/button";
+import type { Booking } from "@features/booking/components/BookingCard";
 
 const categoryLabels: Record<string, string> = {
   driver: "Driver",
@@ -144,7 +144,10 @@ function ReviewCard({
             <p className="text-sm font-medium">Rate this job</p>
             <StarRating value={rating} onChange={setRating} />
           </div>
+          <label htmlFor={`review-comment-${booking.id}`} className="sr-only">Share your experience</label>
           <textarea
+            id={`review-comment-${booking.id}`}
+            aria-label="Share your experience (optional)"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Share your experience (optional)…"

@@ -113,24 +113,8 @@ export interface CloudStorageConfig {
   credentials: Record<string, string>;
 }
 
-function getCloudinaryUploadConfig() {
-  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
-  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_PRESET?.trim();
-
-  if (!cloudName) {
-    throw new Error("Missing required environment variable: NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME");
-  }
-
-  if (!uploadPreset) {
-    throw new Error("Missing required environment variable: NEXT_PUBLIC_CLOUDINARY_PRESET");
-  }
-
-  return { cloudName, uploadPreset };
-}
-
 /**
- * Upload file to Cloudinary using an unsigned upload preset.
- * Requires: NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, NEXT_PUBLIC_CLOUDINARY_PRESET
+ * Upload file to Cloudinary using a server-side signature.
  */
 export async function uploadToCloudinary(
   file: File,
@@ -138,13 +122,32 @@ export async function uploadToCloudinary(
   options?: {
     publicId?: string;
     tags?: string[];
-    eager?: string[];
   }
 ): Promise<{ url: string; publicId: string }> {
+  // 1. Get signature from our API
+  const signResponse = await fetch("/api/cloudinary/sign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      folder,
+      public_id: options?.publicId,
+    }),
+  });
+
+  if (!signResponse.ok) {
+    throw new Error("Failed to get upload signature");
+  }
+
+  const { signature, timestamp, cloud_name, api_key } = await signResponse.json();
+
+  // 2. Upload directly to Cloudinary
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("folder", `zapier/${folder}`);
-
+  formData.append("signature", signature);
+  formData.append("timestamp", timestamp.toString());
+  formData.append("api_key", api_key);
+  formData.append("folder", folder);
+  
   if (options?.publicId) {
     formData.append("public_id", options.publicId);
   }
@@ -153,12 +156,9 @@ export async function uploadToCloudinary(
     formData.append("tags", options.tags.join(","));
   }
 
-  const { cloudName, uploadPreset } = getCloudinaryUploadConfig();
-  formData.append("upload_preset", uploadPreset);
-
   try {
     const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
+      `https://api.cloudinary.com/v1_1/${cloud_name}/auto/upload`,
       {
         method: "POST",
         body: formData,
@@ -166,6 +166,8 @@ export async function uploadToCloudinary(
     );
 
     if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Cloudinary error:", errorData);
       throw new Error("Upload failed");
     }
 
@@ -179,6 +181,7 @@ export async function uploadToCloudinary(
     throw new Error("Failed to upload file");
   }
 }
+
 
 /**
  * Generic upload function that routes through Cloudinary.

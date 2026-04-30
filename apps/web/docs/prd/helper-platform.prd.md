@@ -74,16 +74,18 @@ Manages users, verifies helpers, monitors bookings, handles disputes, and tracks
 - Automatic location detection with manual override
 - Service category and subcategory selection
 - Instant booking request creation
-- Booking status timeline
+- Real-time booking status timeline and live map tracking
+- Secure job completion via OTP verification
 - Payment options: UPI, Card, Wallet, Cash
 - Ratings and reviews
 - Booking history and receipts
 
 ## 8. Helper Features (MVP)
 - Profile and service management
-- KYC and document upload for verification
+- Video KYC (OAuth-based) and document upload for verification
 - Availability toggle (Online/Offline)
 - Accept or reject incoming job requests
+- Live location tracking during active jobs
 - Job history and status updates
 - Earnings dashboard
 - Payout withdrawal to bank account
@@ -128,20 +130,23 @@ The platform should follow a role-first routing model so each user lands in the 
 - `/dashboard` - Role-aware redirect and quick access hub.
 - `/account/settings` - Cross-role account and security settings.
 
-#### Customer Portal Routes
+#### Customer Portal Routes (`/(portal)/customer`)
 - `/customer` - Customer home and active booking summary.
 - `/customer/book` - New booking flow entry point.
+- `/customer/active` - Live tracking and status of the active job.
 - `/customer/bookings` - Booking history and status timeline.
 - `/customer/payments` - Payment methods, invoices, and receipts.
 - `/customer/reviews` - Submitted ratings and feedback management.
 
-#### Helper Portal Routes
+#### Helper Portal Routes (`/(portal)/helper`)
 - `/helper` - Helper home and daily workload summary.
-- `/helper/incoming-jobs` - Live incoming requests queue.
+- `/helper/incoming-jobs` - Live incoming requests queue with map tracking.
+- `/helper/active` - Active job tracking and status updates.
 - `/helper/availability` - Online/offline and schedule controls.
 - `/helper/job-history` - Completed/cancelled jobs history.
 - `/helper/earnings` - Earnings, payouts, and reconciliation.
 - `/helper/verification` - Verification status and pending actions.
+- `/helper/video-kyc` - Video KYC scheduling and verification via OAuth.
 
 #### Seller Onboarding Routes
 - `/seller/onboarding` - Multi-step onboarding wizard.
@@ -229,9 +234,10 @@ Helpers can pay for top placement in discovery lists.
 ### Booking
 - Category-based booking form
 - Location and notes capture
-- Matching and dispatch to nearest available helpers
+- Progressive matching and dispatch to nearest available helpers (expanding search radius: 5km, 10km, 20km, 50km)
 - Accept, reject, and timeout states
-- Cancellations and status lifecycle
+- Cancellations and status lifecycle (including on-disconnect cancellation)
+- Secure job completion verified via Customer OTP
 
 ### Payments
 - Payment intent creation and confirmation
@@ -259,14 +265,14 @@ Helpers can pay for top placement in discovery lists.
 - Usability: mobile-first responsive experience
 
 ## 15. Tech Stack (MVP)
-- Frontend: Next.js (App Router)
+- Frontend: Next.js (App Router), Tailwind CSS 4.0, Shadcn UI
 - Backend: Node.js API routes/services
-- Database: MongoDB (as proposed in PRD baseline)
+- Database: PostgreSQL (Neon) with Drizzle ORM
 - Payments: Razorpay
-- Maps/Location: Google Maps API
-- Auth: OTP-based login
+- Maps/Location: MapLibre GL
+- Auth: Better Auth (OTP and OAuth support)
 
-## 16. Recommended Product Folder Structure
+## 16. Current Monorepo Structure
 
 ```text
 helper-platform/
@@ -274,92 +280,33 @@ helper-platform/
     web/
       src/
         app/
-          auth/
-          customer/
-          helper/
-          admin/
+          (auth)/
+          (marketing)/
+          (portal)/
+            admin/
+            customer/
+            dashboard/
+            helper/
+            organizations/
           api/
         components/
         features/
-          auth/
-          booking/
-          matching/
-          payments/
-          reviews/
-          disputes/
-        lib/
         hooks/
-        styles/
-      public/
-      tests/
-      package.json
-      next.config.ts
-  services/
-    matching-service/
-      src/
-      tests/
-      package.json
-    payment-service/
-      src/
-      tests/
-      package.json
-    notification-service/
-      src/
-      tests/
+        lib/
       package.json
   packages/
+    db/
+      src/
+        schema/
+      package.json
     ui/
       src/
+        components/
       package.json
     shared/
-      auth/
-      types/
-      utils/
-      db/
     config/
-      eslint/
-      typescript/
-  infrastructure/
-    docker/
-    terraform/
-    monitoring/
-  docs/
-    prd/
-    architecture/
-    api/
-  scripts/
-  .github/
-    workflows/
   package.json
-  README.md
 ```
-
-## 17. Suggested Structure for Current Repository
-
-```text
-src/
-  app/
-    auth/
-    dashboard/
-    organizations/
-    account/
-    api/
-  components/
-    ui/
-  db/
-  lib/
-    validation/
-```
-
-Recommended additions:
-- `src/features/booking/`
-- `src/features/helper/`
-- `src/features/payments/`
-- `src/features/reviews/`
-- `src/features/disputes/`
-- `src/features/admin/`
-- `src/services/matching/`
-- `src/services/notifications/`
 
 ## 18. Milestones
 1. Core Auth and Onboarding
@@ -404,6 +351,5 @@ Recommended additions:
 ## 21. Future Roadmap
 - Mobile apps (Android and iOS)
 - AI-based matching and pricing optimization
-- Real-time helper tracking
 - Subscription plans for customers and helpers
 - Emergency fast-response service mode

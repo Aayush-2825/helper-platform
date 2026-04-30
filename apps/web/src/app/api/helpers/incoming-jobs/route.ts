@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { db } from "@/db";
 import { bookingCandidate, helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
+import { evaluateHelperActivationGate } from "@/lib/helper/activation-gate";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
 function isPrerenderHangError(error: unknown): boolean {
@@ -65,13 +66,17 @@ export async function GET() {
     });
 
     if (!profile) {
+      return NextResponse.json({ message: "Helper profile not found.", reason: "helper_profile_missing" }, { status: 403, headers: NO_STORE_HEADERS });
+    }
+
+    const activationGate = evaluateHelperActivationGate(profile);
+    if (!activationGate.ok) {
       return NextResponse.json(
         {
-          profile: null,
-          canReceiveJobs: false,
-          jobs: [],
+          message: activationGate.message,
+          reason: activationGate.reason,
         },
-        { status: 200, headers: NO_STORE_HEADERS }
+        { status: 403, headers: NO_STORE_HEADERS },
       );
     }
 

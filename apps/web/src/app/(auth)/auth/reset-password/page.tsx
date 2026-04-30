@@ -1,9 +1,9 @@
-﻿import { headers } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { getHomeRouteForRole } from "@/lib/auth/roles";
-import { ResetPasswordClientPage } from "@/components/auth/reset-password-client-page";
+import { ResetPasswordClientPage } from "@features/auth/components/reset-password-client-page";
 
 interface ResetPasswordPageProps {
   searchParams?: Promise<{

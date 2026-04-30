@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowRight, Clock, Zap } from "lucide-react";
 import { CATEGORIES, CAT_COLORS, FEATURED, POSTS } from "./data";
-import { Button } from "@/components/ui/button";
+import { Button } from "@repo/ui/components/ui/button";
 
 export function BlogClientPage() {
   const [activeCategory, setActiveCategory] = useState("All");

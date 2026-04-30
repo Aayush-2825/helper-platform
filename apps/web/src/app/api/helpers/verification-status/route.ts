@@ -20,6 +20,8 @@ export async function GET() {
       videoKycStatus: true,
       isActive: true,
       submittedAt: true,
+      blockResubmission: true,
+      lastResubmittedAt: true,
     },
   });
 
@@ -30,12 +32,22 @@ export async function GET() {
         video_kyc_status: "not_required",
         is_active: false,
         submitted_at: null,
+        block_resubmission: false,
+        last_resubmitted_at: null,
+        resubmission_retry_after: null,
         docs: [],
         video_kyc_session: null,
       },
       { status: 200, headers: NO_STORE_HEADERS },
     );
   }
+
+  const resubmissionRetryAfter = profile.lastResubmittedAt
+    ? Math.max(
+        0,
+        Math.floor((profile.lastResubmittedAt.getTime() + 24 * 60 * 60 * 1000) / 1000),
+      )
+    : null;
 
   const docs = await db.query.helperKycDocument.findMany({
     where: and(
@@ -68,6 +80,9 @@ export async function GET() {
       video_kyc_status: profile.videoKycStatus,
       is_active: profile.isActive,
       submitted_at: profile.submittedAt?.toISOString() ?? null,
+      block_resubmission: profile.blockResubmission,
+      last_resubmitted_at: profile.lastResubmittedAt?.toISOString() ?? null,
+      resubmission_retry_after: resubmissionRetryAfter,
       docs: docs.map((doc) => ({
         type: doc.documentType,
         status: doc.status,

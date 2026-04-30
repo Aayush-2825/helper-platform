@@ -1,12 +1,22 @@
-import { headers } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
+import { connection, NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { canRevealJoinLink } from "@/lib/kyc/video-kyc";
 
+function isPrerenderHangError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    (error as { digest?: string }).digest === "HANGING_PROMISE_REJECTION"
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
+    await connection();
+
+    const session = await auth.api.getSession({ headers: request.headers });
     if (!session?.user) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
@@ -40,12 +50,13 @@ export async function GET(request: NextRequest) {
         { status: 403, headers: NO_STORE_HEADERS },
       );
     }
-
     const response = NextResponse.redirect(gate.meetLink, { status: 302 });
     Object.entries(NO_STORE_HEADERS).forEach(([key, value]) => response.headers.set(key, value));
     return response;
   } catch (error) {
-    console.error("Video KYC join redirect error:", error);
+    if (!isPrerenderHangError(error)) {
+      console.error("Video KYC join redirect error:", error);
+    }
     return NextResponse.json({ message: "Internal server error" }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }

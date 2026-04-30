@@ -1,10 +1,34 @@
 import { Router } from "express";
 import { db } from "../db/index.js";
-import { sql } from "drizzle-orm";
-import { helperPresence } from "../db/schema.js";
+import { eq, sql } from "drizzle-orm";
+import { helperPresence, helperProfile } from "../db/schema.js";
 import { randomUUID } from "crypto";
 
 const router: Router = Router();
+
+function getActivationFailureReason(profile: {
+  verificationStatus: "pending" | "approved" | "rejected" | "resubmission_required";
+  videoKycStatus: "not_required" | "pending_schedule" | "scheduled" | "passed" | "failed";
+  isActive: boolean;
+} | null) {
+  if (!profile) {
+    return "helper_profile_missing";
+  }
+
+  if (profile.verificationStatus !== "approved") {
+    return "verification_status_not_approved";
+  }
+
+  if (profile.videoKycStatus !== "passed") {
+    return "video_kyc_not_passed";
+  }
+
+  if (!profile.isActive) {
+    return "helper_not_active";
+  }
+
+  return null;
+}
 
 router.get("/nearby", async (req, res) => {
   try {
@@ -46,6 +70,10 @@ router.get("/nearby", async (req, res) => {
         distanceKm: haversineFormula,
       })
       .from(helperPresence)
+      .innerJoin(
+        helperProfile,
+        eq(helperProfile.userId, helperPresence.helperUserId),
+      )
       .where(
         sql`
         ${haversineFormula} <= ${rad}
@@ -53,6 +81,9 @@ router.get("/nearby", async (req, res) => {
         AND ${helperPresence.lastHeartbeat} > NOW() - INTERVAL '60 seconds'
         AND ${helperPresence.latitude} IS NOT NULL
         AND ${helperPresence.longitude} IS NOT NULL
+        AND ${helperProfile.verificationStatus} = 'approved'
+        AND ${helperProfile.videoKycStatus} = 'passed'
+        AND ${helperProfile.isActive} = true
       `,
       )
       .orderBy(haversineFormula)
@@ -81,6 +112,24 @@ router.post("/helper-presence", async (req, res) => {
 
     if (!helperUserId || !status) {
       return res.status(400).json({ error: "Missing fields" });
+    }
+
+    const [profile] = await db
+      .select({
+        verificationStatus: helperProfile.verificationStatus,
+        videoKycStatus: helperProfile.videoKycStatus,
+        isActive: helperProfile.isActive,
+      })
+      .from(helperProfile)
+      .where(eq(helperProfile.userId, String(helperUserId)))
+      .limit(1);
+
+    const gateReason = getActivationFailureReason(profile ?? null);
+    if (gateReason) {
+      return res.status(403).json({
+        error: "Helper is not eligible for realtime presence",
+        reason: gateReason,
+      });
     }
 
     await db

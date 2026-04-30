@@ -4,11 +4,11 @@ import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CalendarRange, CheckCircle2, Loader2, PlayCircle, RefreshCcw, Search, XCircle } from "lucide-react";
-import { AdminDataTable } from "@/components/admin/admin-data-table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { AdminDataTable } from "@features/admin/components/admin-data-table";
+import { Badge } from "@repo/ui/components/ui/badge";
+import { Button } from "@repo/ui/components/ui/button";
+import { Card, CardContent } from "@repo/ui/components/ui/card";
+import { Input } from "@repo/ui/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -360,7 +360,10 @@ export default function AdminPayoutsPage() {
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <label htmlFor="admin-payouts-search" className="sr-only">Search payouts</label>
               <Input
+                id="admin-payouts-search"
+                aria-label="Search payouts"
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value);
@@ -372,7 +375,11 @@ export default function AdminPayoutsPage() {
             </div>
 
             <div className="flex flex-wrap gap-3">
+              <label htmlFor="admin-payouts-status" className="sr-only">
+                Filter payouts by status
+              </label>
               <select
+                id="admin-payouts-status"
                 value={statusFilter}
                 onChange={(event) => {
                   setStatusFilter(event.target.value as "all" | PayoutStatus);
@@ -390,7 +397,11 @@ export default function AdminPayoutsPage() {
 
               <div className="flex items-center gap-2 rounded-2xl border border-border/50 bg-card/60 px-3">
                 <CalendarRange className="size-4 text-muted-foreground" />
+                <label htmlFor="admin-payouts-from" className="sr-only">
+                  Filter payouts from date
+                </label>
                 <Input
+                  id="admin-payouts-from"
                   type="date"
                   value={from}
                   onChange={(event) => {
@@ -403,7 +414,11 @@ export default function AdminPayoutsPage() {
 
               <div className="flex items-center gap-2 rounded-2xl border border-border/50 bg-card/60 px-3">
                 <CalendarRange className="size-4 text-muted-foreground" />
+                <label htmlFor="admin-payouts-to" className="sr-only">
+                  Filter payouts to date
+                </label>
                 <Input
+                  id="admin-payouts-to"
                   type="date"
                   value={to}
                   onChange={(event) => {

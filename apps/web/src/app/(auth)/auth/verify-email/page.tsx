@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { getHomeRouteForRole } from "@/lib/auth/roles";
-import { VerifyEmailClientPage } from "@/components/auth/verify-email-client-page";
+import { VerifyEmailClientPage } from "@features/auth/components/verify-email-client-page";
 
 export default async function VerifyEmailPage() {
   await connection();

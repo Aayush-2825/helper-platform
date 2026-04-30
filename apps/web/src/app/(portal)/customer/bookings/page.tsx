@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRealtimeEvents } from "@/hooks/use-realtime-events";
+import { useRealtimeEvents } from "@features/booking/hooks/use-realtime-events";
 import { useSession } from "@/lib/auth/session";
-import { BookingCard, type Booking } from "@/components/BookingCard";
-import { BookingJourneySummary } from "@/components/BookingJourneySummary";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { BookingCard, type Booking } from "@features/booking/components/BookingCard";
+import { BookingJourneySummary } from "@features/booking/components/BookingJourneySummary";
+import { Button } from "@repo/ui/components/ui/button";
+import { Badge } from "@repo/ui/components/ui/badge";
+import { Card, CardContent } from "@repo/ui/components/ui/card";
 import { Loader2, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 

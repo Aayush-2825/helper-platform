@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FileText } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button-variants";
+import { buttonVariants } from "@repo/ui/components/ui/button-variants";
 
 export const metadata: Metadata = {
   title: "Blog — Coming Soon | DOZO",

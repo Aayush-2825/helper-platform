@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Centralized Type Exports
  * Import all onboarding-related types from here
  */

@@ -2,8 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  transpilePackages: ["@repo/ui", "@repo/db", "@repo/types", "@repo/validators"],
   cacheComponents: true,
   images: {
+
     remotePatterns: [
       {
         protocol: "https",
@@ -20,6 +22,10 @@ const nextConfig: NextConfig = {
         hostname: "images.unsplash.com",
         pathname: "/**",
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      }
     ],
   },
 };

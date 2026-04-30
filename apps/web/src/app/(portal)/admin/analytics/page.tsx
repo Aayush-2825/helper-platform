@@ -3,8 +3,10 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, BarChart3, Loader2, RefreshCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@repo/ui/components/ui/button";
+import { Card, CardContent } from "@repo/ui/components/ui/card";
+import { Sparkline } from "@/components/charts/sparkline";
+import { BarChart } from "@/components/charts/barchart";
 
 type AnalyticsResponse = {
   metrics: {
@@ -34,6 +36,8 @@ type AnalyticsResponse = {
       total: number;
       averageRating: string;
     };
+    bookingsTimeseries?: { date: string; total: number }[];
+    paymentsTimeseries?: { date: string; gross: number }[];
   };
 };
 
@@ -87,6 +91,9 @@ export default function AdminAnalyticsPage() {
       averageRating: Number(metrics.reviews.averageRating),
     };
   }, [metrics]);
+
+  const bookingsTrend = metrics?.bookingsTimeseries ? metrics.bookingsTimeseries.map((d) => d.total) : undefined;
+  const revenueBars = metrics?.paymentsTimeseries ? metrics.paymentsTimeseries.slice(-4).map((d) => ({ label: d.date.slice(5), value: d.gross })) : undefined;
 
   return (
     <div className="space-y-8">
@@ -154,6 +161,32 @@ export default function AdminAnalyticsPage() {
             </Card>
           </div>
 
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold">Bookings trend</h3>
+                    <p className="text-xs text-muted-foreground">Daily (30d)</p>
+                  </div>
+                </div>
+                <div className="h-24 mt-3">
+                  {bookingsTrend ? <Sparkline data={bookingsTrend} color="var(--primary)" height={48} /> : <div className="h-24" />}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent>
+                <div>
+                  <h3 className="text-sm font-semibold">Revenue (recent)</h3>
+                  <p className="text-xs text-muted-foreground">Last periods</p>
+                </div>
+                <div className="h-28 mt-3">{revenueBars ? <BarChart data={revenueBars} /> : <div className="h-28" />}</div>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card className="surface-card-strong border-none">
             <CardContent className="space-y-5 p-6">
               <div className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
@@ -185,3 +218,4 @@ export default function AdminAnalyticsPage() {
     </div>
   );
 }
+

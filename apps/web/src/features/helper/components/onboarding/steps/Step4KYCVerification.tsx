@@ -1,0 +1,326 @@
+"use client";
+
+import { UseFormReturn, FieldValues, Controller } from "react-hook-form";
+import { FormField } from "@repo/ui/components/ui/form-field";
+import { Label } from "@repo/ui/components/ui/label";
+import { ToggleGroup, ToggleGroupItem } from "@repo/ui/components/ui/toggle-group";
+import { Checkbox } from "@repo/ui/components/ui/checkbox";
+import { FileUploadField } from "../FileUploadField";
+import { AlertCircle, ShieldCheck } from "lucide-react";
+
+interface Step4KYCVerificationProps<T extends FieldValues> {
+  form: UseFormReturn<T>;
+  isIndividual: boolean;
+}
+
+/**
+ * Step 4: KYC & Verification
+ * Collect government ID, selfie, address proof (individual)
+ * Business registration, GST, owner ID (agency)
+ */
+export function Step4KYCVerification<T extends FieldValues>({
+  form,
+  isIndividual,
+}: Step4KYCVerificationProps<T>) {
+  const { control, formState } = form;
+  const { errors } = formState;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gstNumber = form.watch("gstNumber" as any);
+
+  const ID_TYPES = [
+    { value: "aadhar", label: "Aadhar Card" },
+    { value: "pan", label: "PAN Card" },
+    { value: "driving_license", label: "Driving License" },
+    { value: "passport", label: "Passport" },
+  ];
+
+  const idDocumentTypeErrorId = "idDocumentType-error";
+  const ownerIdDocumentTypeErrorId = "ownerIdDocumentType-error";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dpdpConsentGiven = Boolean(form.watch("dpdpConsentGiven" as any));
+
+  if (!dpdpConsentGiven) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            <ShieldCheck className="mr-2 inline h-6 w-6 text-primary" />
+            DPDP Consent Required
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            Before uploading KYC documents, you must consent to collection and processing of identity data.
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+          <p>
+            I consent to the collection, processing, and secure storage of my identity and business documents for
+            helper verification and compliance purposes under the DPDP policy.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          onClick={() => {
+            const timestamp = new Date().toISOString();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (form.setValue as any)("dpdpConsentGiven", true, { shouldDirty: true, shouldValidate: true });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (form.setValue as any)("dpdpConsentAt", timestamp, { shouldDirty: true, shouldValidate: true });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (form.setValue as any)("dpdpConsentVersion", "v1.0", { shouldDirty: true, shouldValidate: true });
+          }}
+        >
+          I consent and continue
+        </button>
+
+        {errors.dpdpConsentGiven ? (
+          <p className="text-xs text-destructive" role="alert">
+            {errors.dpdpConsentGiven.message as string}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">
+          <ShieldCheck className="mr-2 inline h-6 w-6 text-primary" />
+          Identity Verification
+        </h1>
+        <p className="mt-2 text-muted-foreground">
+          Help us verify your identity to build trust with customers
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+        <div className="flex gap-3">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Verified badge increases job chances by 3x
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Your documents are encrypted and reviewed securely
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {isIndividual ? (
+        <>
+          <Controller
+            control={control}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            name={"idDocumentType" as any}
+            render={({ field, fieldState: { error } }) => (
+              <div>
+                <Label htmlFor="idDocumentType">Government ID Type</Label>
+                <ToggleGroup
+                  id="idDocumentType"
+                  multiple={false}
+                  variant="outline"
+                  value={typeof field.value === "string" && field.value.length > 0 ? [field.value] : []}
+                  onValueChange={(values) => field.onChange(values[0] ?? "")}
+                  aria-invalid={!!error?.message}
+                  aria-describedby={error?.message ? idDocumentTypeErrorId : undefined}
+                  className="mt-2 grid w-full grid-cols-2 gap-2"
+                >
+                  {ID_TYPES.map((type) => (
+                    <ToggleGroupItem
+                      key={type.value}
+                      value={type.value}
+                      className="h-auto min-h-11 w-full rounded-lg border-2 border-border px-3 py-2 text-sm font-medium text-foreground data-pressed:border-primary data-pressed:bg-primary/10 data-pressed:text-primary"
+                    >
+                      {type.label}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+                {error?.message && (
+                  <p id={idDocumentTypeErrorId} className="mt-1 text-xs text-destructive" role="alert">{error.message}</p>
+                )}
+              </div>
+            )}
+          />
+
+          <Controller
+            control={control}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            name={"idDocumentNumber" as any}
+            render={({ field, fieldState: { error } }) => (
+              <FormField
+                {...field}
+                id="idDocumentNumber"
+                placeholder="1234 5678 9012"
+                label="Document Number"
+                error={error?.message}
+                helperText="The unique identifier on your document"
+                required
+              />
+            )}
+          />
+
+          <FileUploadField
+            control={control}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            name={"idDocumentUrl" as any}
+            label="ID Document (Front & Back or Single Page)"
+            accept="image/*,application/pdf"
+            maxSize={5}
+            category="kyc"
+            hint="Clear photos showing all visible text and security features"
+          />
+
+          <div className="rounded-lg border border-accent/30 bg-accent/10 p-4">
+            <p className="text-sm text-foreground">
+              <AlertCircle className="mr-2 inline h-4 w-4 text-accent" />
+              <strong>Optional:</strong> Upload a selfie holding your ID for instant verification
+            </p>
+          </div>
+
+          <FileUploadField
+            control={control}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            name={"addressProofUrl" as any}
+            label="Address Proof (Optional)"
+            accept="image/*,application/pdf"
+            maxSize={5}
+            category="kyc"
+            hint="Recent document with your name and address"
+          />
+        </>
+      ) : (
+        <>
+          <FileUploadField
+            control={control}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            name={"businessRegistrationUrl" as any}
+            label="Business Registration Document"
+            accept="image/*,application/pdf"
+            maxSize={5}
+            category="kyc"
+            required
+            hint="Company registration certificate, LLC, or partnership deed"
+          />
+
+          <Controller
+            control={control}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            name={"gstNumber" as any}
+            render={({ field, fieldState: { error } }) => (
+              <FormField
+                {...field}
+                id="gstNumber"
+                placeholder="29ABCDE1234F1Z5"
+                label="GST Number (Optional)"
+                error={error?.message}
+                helperText="15-character GST number if registered"
+              />
+            )}
+          />
+
+          {gstNumber && (
+            <FileUploadField
+              control={control}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              name={"gstDocumentUrl" as any}
+              label="GST Certificate"
+              accept="image/*,application/pdf"
+              maxSize={5}
+              category="kyc"
+              hint="GST registration certificate or acknowledgment"
+            />
+          )}
+
+          <Controller
+            control={control}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            name={"ownerIdDocumentType" as any}
+            render={({ field, fieldState: { error } }) => (
+              <div>
+                <Label htmlFor="ownerIdDocumentType">Owner/Manager ID Type</Label>
+                <ToggleGroup
+                  id="ownerIdDocumentType"
+                  multiple={false}
+                  variant="outline"
+                  value={typeof field.value === "string" && field.value.length > 0 ? [field.value] : []}
+                  onValueChange={(values) => field.onChange(values[0] ?? "")}
+                  aria-invalid={!!error?.message}
+                  aria-describedby={error?.message ? ownerIdDocumentTypeErrorId : undefined}
+                  className="mt-2 grid w-full grid-cols-2 gap-2"
+                >
+                  {ID_TYPES.map((type) => (
+                    <ToggleGroupItem
+                      key={type.value}
+                      value={type.value}
+                      className="h-auto min-h-11 w-full rounded-lg border-2 border-border px-3 py-2 text-sm font-medium text-foreground data-pressed:border-primary data-pressed:bg-primary/10 data-pressed:text-primary"
+                    >
+                      {type.label}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+                {error?.message && (
+                  <p id={ownerIdDocumentTypeErrorId} className="mt-1 text-xs text-destructive" role="alert">{error.message}</p>
+                )}
+              </div>
+            )}
+          />
+
+          <FileUploadField
+            control={control}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            name={"ownerIdDocumentUrl" as any}
+            label="Owner/Manager ID Document"
+            accept="image/*,application/pdf"
+            maxSize={5}
+            category="kyc"
+            required
+            hint="Clear photos of the owner's government-issued ID"
+          />
+
+          <Controller
+            control={control}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            name={"workerDeclarationAgreed" as any}
+            render={({ field }) => (
+              <label
+                htmlFor="workerDeclarationAgreed"
+                className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3"
+              >
+                <Checkbox
+                  id="workerDeclarationAgreed"
+                  checked={field.value || false}
+                  onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                  className="mt-1"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    I certify that all workers on my team have verified their identity
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    We will verify this during onboarding completion
+                  </p>
+                </div>
+              </label>
+            )}
+          />
+          {errors.workerDeclarationAgreed && (
+            <p className="text-xs text-destructive" role="alert">
+              {errors.workerDeclarationAgreed.message as string}
+            </p>
+          )}
+        </>
+      )}
+
+      <div className="rounded-lg border border-border bg-muted/40 p-4">
+        <p className="text-xs text-muted-foreground">
+          <strong>Timeline:</strong> Verification typically completes within 24-48 hours. You will receive updates via email.
+        </p>
+      </div>
+    </div>
+  );
+}

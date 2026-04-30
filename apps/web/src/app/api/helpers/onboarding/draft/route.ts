@@ -6,6 +6,8 @@ import { helperOnboardingDraft } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
+const DRAFT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+
 export async function GET() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) {
@@ -20,6 +22,14 @@ export async function GET() {
       updatedAt: true,
     },
   });
+
+  if (draft && Date.now() - draft.updatedAt.getTime() > DRAFT_EXPIRY_MS) {
+    await db.delete(helperOnboardingDraft).where(eq(helperOnboardingDraft.userId, session.user.id));
+    return NextResponse.json(
+      { draft: null },
+      { status: 200, headers: NO_STORE_HEADERS },
+    );
+  }
 
   return NextResponse.json(
     {

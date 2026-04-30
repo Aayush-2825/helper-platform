@@ -1,4 +1,4 @@
-﻿import { headers } from "next/headers";
+import { headers } from "next/headers";
 import { and, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 

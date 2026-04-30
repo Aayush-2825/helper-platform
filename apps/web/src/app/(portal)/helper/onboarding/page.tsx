@@ -8,6 +8,8 @@ import { auth } from "@/lib/auth/server";
 import { getHelperLandingPath } from "@/lib/helper/routing";
 import { HelperOnboardingClientPage } from "../helper-onboarding-client";
 
+const DRAFT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+
 /**
  * Helper Onboarding Page
  * Redirects already-onboarded helpers away from onboarding form.
@@ -33,8 +35,15 @@ export default async function HelperOnboardingPage() {
     columns: {
       stepIndex: true,
       payload: true,
+      updatedAt: true,
     },
   });
+
+  if (draft && Date.now() - draft.updatedAt.getTime() > DRAFT_EXPIRY_MS) {
+    await db.delete(helperOnboardingDraft).where(eq(helperOnboardingDraft.userId, session.user.id));
+
+    return <HelperOnboardingClientPage initialDraft={null} />;
+  }
 
   return (
     <HelperOnboardingClientPage
@@ -42,9 +51,14 @@ export default async function HelperOnboardingPage() {
         draft
           ? {
               step_index: draft.stepIndex,
-              payload: (draft.payload as Record<string, unknown>) ?? {},
+              payload: {
+                ...((draft.payload as Record<string, unknown>) ?? {}),
+              },
             }
-          : null
+          : {
+              step_index: 0,
+              payload: {},
+            }
       }
     />
   );

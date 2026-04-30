@@ -1,4 +1,4 @@
-import { RoleSectionLayout } from "@/components/portal/role-section-layout";
+import { RoleSectionLayout } from "@features/shared/components/portal/role-section-layout";
 import {
   LayoutDashboard,
   Plus,

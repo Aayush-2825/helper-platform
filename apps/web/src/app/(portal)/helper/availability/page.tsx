@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Wifi, WifiOff, Clock, Plus, Trash2 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
+import { Button } from "@repo/ui/components/ui/button";
 import { publishHelperPresence } from "@/lib/realtime/client";
 import { useSession } from "@/lib/auth/session";
-import { useWebSocket } from "@/hooks/useWebsocket";
+import { useWebSocket } from "@features/shared/hooks/useWebsocket";
 
 type AvailabilityStatus = "online" | "offline" | "busy";
 type AvailabilitySlot = {

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle } from "lucide-react";
-import { HelperOnboardingWizard } from "@/components/onboarding/HelperOnboardingWizard";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { HelperOnboardingWizard } from "@features/helper/components/onboarding/HelperOnboardingWizard";
+import { Alert, AlertDescription, AlertTitle } from "@repo/ui/components/ui/alert";
 import { type CompleteOnboarding, clearOnboardingDraft } from "@/types/onboarding";
 
 interface DraftState {
@@ -77,6 +77,9 @@ function buildOnboardingFormData(data: CompleteOnboarding) {
   appendFormDataValue(formData, "ownerIdDocumentType", data.ownerIdDocumentType);
   appendFormDataValue(formData, "ownerIdDocumentUrl", data.ownerIdDocumentUrl);
   appendFormDataValue(formData, "workerDeclarationAgreed", data.workerDeclarationAgreed);
+  appendFormDataValue(formData, "dpdpConsentGiven", data.dpdpConsentGiven);
+  appendFormDataValue(formData, "dpdpConsentAt", data.dpdpConsentAt);
+  appendFormDataValue(formData, "dpdpConsentVersion", data.dpdpConsentVersion);
   appendFormDataValue(formData, "accountHolderName", data.accountHolderName);
   appendFormDataValue(formData, "bankAccountNumber", data.bankAccountNumber);
   appendFormDataValue(formData, "ifscCode", data.ifscCode);
@@ -96,12 +99,16 @@ function getStringProp(obj: unknown, key: string): string | null {
 export function HelperOnboardingClientPage({ initialDraft }: { initialDraft: DraftState | null }) {
   const router = useRouter();
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const idempotencyKeyRef = useRef(`onboarding-${crypto.randomUUID()}`);
 
   async function handleSubmit(data: CompleteOnboarding) {
     setSubmissionError(null);
 
     const res = await fetch("/api/helpers/onboarding", {
       method: "POST",
+      headers: {
+        "Idempotency-Key": idempotencyKeyRef.current,
+      },
       body: buildOnboardingFormData(data),
     });
 
@@ -114,6 +121,7 @@ export function HelperOnboardingClientPage({ initialDraft }: { initialDraft: Dra
     }
 
     clearOnboardingDraft();
+    idempotencyKeyRef.current = `onboarding-${crypto.randomUUID()}`;
     await fetch("/api/helpers/onboarding/draft", {
       method: "DELETE",
       credentials: "include",

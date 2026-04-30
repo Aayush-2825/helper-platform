@@ -6,16 +6,16 @@ import {
   MapPin, Star, ShieldCheck, Menu, CheckCircle2, Lock, ArrowRight,
   Zap, Users, Clock, Phone, BadgeCheck, Award, TrendingUp, X
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ServiceSection } from "@/components/ServiceSection";
-import { HowItWorks } from "@/components/HowItWorks";
-import { ActivityTicker } from "@/components/ActivityTicker";
-import { Testimonials } from "@/components/Testimonials";
-import { AppDownload } from "@/components/AppDownload";
-import { CityCoverage } from "@/components/CityCoverage";
-import { FAQ } from "@/components/FAQ";
-import { BecomeHelper } from "@/components/BecomeHelper";
+import { Button } from "@repo/ui/components/ui/button";
+import { Input } from "@repo/ui/components/ui/input";
+import { ServiceSection } from "@features/landing/components/ServiceSection";
+import { HowItWorks } from "@features/landing/components/HowItWorks";
+import { ActivityTicker } from "@features/landing/components/ActivityTicker";
+import { Testimonials } from "@features/landing/components/Testimonials";
+import { AppDownload } from "@features/landing/components/AppDownload";
+import { CityCoverage } from "@features/landing/components/CityCoverage";
+import { FAQ } from "@features/landing/components/FAQ";
+import { BecomeHelper } from "@features/landing/components/BecomeHelper";
 import { useState, useEffect } from "react";
 
 const LIVE_HELPERS = [
@@ -165,18 +165,24 @@ export default function DozoLandingPage() {
 
       <main>
         {/* 2. HERO SECTION */}
-        <section className="pt-36 pb-20 lg:pt-48 lg:pb-32 px-6">
+        <section className="pt-36 pb-20 lg:pt-48 lg:pb-32 px-6 relative overflow-hidden">
+          {/* Gradient background effects */}
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-0 right-1/4 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+          </div>
+
           <div className="max-w-7xl mx-auto grid lg:grid-cols-[1.1fr_0.9fr] gap-16 items-center">
-            <div className="space-y-8">
+            <div className="space-y-8 reveal-up">
               {/* Pill */}
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-sm font-bold">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-sm font-bold hover:shadow-md hover:shadow-orange-500/10 transition-all cursor-default">
                 <Zap className="size-3.5 fill-orange-500" />
                 Help in 10 Minutes · Live in Delhi NCR
               </div>
 
               <h1 className="text-5xl lg:text-[5.5rem] font-black tracking-tighter leading-[1.05] text-balance">
                 Book Trusted Helpers in{" "}
-                <span className="text-orange-500">10 Minutes.</span>
+                <span className="text-gradient-accent">10 Minutes.</span>
               </h1>
 
               <p className="text-lg lg:text-xl text-muted-foreground font-medium max-w-xl leading-relaxed">
@@ -184,7 +190,7 @@ export default function DozoLandingPage() {
               </p>
 
               {/* Search / CTA */}
-              <div className="bg-card p-2 rounded-[14px] border border-border shadow-sm flex flex-col sm:flex-row gap-2 max-w-xl">
+              <div className="bg-card p-2 rounded-[14px] border border-border shadow-sm hover:shadow-md hover:border-border/80 transition-all flex flex-col sm:flex-row gap-2 max-w-xl">
                 <div className="relative flex-1 flex items-center">
                   <label htmlFor="hero-address" className="sr-only">Enter your address or locality</label>
                   <MapPin className="size-5 text-muted-foreground absolute left-4 shrink-0" />
@@ -197,8 +203,8 @@ export default function DozoLandingPage() {
                     className="w-full bg-transparent pl-11 pr-4 border-0 shadow-none outline-none text-base font-medium placeholder:text-muted-foreground h-12 rounded-none focus-visible:ring-0"
                   />
                 </div>
-                <Link href={bookingHref} className="w-full sm:w-auto">
-                  <Button className="h-12 w-full px-8 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-[10px] text-base shadow-md shadow-orange-500/20 transition-all">
+                  <Link href={bookingHref} className="w-full sm:w-auto">
+                  <Button className="h-12 w-full px-8 bg-accent-gradient hover:opacity-95 text-white font-bold rounded-[10px] text-base shadow-lg shadow-orange-500/30 transition-all hover:scale-105 active:scale-95">
                     Book Now
                   </Button>
                 </Link>
@@ -206,28 +212,29 @@ export default function DozoLandingPage() {
 
               {/* Trust pills */}
               <div className="flex flex-wrap items-center gap-4 text-sm font-semibold text-muted-foreground">
-                <div className="flex items-center gap-2"><Lock className="size-4" /> Secure Payments</div>
-                <div className="flex items-center gap-2"><ShieldCheck className="size-4 text-emerald-500" /> Verified Helpers</div>
-                <div className="flex items-center gap-2"><Star className="size-4 fill-amber-400 text-amber-400" /> 4.9/5 Avg Rating</div>
+                <div className="flex items-center gap-2 hover:text-foreground transition-colors"><Lock className="size-4" /> Secure Payments</div>
+                <div className="flex items-center gap-2 hover:text-foreground transition-colors"><ShieldCheck className="size-4 text-emerald-500" /> Verified Helpers</div>
+                <div className="flex items-center gap-2 hover:text-foreground transition-colors"><Star className="size-4 fill-amber-400 text-amber-400" /> 4.9/5 Avg Rating</div>
               </div>
             </div>
 
             {/* Hero Visual */}
-            <div className="hidden lg:block relative">
-              <div className="relative w-full aspect-4/3 rounded-3xl overflow-hidden border border-border shadow-2xl">
+            <div className="hidden lg:block relative reveal-up delay-1">
+              <div className="relative w-full aspect-4/3 rounded-3xl overflow-hidden border border-border shadow-2xl hover:shadow-2xl transition-all duration-300">
                 <Image
                   src="/images/services/dozo_home_cleaning_pro_1775929072455.png"
                   alt="DOZO professional cleaner"
                   fill
                   sizes="(min-width: 1024px) 50vw, 100vw"
-                  className="object-cover"
+                  className="object-cover hover:scale-105 transition-transform duration-500"
                   priority
                 />
                 <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent" />
                 {/* Dynamic Cycling Helper Card */}
                 <div
-                  className="absolute bottom-5 left-5 right-5 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[14px] p-4 shadow-xl transition-all duration-400"
-                  style={{ opacity: helperVisible ? 1 : 0, transform: helperVisible ? "translateY(0px)" : "translateY(6px)", transition: "opacity 0.4s ease, transform 0.4s ease" }}
+                  className={`absolute bottom-5 left-5 right-5 bg-white/10 backdrop-blur-xl border border-white/20 rounded-[14px] p-4 shadow-xl transition-all duration-300 ${
+                    helperVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1.5"
+                  }`}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
@@ -265,11 +272,11 @@ export default function DozoLandingPage() {
                 </div>
               </div>
               {/* Floating stat chips */}
-              <div className="absolute -top-4 -right-4 bg-background border border-border rounded-[12px] px-4 py-3 shadow-lg flex items-center gap-2.5">
+              <div className="absolute -top-4 -right-4 bg-background border border-border rounded-[12px] px-4 py-3 shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2.5 reveal-up delay-2">
                 <Star className="size-4 fill-amber-400 text-amber-400" />
                 <div><p className="text-[11px] text-muted-foreground font-medium">Avg Rating</p><p className="font-black text-sm">4.9 / 5.0</p></div>
               </div>
-              <div className="absolute -bottom-4 -left-4 bg-background border border-border rounded-[12px] px-4 py-3 shadow-lg flex items-center gap-2.5">
+              <div className="absolute -bottom-4 -left-4 bg-background border border-border rounded-[12px] px-4 py-3 shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2.5 reveal-up delay-3">
                 <ShieldCheck className="size-4 text-emerald-500" />
                 <div><p className="text-[11px] text-muted-foreground font-medium">Helpers Verified</p><p className="font-black text-sm">10,000+</p></div>
               </div>
@@ -285,9 +292,9 @@ export default function DozoLandingPage() {
                 <div className="size-10 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0">
                   <s.icon className="size-5 text-orange-500" strokeWidth={2} />
                 </div>
-                <div>
-                  <p className="font-black text-xl leading-none">{s.value}</p>
-                  <p className="text-xs text-muted-foreground font-semibold mt-1">{s.label}</p>
+                <div className="flex flex-col">
+                  <p className="text-[11px] text-muted-foreground font-medium">{s.label}</p>
+                  <p className="font-black text-sm">{s.value}</p>
                 </div>
               </div>
             ))}

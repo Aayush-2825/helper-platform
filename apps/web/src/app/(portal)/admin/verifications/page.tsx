@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, BadgeCheck, CheckCircle2, Clock3, Loader2, RefreshCcw, Search, ShieldCheck, Video, XCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@repo/ui/components/ui/badge";
+import { Button } from "@repo/ui/components/ui/button";
+import { Card, CardContent } from "@repo/ui/components/ui/card";
+import { Input } from "@repo/ui/components/ui/input";
+import { Textarea } from "@repo/ui/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { CalendarStatus } from "@/components/admin/CalendarStatus";
+import { CalendarStatus } from "@features/admin/components/CalendarStatus";
 
 type VerificationDocument = {
   id: string;
@@ -551,14 +551,21 @@ export default function AdminVerificationsPage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <label htmlFor="admin-verifications-search" className="sr-only">Search verifications</label>
                 <Input
+                  id="admin-verifications-search"
+                  aria-label="Search verifications"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search document, helper, city, or category..."
                   className="h-12 pl-11"
                 />
               </div>
+              <label htmlFor="admin-verifications-status" className="sr-only">
+                Filter verifications by status
+              </label>
               <select
+                id="admin-verifications-status"
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as VerificationStatus | "all")}
                 className="h-12 rounded-2xl border border-border/50 bg-card/60 px-4 text-sm font-medium outline-none transition-all focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
@@ -748,7 +755,11 @@ export default function AdminVerificationsPage() {
                           <p className="text-xs text-muted-foreground">Last updated {formatDate(helper.updatedAt)}</p>
                         </div>
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+                          <label htmlFor={`video-schedule-${helper.id}`} className="sr-only">
+                            Schedule video KYC for {helper.user?.name ?? helper.id}
+                          </label>
                           <Input
+                            id={`video-schedule-${helper.id}`}
                             type="datetime-local"
                             value={pendingVideoSchedule[helper.id] ?? ""}
                             onChange={(event) =>
@@ -796,7 +807,11 @@ export default function AdminVerificationsPage() {
                       </div>
                       <div className="flex w-full flex-col gap-2 lg:w-auto lg:items-end">
                         <div className="flex w-full flex-col gap-2 sm:flex-row lg:justify-end">
+                          <label htmlFor={`video-reschedule-${session.id}`} className="sr-only">
+                            Reschedule video KYC for {session.helperProfile?.user?.name ?? session.helperProfile?.id ?? session.id}
+                          </label>
                           <Input
+                            id={`video-reschedule-${session.id}`}
                             type="datetime-local"
                             value={rescheduleVideoSchedule[session.id] ?? toDateTimeLocalValue(session.scheduledAt)}
                             onChange={(event) =>
@@ -804,7 +819,11 @@ export default function AdminVerificationsPage() {
                             }
                             className="h-10 rounded-xl sm:w-56"
                           />
+                          <label htmlFor={`video-notes-${session.id}`} className="sr-only">
+                            Admin notes for {session.helperProfile?.user?.name ?? session.helperProfile?.id ?? session.id}
+                          </label>
                           <Input
+                            id={`video-notes-${session.id}`}
                             value={videoAdminNotes[session.id] ?? ""}
                             onChange={(event) =>
                               setVideoAdminNotes((current) => ({ ...current, [session.id]: event.target.value }))

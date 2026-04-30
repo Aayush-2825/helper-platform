@@ -1,6 +1,6 @@
 "use client";
 
-import { MyMap } from "@/components/map-component";
+import { MyMap } from "@features/shared/components/mapping/map-component";
 import { useSession } from "@/lib/auth/session";
 import { useSearchParams } from "next/navigation";
 

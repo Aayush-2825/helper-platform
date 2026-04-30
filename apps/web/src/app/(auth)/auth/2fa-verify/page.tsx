@@ -1,9 +1,9 @@
-﻿import { headers } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { getHomeRouteForRole } from "@/lib/auth/roles";
-import { TwoFactorVerifyClientPage } from "@/components/auth/two-factor-verify-client-page";
+import { TwoFactorVerifyClientPage } from "@features/auth/components/two-factor-verify-client-page";
 
 export default async function TwoFactorVerifyPage() {
   await connection();

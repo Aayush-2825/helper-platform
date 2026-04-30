@@ -17,9 +17,9 @@ import {
   History,
   MapPin
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/StatusBadge";
-import type { Booking } from "@/components/BookingCard";
+import { Button } from "@repo/ui/components/ui/button";
+import { StatusBadge } from "@features/shared/components/StatusBadge";
+import type { Booking } from "@features/booking/components/BookingCard";
 
 const categoryLabels: Record<string, string> = {
   cleaner: "Cleaner",

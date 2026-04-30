@@ -238,6 +238,9 @@ export const completeOnboardingSchema = z.object({
   ownerIdDocumentType: z.string().optional(),
   ownerIdDocumentUrl: z.string().optional(),
   workerDeclarationAgreed: z.boolean().default(false),
+  dpdpConsentGiven: z.boolean().default(false),
+  dpdpConsentAt: z.string().optional(),
+  dpdpConsentVersion: z.string().optional(),
 
   // Step 5: Bank
   accountHolderName: z.string().optional(),

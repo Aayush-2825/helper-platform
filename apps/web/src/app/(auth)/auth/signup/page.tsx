@@ -1,9 +1,9 @@
-﻿import { headers } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { getHomeRouteForRole } from "@/lib/auth/roles";
-import { SignUpClientPage } from "@/components/auth/signup-client-page";
+import { SignUpClientPage } from "@features/auth/components/signup-client-page";
 
 export default async function SignUpPage() {
   await connection();

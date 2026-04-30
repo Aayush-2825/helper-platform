@@ -4,9 +4,9 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { canRevealJoinLink } from "@/lib/kyc/video-kyc";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@repo/ui/components/ui/alert";
+import { buttonVariants } from "@repo/ui/components/ui/button-variants";
+import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
 
 function formatDate(value: Date) {
   return new Intl.DateTimeFormat("en-IN", {

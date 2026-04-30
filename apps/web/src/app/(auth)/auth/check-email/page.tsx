@@ -5,9 +5,9 @@ import { connection } from "next/server";
 import { MailCheck } from "lucide-react";
 import { auth } from "@/lib/auth/server";
 import { getHomeRouteForRole } from "@/lib/auth/roles";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@repo/ui/components/ui/badge";
+import { buttonVariants } from "@repo/ui/components/ui/button-variants";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
 
 export default async function CheckEmailPage() {
   await connection();
@@ -31,10 +31,12 @@ export default async function CheckEmailPage() {
           <CardDescription>We sent a verification link to your inbox.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex justify-center rounded-xl bg-secondary/60 p-4">
-            <MailCheck className="text-primary" />
+          <div className="flex justify-center">
+            <div className="flex size-20 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/10 shadow-sm">
+              <MailCheck className="size-8 text-primary" />
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-base leading-relaxed text-muted-foreground">
             Click the link in your email to activate your account. If you cannot find it, check your spam folder and
             try again.
           </p>

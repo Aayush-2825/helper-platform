@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, Loader2, RefreshCcw, Search, Wifi, WifiOff } from "lucide-react";
-import { useRealtimeEvents } from "@/hooks/use-realtime-events";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { useRealtimeEvents } from "@features/booking/hooks/use-realtime-events";
+import { Badge } from "@repo/ui/components/ui/badge";
+import { Button } from "@repo/ui/components/ui/button";
+import { Card, CardContent } from "@repo/ui/components/ui/card";
+import { Input } from "@repo/ui/components/ui/input";
 import { useSession } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 
@@ -273,7 +273,10 @@ export default function AdminBookingsPage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <label htmlFor="admin-bookings-search" className="sr-only">Search bookings</label>
                 <Input
+                  id="admin-bookings-search"
+                  aria-label="Search bookings"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search booking, customer, helper, city, category..."
@@ -281,7 +284,11 @@ export default function AdminBookingsPage() {
                 />
               </div>
 
+              <label htmlFor="admin-bookings-status" className="sr-only">
+                Filter bookings by status
+              </label>
               <select
+                id="admin-bookings-status"
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as BookingStatus | "all")}
                 className="h-12 rounded-2xl border border-border/50 bg-card/60 px-4 text-sm font-medium outline-none transition-all focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"

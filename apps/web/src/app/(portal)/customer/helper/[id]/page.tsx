@@ -33,7 +33,7 @@ export default function HelperProfilePage({ params }: { params: { id: string } }
     <div className="max-w-3xl mx-auto space-y-8 pb-32">
        {/* Header Navigation */}
        <div className="flex items-center gap-4">
-         <Link href="/customer/book" className="p-2 rounded-full hover:bg-muted transition-colors">
+             <Link href="/customer/book" className="p-2 rounded-full hover:bg-muted transition-colors" aria-label="Back to booking list">
             <ArrowLeft className="size-5 text-muted-foreground" />
          </Link>
          <h1 className="text-xl font-heading font-bold">Provider Profile</h1>
@@ -113,7 +113,7 @@ export default function HelperProfilePage({ params }: { params: { id: string } }
        </div>
 
        {/* Reviews Section */}
-       <div className="space-y-4 animate-reveal-up" style={{ animationDelay: "0.1s" }}>
+      <div className="space-y-4 animate-reveal-up delay-100">
           <h3 className="text-xl font-heading font-black px-2">Recent Reviews</h3>
           <div className="grid gap-4">
              {helper.reviews.map((r) => (
@@ -136,11 +136,11 @@ export default function HelperProfilePage({ params }: { params: { id: string } }
        </div>
 
        {/* Sticky CTA */}
-       <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background to-transparent z-50">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-linear-to-t from-background via-background to-transparent z-50">
           <div className="max-w-3xl mx-auto flex gap-4">
             <Link href={`/customer/book?helperId=${helper.id}`} className="w-full">
-              <Button size="lg" className="w-full h-16 rounded-[1.5rem] text-lg font-black shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-95 bg-primary text-white">
-                 Book via DOZO
+              <Button size="lg" className="w-full h-16 rounded-3xl text-lg font-black shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-95 bg-primary text-white">
+                 Book Now
               </Button>
             </Link>
           </div>

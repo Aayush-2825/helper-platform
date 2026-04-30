@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, Copy, Loader2, RefreshCcw, Search, ShieldAlert, WalletCards } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Badge } from "@repo/ui/components/ui/badge";
+import { Button } from "@repo/ui/components/ui/button";
+import { Card, CardContent } from "@repo/ui/components/ui/card";
+import { Input } from "@repo/ui/components/ui/input";
 import { cn } from "@/lib/utils";
 
 type BookingSummary = {
@@ -240,7 +240,10 @@ export default function AdminPaymentsPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <label htmlFor="admin-payments-search" className="sr-only">Search payments</label>
               <Input
+                id="admin-payments-search"
+                aria-label="Search payments"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search payment ID, booking, customer, helper, provider order..."
@@ -249,7 +252,11 @@ export default function AdminPaymentsPage() {
             </div>
 
             <div className="flex items-center gap-3">
+              <label htmlFor="admin-payments-status" className="sr-only">
+                Filter payments by status
+              </label>
               <select
+                id="admin-payments-status"
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as PaymentTransaction["status"] | "all")}
                 className="h-12 rounded-2xl border border-border/50 bg-card/60 px-4 text-sm font-medium outline-none transition-all focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"

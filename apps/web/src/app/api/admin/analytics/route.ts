@@ -1,5 +1,5 @@
-﻿import { headers } from "next/headers";
-import { count, gte, sql } from "drizzle-orm";
+import { headers } from "next/headers";
+import { count, gte, sql, lt, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { booking, dispute, helperProfile, paymentTransaction, review } from "@/db/schema";
@@ -71,6 +71,31 @@ export async function GET() {
       .from(review)
       .where(gte(review.createdAt, since));
 
+    // Build simple daily timeseries for the last 30 days (bookings and payments)
+    const bookingsTimeseries: Array<{ date: string; total: number }> = [];
+    const paymentsTimeseries: Array<{ date: string; gross: number }> = [];
+
+    for (let i = 29; i >= 0; i--) {
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      dayStart.setDate(dayStart.getDate() - i);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayStart.getDate() + 1);
+
+      const [bRow] = await db
+        .select({ total: count() })
+        .from(booking)
+        .where(and(gte(booking.createdAt, dayStart), lt(booking.createdAt, dayEnd)));
+
+      const [pRow] = await db
+        .select({ gross: sql<number>`coalesce(sum(${paymentTransaction.amount}), 0)` })
+        .from(paymentTransaction)
+        .where(and(gte(paymentTransaction.createdAt, dayStart), lt(paymentTransaction.createdAt, dayEnd)));
+
+      bookingsTimeseries.push({ date: dayStart.toISOString().slice(0, 10), total: Number(bRow?.total ?? 0) });
+      paymentsTimeseries.push({ date: dayStart.toISOString().slice(0, 10), gross: Number(pRow?.gross ?? 0) });
+    }
+
     return NextResponse.json(
       {
         metrics: {
@@ -79,6 +104,8 @@ export async function GET() {
           helpers: helperTotals,
           disputes: disputeTotals,
           reviews: reviewTotals,
+          bookingsTimeseries,
+          paymentsTimeseries,
         },
       },
       { status: 200, headers: NO_STORE_HEADERS },

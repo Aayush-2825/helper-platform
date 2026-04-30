@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Fraunces, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryProvider } from "@/components/providers/query-provider";
+import { Toaster } from "@repo/ui/components/ui/sonner";
+import { TooltipProvider } from "@repo/ui/components/ui/tooltip";
+import { QueryProvider } from "@features/shared/components/providers/query-provider";
+
 import { SessionProvider } from "@/lib/auth/session";
 
 const plusJakartaSans = Plus_Jakarta_Sans({

@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRealtimeEvents } from "@/hooks/use-realtime-events";
+import { useRealtimeEvents } from "@features/booking/hooks/use-realtime-events";
 import { useSession } from "@/lib/auth/session";
-import { JobCard } from "@/components/JobCard";
-import { BookingJourneySummary } from "@/components/BookingJourneySummary";
-import { Card, CardContent } from "@/components/ui/card";
-import type { Booking } from "@/components/BookingCard";
+import { JobCard } from "@features/helper/components/JobCard";
+import { BookingJourneySummary } from "@features/booking/components/BookingJourneySummary";
+import { Card, CardContent } from "@repo/ui/components/ui/card";
+import type { Booking } from "@features/booking/components/BookingCard";
 
 function LoadingSkeleton() {
   return (

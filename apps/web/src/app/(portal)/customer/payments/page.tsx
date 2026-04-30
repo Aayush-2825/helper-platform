@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, CheckCircle2, AlertCircle, Download } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import type { Booking as BaseBooking } from "@/components/BookingCard";
+import { Badge } from "@repo/ui/components/ui/badge";
+import { Button } from "@repo/ui/components/ui/button";
+import type { Booking as BaseBooking } from "@features/booking/components/BookingCard";
 import { useSession } from "@/lib/auth/session";
 import { openRazorpayCheckout } from "@/lib/payments/checkout";
 import { cn } from "@/lib/utils";

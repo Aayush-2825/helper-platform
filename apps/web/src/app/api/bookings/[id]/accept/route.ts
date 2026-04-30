@@ -11,6 +11,10 @@ import {
   user,
 } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
+import {
+  activationGateForbiddenResponse,
+  evaluateHelperActivationGate,
+} from "@/lib/helper/activation-gate";
 import { hasAnyMatchingAvailabilitySlot } from "@/lib/helper/availability-slots";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { publishBookingEvent } from "@/lib/realtime/client";
@@ -44,32 +48,13 @@ export async function POST(
       },
     });
 
+    const gate = evaluateHelperActivationGate(profile ?? null);
+    if (!gate.ok) {
+      return activationGateForbiddenResponse(gate, NO_STORE_HEADERS);
+    }
+
     if (!profile) {
-      return NextResponse.json(
-        { message: "Helper profile not found." },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    if (profile.verificationStatus !== "approved") {
-      return NextResponse.json(
-        { message: "Finish verification before accepting jobs." },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    if (profile.videoKycStatus !== "passed") {
-      return NextResponse.json(
-        { message: "Complete video KYC before accepting jobs." },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    if (!profile.isActive) {
-      return NextResponse.json(
-        { message: "Activate your helper profile before accepting jobs." },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
+      return NextResponse.json({ message: "Helper profile not found." }, { status: 404, headers: NO_STORE_HEADERS });
     }
 
     const existingBooking = await db.query.booking.findFirst({

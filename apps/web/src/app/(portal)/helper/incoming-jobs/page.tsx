@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { IncomingJobsPanel } from "@/components/IncomingJobsPanel";
-import { IncomingJobsMap } from "@/components/IncomingJobsMap";
+import { IncomingJobsPanel } from "@features/helper/components/IncomingJobsPanel";
+import { IncomingJobsMap } from "@features/helper/components/incoming-jobs-map";
 import { useIncomingJobs } from "./useIncomingJobs";
-import { useWebSocket } from "@/hooks/useWebsocket";
+import { useWebSocket } from "@features/shared/hooks/useWebsocket";
 import { useSession } from "@/lib/auth/session";
 import { publishHelperPresence, publishLocationUpdate } from "@/lib/realtime/client";
-import { Badge } from "@/components/ui/badge";
-import { CurrentJobPanel } from "@/components/CurrentJobPanel";
+import { Badge } from "@repo/ui/components/ui/badge";
+import { CurrentJobPanel } from "@features/helper/components/CurrentJobPanel";
 import type { IncomingJob } from "./useIncomingJobs";
 import { RadioTower } from "lucide-react";
 

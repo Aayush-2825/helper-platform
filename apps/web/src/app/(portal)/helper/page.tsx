@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { COMMISSION_RATE } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { Button } from "@repo/ui/components/ui/button";
 import { publishHelperPresence } from "@/lib/realtime/client";
 import { useSession } from "@/lib/auth/session";
 
