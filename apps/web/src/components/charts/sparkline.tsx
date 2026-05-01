@@ -25,7 +25,7 @@ export function Sparkline({ data, color = "#3b82f6", height = 48 }: SparklinePro
           <XAxis dataKey="x" hide />
           <YAxis hide domain={["dataMin", "dataMax"]} />
           <Tooltip
-            formatter={(value: any) => [value, "value"]}
+            formatter={(value: number | string) => [value, "value"]}
             labelFormatter={(label) => `Index ${label}`}
             wrapperStyle={{ pointerEvents: "auto" }}
             contentStyle={{ borderRadius: 8, padding: 8, border: "none", boxShadow: "0 6px 18px rgba(0,0,0,0.08)" }}

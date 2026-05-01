@@ -56,7 +56,8 @@ export default function HelperLayout({ children }: { children: React.ReactNode }
     let isCancelled = false;
 
     if (!session?.user?.id) {
-      setIsAccessCheckLoading(false);
+      // Avoid synchronous setState inside effect to prevent cascading renders
+      setTimeout(() => setIsAccessCheckLoading(false), 0);
       return;
     }
 

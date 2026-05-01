@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import type { ChangeEvent } from "react";
 import { Button } from "@repo/ui/components/ui/button";
 import { Loader2, ArrowRight, ArrowLeft, Sparkles, PlugZap, Wrench, Car, Utensils, Package, Heart, Shield, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -433,7 +434,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                 <select
                   id="booking-subcategory"
                   value={subcategoryID}
-                  onChange={(e) => setSubcategoryID(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setSubcategoryID(e.target.value)}
                   className="w-full h-14 px-4 bg-muted/30 border border-border rounded-2xl text-base font-medium outline-none premium-input-ring transition-all"
                 >
                   {subcategoryOptions.map((option) => (
@@ -466,7 +467,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                   id="booking-address-line"
                   type="text"
                   value={addressLine}
-                  onChange={(e) => setAddressLine(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setAddressLine(e.target.value)}
                   placeholder="Apartment, Studio, or Floor"
                   className={cn("w-full h-14 pl-12 pr-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.addressLine ? "border-red-500 focus:border-red-500" : "border-border premium-input-ring")}
                 />
@@ -479,7 +480,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                   id="booking-area"
                   type="text"
                   value={area}
-                  onChange={(e) => setArea(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setArea(e.target.value)}
                   placeholder="Area / Locality"
                   className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.area ? "border-red-500" : "border-border premium-input-ring")}
                 />
@@ -492,7 +493,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                     id="booking-city"
                     type="text"
                     value={city}
-                    onChange={(e) => setCity(e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setCity(e.target.value)}
                     placeholder="City"
                     className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.city ? "border-red-500" : "border-border premium-input-ring")}
                   />
@@ -504,7 +505,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                     id="booking-budget"
                     type="number"
                     value={quotedAmount}
-                    onChange={(e) => setQuotedAmount(e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setQuotedAmount(e.target.value)}
                     placeholder="Budget"
                     className={cn("w-full h-14 pl-9 pr-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.quotedAmount ? "border-red-500" : "border-border premium-input-ring")}
                   />
@@ -550,7 +551,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                     id="booking-scheduled-for"
                     type="datetime-local"
                     value={scheduledFor}
-                    onChange={(e) => setScheduledFor(e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setScheduledFor(e.target.value)}
                     className={cn(
                       "w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all",
                       errors.scheduledFor ? "border-red-500" : "border-border premium-input-ring"
@@ -566,7 +567,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                     id="booking-state"
                     type="text"
                     value={state}
-                    onChange={(e) => setState(e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setState(e.target.value)}
                     placeholder="State"
                     className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.state ? "border-red-500" : "border-border premium-input-ring")}
                   />
@@ -577,7 +578,7 @@ export function BookingForm({ latitude, longitude, userId, defaultCategory, defa
                     id="booking-postal-code"
                     type="text"
                     value={postalCode}
-                    onChange={(e) => setPostalCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setPostalCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
                     placeholder="PIN Code"
                     className={cn("w-full h-14 px-4 bg-muted/30 border rounded-2xl text-base font-medium outline-none transition-all", errors.postalCode ? "border-red-500" : "border-border premium-input-ring")}
                   />

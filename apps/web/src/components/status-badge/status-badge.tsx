@@ -1,6 +1,4 @@
-import { LucideIcon, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import React from "react";
 
 type StatusType = "success" | "error" | "warning" | "info" | "pending";
 

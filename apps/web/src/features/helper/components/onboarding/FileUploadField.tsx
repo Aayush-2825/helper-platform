@@ -89,7 +89,7 @@ export function FileUploadField<
     // Create preview for images
     if (file.type.startsWith("image/")) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = (e: ProgressEvent<FileReader>) => {
         setPreview(e.target?.result as string);
       };
       reader.readAsDataURL(file);

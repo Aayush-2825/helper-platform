@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { ChangeEvent } from "react";
 import { Card } from "@repo/ui/components/ui/card";
 import { Button } from "@repo/ui/components/ui/button";
 import { Badge } from "@repo/ui/components/ui/badge";
@@ -180,7 +181,7 @@ export function CurrentJobPanel({ bookingId, onJobCompleted }: CurrentJobPanelPr
                     placeholder={booking.status === "accepted" ? "Enter Start OTP" : "Enter Completion OTP"}
                     maxLength={4}
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
                     className="w-full h-16 bg-muted/30 border-2 border-border/50 rounded-2xl text-center text-3xl font-black tracking-widest placeholder:text-muted-foreground/30 placeholder:tracking-normal placeholder:text-sm focus:border-primary/50 focus:bg-primary/5 outline-none transition-all"
                 />
             </div>

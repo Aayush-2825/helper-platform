@@ -164,7 +164,7 @@ async function connect(connection: Connection) {
   };
 
 
-  ws.onmessage = (event) => {
+  ws.onmessage = (event: MessageEvent) => {
     try {
       const data = JSON.parse(event.data) as WSMessage;
       connection.messageListeners.forEach((listener) => listener(data));
@@ -188,7 +188,7 @@ async function connect(connection: Connection) {
     }
   };
 
-  ws.onerror = (event) => {
+  ws.onerror = (event: Event) => {
     console.error(`[WS] error user=${connection.userId}`, event);
     connection.errorListeners.forEach((listener) => listener(event));
     closeSocketSafely(ws);
@@ -283,7 +283,7 @@ export function useWebSocket(
           setConnected(false);
           onCloseRef.current?.();
         },
-        onError: (event) => {
+        onError: (event: Event) => {
           setConnected(false);
           setError("WebSocket connection failed");
           onErrorRef.current?.(event);

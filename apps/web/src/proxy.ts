@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
 /**
  * Security Headers configuration
@@ -21,7 +20,7 @@ const securityHeaders = {
   
 };
 
-export function proxy(request: NextRequest) {
+export function proxy() {
   const response = NextResponse.next();
 
   // Apply security headers

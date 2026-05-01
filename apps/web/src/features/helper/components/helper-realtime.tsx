@@ -24,7 +24,7 @@ export const useRealTimeUpdates = () => {
 
     ws.onopen = () => {};
 
-    ws.onmessage = (event) => {
+    ws.onmessage = (event: MessageEvent) => {
       const data = JSON.parse(event.data);
 
       if (data.event === "booking_request") {

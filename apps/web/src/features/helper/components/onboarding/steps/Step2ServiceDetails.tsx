@@ -1,6 +1,7 @@
 "use client";
 
 import { UseFormReturn, FieldValues, Controller, type FieldPath } from "react-hook-form";
+import type { ChangeEvent } from "react";
 import { Label } from "@repo/ui/components/ui/label";
 import { FormField } from "@repo/ui/components/ui/form-field";
 import { ServiceSelector } from "../ServiceSelector";
@@ -91,7 +92,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
               }
               error={error?.message}
               required
-              onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
             />
           </div>
         )}
@@ -189,7 +190,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
               error={error?.message}
               helperText="How far are you willing to travel to serve customers?"
               required
-              onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
             />
           </div>
         )}
@@ -213,7 +214,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
                 label="Number of Workers"
                 error={error?.message}
                 helperText="How many workers does your agency have?"
-                onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
               />
             )}
           />

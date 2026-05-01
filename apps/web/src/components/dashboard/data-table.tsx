@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode } from "react";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@repo/ui/components/ui/button";
@@ -36,10 +36,7 @@ export function DataTable<T>({
   emptyState,
   rowHoverEffect = true,
 }: DataTableProps<T>) {
-  const [internalSort, setInternalSort] = useState<{
-    column: string;
-    direction: SortDirection;
-  } | null>(null);
+  // Internal sort state not used; rely on parent `onSort` if provided
 
   const handleSort = (columnId: string) => {
     if (!onSort) return;

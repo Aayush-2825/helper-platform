@@ -100,7 +100,7 @@ export default function HelperVideoKycClient() {
     if (status.video_kyc_status === "pending_schedule" || status.video_kyc_status === "scheduled") {
       refreshSlots();
     }
-  }, [status?.profile_status, status?.video_kyc_status]);
+  }, [status]);
 
   async function bookSelectedSlot() {
     if (!selectedSlotIso) return;

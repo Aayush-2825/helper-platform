@@ -26,7 +26,6 @@ import {
   AdminStatsCard,
   AdminCardSection,
   DashboardMetric,
-  DashboardGrid,
   StatsPill,
 } from "@/components/dashboard";
 

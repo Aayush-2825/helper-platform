@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import type { ChangeEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -95,7 +96,7 @@ export function ServiceSection() {
               id="service-search"
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
               placeholder="Search for a service — e.g. plumber, chef, driver..."
               className="flex-1 bg-transparent border-0 shadow-none text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none h-auto px-0 py-0 rounded-none focus-visible:ring-0"
             />

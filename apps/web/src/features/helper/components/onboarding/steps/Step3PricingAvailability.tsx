@@ -1,6 +1,7 @@
 "use client";
 
 import { UseFormReturn, FieldValues, Controller } from "react-hook-form";
+import type { ChangeEvent } from "react";
 import { Label } from "@repo/ui/components/ui/label";
 import { FormField } from "@repo/ui/components/ui/form-field";
 import { ToggleGroup, ToggleGroupItem } from "@repo/ui/components/ui/toggle-group";
@@ -146,7 +147,7 @@ export function Step3PricingAvailability<T extends FieldValues>({
                     ? "You can adjust per job based on requirements"
                     : "Per hour of work in INR"
                 }
-                onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
               />
             </div>
           )}

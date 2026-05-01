@@ -6,10 +6,10 @@ import { headers as nextHeaders } from "next/headers";
 
 type HandlerContext = {
   params: Record<string, string>;
-  user?: any; // Better Auth user type
+  user?: unknown; // Better Auth user type
 };
 
-type ApiHandlerConfig<TBody extends z.ZodType, TQuery extends z.ZodType> = {
+type ApiHandlerConfig<TBody extends z.ZodType = z.ZodTypeAny, TQuery extends z.ZodType = z.ZodTypeAny> = {
   schema?: {
     body?: TBody;
     query?: TQuery;
@@ -20,7 +20,10 @@ type ApiHandlerConfig<TBody extends z.ZodType, TQuery extends z.ZodType> = {
 /**
  * Higher-order function to create a standardized API handler with validation and error handling
  */
-export function createApiHandler<TBody extends z.ZodType = any, TQuery extends z.ZodType = any>(
+export function createApiHandler<
+  TBody extends z.ZodType = z.ZodTypeAny,
+  TQuery extends z.ZodType = z.ZodTypeAny,
+>(
   config: ApiHandlerConfig<TBody, TQuery>,
   handler: (
     req: NextRequest,

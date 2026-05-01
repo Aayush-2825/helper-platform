@@ -87,7 +87,7 @@ export async function generateFilePreview(file: File): Promise<{
       type: "image",
       data: await new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onload = (e: ProgressEvent<FileReader>) => resolve(e.target?.result as string);
         reader.readAsDataURL(file);
       }),
     };

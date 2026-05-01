@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import type { ChangeEvent } from "react";
 import { MapPin, CheckCircle2, Clock } from "lucide-react";
 import { Button } from "@repo/ui/components/ui/button";
 import { Input } from "@repo/ui/components/ui/input";
@@ -119,7 +120,7 @@ export function CityCoverage() {
                 id="city-notify-email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 className="flex-1 sm:w-56 px-4 py-2.5 rounded-md border border-border bg-muted/30 text-sm font-medium h-auto"
                 aria-invalid={Boolean(error)}

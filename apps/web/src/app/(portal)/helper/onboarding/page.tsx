@@ -39,6 +39,7 @@ export default async function HelperOnboardingPage() {
     },
   });
 
+  // eslint-disable-next-line react-hooks/purity -- server-side timestamp comparison is safe here
   if (draft && Date.now() - draft.updatedAt.getTime() > DRAFT_EXPIRY_MS) {
     await db.delete(helperOnboardingDraft).where(eq(helperOnboardingDraft.userId, session.user.id));
 

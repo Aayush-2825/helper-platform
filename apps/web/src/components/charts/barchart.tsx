@@ -15,7 +15,7 @@ export function BarChart({ data, height = 160 }: { data: BarDatum[]; height?: nu
           <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.6} />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} />
           <YAxis tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))} width={56} />
-          <Tooltip formatter={(value: any) => inrFormatter(Number(value))} labelFormatter={(label) => `Period ${label}`} wrapperStyle={{ boxShadow: "0 6px 20px rgba(0,0,0,0.08)", borderRadius: 8 }} />
+          <Tooltip formatter={(value: number | string) => inrFormatter(Number(value))} labelFormatter={(label) => `Period ${label}`} wrapperStyle={{ boxShadow: "0 6px 20px rgba(0,0,0,0.08)", borderRadius: 8 }} />
           <Bar dataKey="value" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
         </ReBarChart>
       </ResponsiveContainer>

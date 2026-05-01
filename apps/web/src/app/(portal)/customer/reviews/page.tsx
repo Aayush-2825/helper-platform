@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ChangeEvent } from "react";
 import { Loader2, Star } from "lucide-react";
 import { Button } from "@repo/ui/components/ui/button";
 import type { Booking } from "@features/booking/components/BookingCard";
@@ -149,7 +150,7 @@ function ReviewCard({
             id={`review-comment-${booking.id}`}
             aria-label="Share your experience (optional)"
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setComment(e.target.value)}
             placeholder="Share your experience (optional)…"
             rows={2}
             className="w-full border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
