@@ -16,7 +16,7 @@ import { AppDownload } from "@features/landing/components/AppDownload";
 import { CityCoverage } from "@features/landing/components/CityCoverage";
 import { FAQ } from "@features/landing/components/FAQ";
 import { BecomeHelper } from "@features/landing/components/BecomeHelper";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ChangeEvent } from "react";
 
 const LIVE_HELPERS = [
   { name: "Priya Sharma",  skill: "Home Cleaning",  rating: "4.9", jobs: "486", eta: "3 mins", avatar: "https://randomuser.me/api/portraits/women/44.jpg" },
@@ -199,7 +199,7 @@ export default function DozoLandingPage() {
                     type="text"
                     placeholder="Enter your address or locality..."
                     value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setAddress(e.target.value)}
                     className="w-full bg-transparent pl-11 pr-4 border-0 shadow-none outline-none text-base font-medium placeholder:text-muted-foreground h-12 rounded-none focus-visible:ring-0"
                   />
                 </div>
