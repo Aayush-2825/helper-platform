@@ -207,6 +207,9 @@ importers:
       resend:
         specifier: ^6.9.4
         version: 6.9.4
+      shadcn:
+        specifier: ^4.6.0
+        version: 4.6.0(@types/node@20.19.37)(typescript@5.9.2)
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -250,9 +253,6 @@ importers:
       fast-check:
         specifier: ^4.6.0
         version: 4.6.0
-      shadcn:
-        specifier: ^4.6.0
-        version: 4.6.0(@types/node@20.19.37)(typescript@5.9.2)
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
