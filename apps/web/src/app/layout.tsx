@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Fraunces, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@repo/ui/components/ui/sonner";
 import { TooltipProvider } from "@repo/ui/components/ui/tooltip";
@@ -8,20 +7,8 @@ import { QueryProvider } from "@features/shared/components/providers/query-provi
 
 import { SessionProvider } from "@/lib/auth/session";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-plus-jakarta",
-  subsets: ["latin"],
-});
-
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Google fonts are loaded via CSS @import in globals.css to avoid Turbopack
+// internal font module resolution issues during builds.
 
 export const metadata: Metadata = {
   title: "Helper Platform | Premium Quick Commerce Services",
@@ -35,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${plusJakartaSans.variable} ${fraunces.variable} ${geistMono.variable}`}>
+      <body>
         <Suspense fallback={null}>
           <QueryProvider>
             <SessionProvider>
