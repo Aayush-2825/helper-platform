@@ -7,9 +7,6 @@ import { QueryProvider } from "@features/shared/components/providers/query-provi
 
 import { SessionProvider } from "@/lib/auth/session";
 
-// Google fonts are loaded via CSS @import in globals.css to avoid Turbopack
-// internal font module resolution issues during builds.
-
 export const metadata: Metadata = {
   title: "Helper Platform | Premium Quick Commerce Services",
   description: "Verified professionals for home and business services, delivered in under 60 seconds.",

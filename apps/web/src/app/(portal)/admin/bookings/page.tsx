@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { AlertCircle, CheckCircle2, Loader2, RefreshCcw, Search, Wifi, WifiOff } from "lucide-react";
 import { useRealtimeEvents } from "@features/booking/hooks/use-realtime-events";
 import { Badge } from "@repo/ui/components/ui/badge";
@@ -278,7 +278,7 @@ export default function AdminBookingsPage() {
                   id="admin-bookings-search"
                   aria-label="Search bookings"
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
                   placeholder="Search booking, customer, helper, city, category..."
                   className="h-12 pl-11"
                 />
@@ -290,7 +290,7 @@ export default function AdminBookingsPage() {
               <select
                 id="admin-bookings-status"
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as BookingStatus | "all")}
+                onChange={(event: ChangeEvent<HTMLSelectElement>) => setStatusFilter(event.target.value as BookingStatus | "all")}
                 className="h-12 rounded-2xl border border-border/50 bg-card/60 px-4 text-sm font-medium outline-none transition-all focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
               >
                 {statusOptions.map((option) => (
