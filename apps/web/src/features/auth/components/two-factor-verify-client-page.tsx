@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Controller, useForm, useWatch } from "react-hook-form";
@@ -132,7 +132,7 @@ export function TwoFactorVerifyClientPage() {
                       placeholder={method === "totp" ? "000000" : "XXXX-XXXX-XXXX"}
                       aria-invalid={fieldState.invalid}
                       className="text-center tracking-wider"
-                      onChange={(event) => {
+                      onChange={(event: ChangeEvent<HTMLInputElement>) => {
                         const nextValue =
                           method === "totp"
                             ? event.target.value.replace(/\D/g, "").slice(0, 6)

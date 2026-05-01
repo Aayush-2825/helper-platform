@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
@@ -319,7 +319,7 @@ export default function AdminUsersPage() {
                 id="admin-users-search"
                 aria-label="Search users"
                 value={search}
-                onChange={(event) => {
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
                   setSearch(event.target.value);
                   setPage(1);
                 }}
@@ -334,7 +334,7 @@ export default function AdminUsersPage() {
             <select
               id="admin-users-role"
               value={roleFilter}
-              onChange={(event) => {
+              onChange={(event: ChangeEvent<HTMLSelectElement>) => {
                 setRoleFilter(event.target.value as "all" | "admin" | "helper" | "customer");
                 setPage(1);
               }}

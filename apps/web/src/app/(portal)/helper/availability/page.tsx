@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { Loader2, Wifi, WifiOff, Clock, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
 import { Button } from "@repo/ui/components/ui/button";
@@ -348,7 +348,7 @@ export default function HelperAvailabilityPage() {
                         <select
                           className="mt-1 h-10 w-full rounded-md border bg-background px-3"
                           value={slot.dayOfWeek}
-                          onChange={(event) => updateSlot(index, { dayOfWeek: Number(event.target.value) })}
+                          onChange={(event: ChangeEvent<HTMLSelectElement>) => updateSlot(index, { dayOfWeek: Number(event.target.value) })}
                           disabled={slotsSaving}
                         >
                           {DAYS.map((day) => (
@@ -365,7 +365,7 @@ export default function HelperAvailabilityPage() {
                           type="time"
                           className="mt-1 h-10 w-full rounded-md border bg-background px-3"
                           value={slot.startTime}
-                          onChange={(event) => updateSlot(index, { startTime: event.target.value })}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateSlot(index, { startTime: event.target.value })}
                           disabled={slotsSaving}
                         />
                       </label>
@@ -376,7 +376,7 @@ export default function HelperAvailabilityPage() {
                           type="time"
                           className="mt-1 h-10 w-full rounded-md border bg-background px-3"
                           value={slot.endTime}
-                          onChange={(event) => updateSlot(index, { endTime: event.target.value })}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateSlot(index, { endTime: event.target.value })}
                           disabled={slotsSaving}
                         />
                       </label>
@@ -388,7 +388,7 @@ export default function HelperAvailabilityPage() {
                           className="mt-1 h-10 w-full rounded-md border bg-background px-3"
                           placeholder="Asia/Kolkata"
                           value={slot.timezone}
-                          onChange={(event) => updateSlot(index, { timezone: event.target.value })}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => updateSlot(index, { timezone: event.target.value })}
                           disabled={slotsSaving}
                         />
                       </label>
@@ -398,7 +398,7 @@ export default function HelperAvailabilityPage() {
                           <input
                             type="checkbox"
                             checked={slot.isActive}
-                            onChange={(event) => updateSlot(index, { isActive: event.target.checked })}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) => updateSlot(index, { isActive: event.target.checked })}
                             disabled={slotsSaving}
                           />
                           Active slot

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
@@ -338,7 +338,7 @@ export default function AdminHelpersPage() {
                   id="admin-helpers-search"
                   aria-label="Search helpers"
                   value={search}
-                  onChange={(event) => {
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
                     setSearch(event.target.value);
                     setPage(1);
                   }}
@@ -354,7 +354,7 @@ export default function AdminHelpersPage() {
               <select
                 id="admin-helpers-verification-status"
                 value={verificationStatus}
-                onChange={(event) => {
+                onChange={(event: ChangeEvent<HTMLSelectElement>) => {
                   setVerificationStatus(
                     event.target.value as
                       | "all"
@@ -380,7 +380,7 @@ export default function AdminHelpersPage() {
               <select
                 id="admin-helpers-activity"
                 value={activeFilter}
-                onChange={(event) => {
+                onChange={(event: ChangeEvent<HTMLSelectElement>) => {
                   setActiveFilter(event.target.value as "all" | "true" | "false");
                   setPage(1);
                 }}

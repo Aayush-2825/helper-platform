@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { AlertCircle, CheckCircle2, Copy, Loader2, RefreshCcw, Search, ShieldAlert, WalletCards } from "lucide-react";
 import { Badge } from "@repo/ui/components/ui/badge";
 import { Button } from "@repo/ui/components/ui/button";
@@ -245,7 +245,7 @@ export default function AdminPaymentsPage() {
                 id="admin-payments-search"
                 aria-label="Search payments"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
                 placeholder="Search payment ID, booking, customer, helper, provider order..."
                 className="h-12 pl-11"
               />
@@ -258,7 +258,7 @@ export default function AdminPaymentsPage() {
               <select
                 id="admin-payments-status"
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as PaymentTransaction["status"] | "all")}
+                onChange={(event: ChangeEvent<HTMLSelectElement>) => setStatusFilter(event.target.value as PaymentTransaction["status"] | "all")}
                 className="h-12 rounded-2xl border border-border/50 bg-card/60 px-4 text-sm font-medium outline-none transition-all focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
               >
                 <option value="all">All statuses</option>

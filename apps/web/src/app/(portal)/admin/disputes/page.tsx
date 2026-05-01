@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { AlertCircle, CircleAlert, CircleCheckBig, Loader2, MessageSquare, RefreshCcw, Scale, Search } from "lucide-react";
 import { Badge } from "@repo/ui/components/ui/badge";
 import { Button } from "@repo/ui/components/ui/button";
@@ -278,7 +278,7 @@ export default function AdminDisputesPage() {
                   id="admin-disputes-search"
                   aria-label="Search disputes"
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
                   placeholder="Search disputes, bookings, users, or reason codes..."
                   className="h-12 pl-11"
                 />
@@ -289,7 +289,7 @@ export default function AdminDisputesPage() {
               <select
                 id="admin-disputes-status"
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as DisputeStatus | "all")}
+                onChange={(event: ChangeEvent<HTMLSelectElement>) => setStatusFilter(event.target.value as DisputeStatus | "all")}
                 className="h-12 rounded-2xl border border-border/50 bg-card/60 px-4 text-sm font-medium outline-none transition-all focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
               >
                 <option value="all">All statuses</option>
@@ -394,7 +394,7 @@ export default function AdminDisputesPage() {
                       <span>Status</span>
                       <select
                         value={formState.status}
-                        onChange={(event) => setFormState((current) => ({ ...current, status: event.target.value as DisputeStatus }))}
+                        onChange={(event: ChangeEvent<HTMLSelectElement>) => setFormState((current) => ({ ...current, status: event.target.value as DisputeStatus }))}
                         className="h-12 w-full rounded-2xl border border-border/50 bg-background px-4 outline-none transition-all focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
                       >
                         <option value="investigating">Investigating</option>
@@ -407,7 +407,7 @@ export default function AdminDisputesPage() {
                       <span>Resolution type</span>
                       <select
                         value={formState.resolutionType}
-                        onChange={(event) => setFormState((current) => ({ ...current, resolutionType: event.target.value as NonNullable<DisputeRecord["resolutionType"]> }))}
+                        onChange={(event: ChangeEvent<HTMLSelectElement>) => setFormState((current) => ({ ...current, resolutionType: event.target.value as NonNullable<DisputeRecord["resolutionType"]> }))}
                         className="h-12 w-full rounded-2xl border border-border/50 bg-background px-4 outline-none transition-all focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
                       >
                         <option value="refund_full">Refund full</option>
@@ -426,7 +426,7 @@ export default function AdminDisputesPage() {
                       min="0"
                       step="1"
                       value={formState.resolutionAmount}
-                      onChange={(event) => setFormState((current) => ({ ...current, resolutionAmount: event.target.value }))}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) => setFormState((current) => ({ ...current, resolutionAmount: event.target.value }))}
                       placeholder="Leave empty if no monetary adjustment is needed"
                     />
                   </label>
@@ -435,7 +435,7 @@ export default function AdminDisputesPage() {
                     <span>Admin notes</span>
                     <Textarea
                       value={formState.adminNotes}
-                      onChange={(event) => setFormState((current) => ({ ...current, adminNotes: event.target.value }))}
+                      onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setFormState((current) => ({ ...current, adminNotes: event.target.value }))}
                       placeholder="Summarize investigation findings and the final decision."
                       className="min-h-28 rounded-2xl"
                     />

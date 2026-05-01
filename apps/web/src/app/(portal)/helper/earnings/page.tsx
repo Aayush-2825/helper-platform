@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { CheckCircle2, Clock, IndianRupee, Loader2, TrendingUp, Wallet } from "lucide-react";
 import { Badge } from "@repo/ui/components/ui/badge";
 import { Button } from "@repo/ui/components/ui/button";
@@ -307,7 +307,7 @@ export default function HelperEarningsPage() {
                       min="1"
                       max={availableBalance}
                       value={withdrawAmount}
-                      onChange={(event) => setWithdrawAmount(event.target.value)}
+                      onChange={(event: ChangeEvent<HTMLInputElement>) => setWithdrawAmount(event.target.value)}
                       placeholder={availableBalance > 0 ? String(availableBalance) : "0"}
                       className="pl-10"
                     />

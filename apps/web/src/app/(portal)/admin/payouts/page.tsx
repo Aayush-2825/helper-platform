@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ChangeEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CalendarRange, CheckCircle2, Loader2, PlayCircle, RefreshCcw, Search, XCircle } from "lucide-react";
@@ -365,7 +365,7 @@ export default function AdminPayoutsPage() {
                 id="admin-payouts-search"
                 aria-label="Search payouts"
                 value={search}
-                onChange={(event) => {
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
                   setSearch(event.target.value);
                   setPage(1);
                 }}
@@ -381,7 +381,7 @@ export default function AdminPayoutsPage() {
               <select
                 id="admin-payouts-status"
                 value={statusFilter}
-                onChange={(event) => {
+                onChange={(event: ChangeEvent<HTMLSelectElement>) => {
                   setStatusFilter(event.target.value as "all" | PayoutStatus);
                   setPage(1);
                 }}
@@ -404,7 +404,7 @@ export default function AdminPayoutsPage() {
                   id="admin-payouts-from"
                   type="date"
                   value={from}
-                  onChange={(event) => {
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
                     setFrom(event.target.value);
                     setPage(1);
                   }}
@@ -421,7 +421,7 @@ export default function AdminPayoutsPage() {
                   id="admin-payouts-to"
                   type="date"
                   value={to}
-                  onChange={(event) => {
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
                     setTo(event.target.value);
                     setPage(1);
                   }}

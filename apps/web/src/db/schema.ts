@@ -1,1 +1,1 @@
-export * from "@repo/db/schema/web";
+export * from "@repo/db/schema";

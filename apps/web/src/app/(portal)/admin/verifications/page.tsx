@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { AlertCircle, BadgeCheck, CheckCircle2, Clock3, Loader2, RefreshCcw, Search, ShieldCheck, Video, XCircle } from "lucide-react";
 import { Badge } from "@repo/ui/components/ui/badge";
 import { Button } from "@repo/ui/components/ui/button";
@@ -130,7 +130,7 @@ export default function AdminVerificationsPage() {
     rejectionReason: "",
   });
 
-  const fetchDocuments = async (isManualRefresh = false) => {
+  const fetchDocuments = useCallback(async (isManualRefresh = false) => {
     setError(null);
     setSuccess(null);
     if (isManualRefresh) {
@@ -157,11 +157,11 @@ export default function AdminVerificationsPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [includeHistory]);
 
   useEffect(() => {
     void fetchDocuments();
-  }, [includeHistory]);
+  }, [fetchDocuments]);
 
   const fetchVideoSessions = async () => {
     setVideoLoading(true);
@@ -556,7 +556,7 @@ export default function AdminVerificationsPage() {
                   id="admin-verifications-search"
                   aria-label="Search verifications"
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
                   placeholder="Search document, helper, city, or category..."
                   className="h-12 pl-11"
                 />
@@ -567,7 +567,7 @@ export default function AdminVerificationsPage() {
               <select
                 id="admin-verifications-status"
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as VerificationStatus | "all")}
+                onChange={(event: ChangeEvent<HTMLSelectElement>) => setStatusFilter(event.target.value as VerificationStatus | "all")}
                 className="h-12 rounded-2xl border border-border/50 bg-card/60 px-4 text-sm font-medium outline-none transition-all focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
               >
                 <option value="all">All statuses</option>
@@ -677,7 +677,7 @@ export default function AdminVerificationsPage() {
                       <span>Decision</span>
                       <select
                         value={formState.status}
-                        onChange={(event) => setFormState((current) => ({ ...current, status: event.target.value as VerificationStatus }))}
+                        onChange={(event: ChangeEvent<HTMLSelectElement>) => setFormState((current) => ({ ...current, status: event.target.value as VerificationStatus }))}
                         className="h-12 w-full rounded-2xl border border-border/50 bg-background px-4 outline-none transition-all focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
                       >
                         <option value="approved">Approved</option>
@@ -699,7 +699,7 @@ export default function AdminVerificationsPage() {
                     <span>Rejection reason or reviewer notes</span>
                     <Textarea
                       value={formState.rejectionReason}
-                      onChange={(event) => setFormState((current) => ({ ...current, rejectionReason: event.target.value }))}
+                      onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setFormState((current) => ({ ...current, rejectionReason: event.target.value }))}
                       placeholder="Explain why the document needs resubmission or rejection."
                       className="min-h-28 rounded-2xl"
                     />
@@ -762,7 +762,7 @@ export default function AdminVerificationsPage() {
                             id={`video-schedule-${helper.id}`}
                             type="datetime-local"
                             value={pendingVideoSchedule[helper.id] ?? ""}
-                            onChange={(event) =>
+                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
                               setPendingVideoSchedule((current) => ({ ...current, [helper.id]: event.target.value }))
                             }
                             className="h-10 rounded-xl sm:w-56"
@@ -814,7 +814,7 @@ export default function AdminVerificationsPage() {
                             id={`video-reschedule-${session.id}`}
                             type="datetime-local"
                             value={rescheduleVideoSchedule[session.id] ?? toDateTimeLocalValue(session.scheduledAt)}
-                            onChange={(event) =>
+                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
                               setRescheduleVideoSchedule((current) => ({ ...current, [session.id]: event.target.value }))
                             }
                             className="h-10 rounded-xl sm:w-56"
@@ -825,7 +825,7 @@ export default function AdminVerificationsPage() {
                           <Input
                             id={`video-notes-${session.id}`}
                             value={videoAdminNotes[session.id] ?? ""}
-                            onChange={(event) =>
+                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
                               setVideoAdminNotes((current) => ({ ...current, [session.id]: event.target.value }))
                             }
                             placeholder="Notes (optional)"
