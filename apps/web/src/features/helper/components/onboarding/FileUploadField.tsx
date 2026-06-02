@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useUploadFocus } from "./ui/UploadFocusContext";
 import { useController, FieldValues, FieldPath, Control } from "react-hook-form";
 import { Loader2, Upload, X, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ interface FileUploadFieldProps<
   category?: "image" | "document" | "kyc";
   hint?: string;
   required?: boolean;
+  uploadId?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export function FileUploadField<
   category = "kyc",
   hint,
   required = false,
+  uploadId,
 }: FileUploadFieldProps<TFieldValues, TName>) {
   const { field, fieldState } = useController({
     control,
@@ -55,6 +58,28 @@ export function FileUploadField<
       setFileName(field.value.split("/").pop() ?? field.value);
     }
   }, [field.value, fileName]);
+
+  // register with upload focus registry if available
+  const uploadFocus = (() => {
+    try {
+      return useUploadFocus();
+    } catch (e) {
+      return null;
+    }
+  })();
+
+  useEffect(() => {
+    if (uploadId && uploadFocus) {
+      uploadFocus.register(String(uploadId), () => fileInputRef.current?.click());
+    }
+    return () => {
+      if (uploadId && uploadFocus) {
+        uploadFocus.unregister(String(uploadId));
+      }
+    };
+    // intentionally only run on mount/unmount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleFile = async (file: File) => {
     // Validate file size
@@ -146,6 +171,8 @@ export function FileUploadField<
 
   const hasFile = (typeof field.value === "string" && field.value.trim().length > 0) || !!fileName;
 
+  const statusId = `${inputId}-status`;
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -163,6 +190,8 @@ export function FileUploadField<
           role="button"
           tabIndex={0}
           onKeyDown={handleKeyDown}
+          aria-busy={isUploading}
+          aria-describedby={statusId}
           className={cn(
             "relative rounded-lg border-2 border-dashed transition-colors p-6 text-center cursor-pointer",
             isDragActive
@@ -239,6 +268,14 @@ export function FileUploadField<
           {hint}
         </p>
       )}
+
+      <div id={statusId} role="status" aria-live="polite" className="text-xs mt-1 min-h-4">
+        {isUploading ? (
+          <span className="text-gray-600">Uploading...</span>
+        ) : hasFile ? (
+          <span className="text-green-600">Uploaded</span>
+        ) : null}
+      </div>
 
       {fieldState.error && (
         <p className="text-xs text-red-500">

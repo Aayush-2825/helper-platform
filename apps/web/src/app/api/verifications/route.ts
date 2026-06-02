@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        documents: documents.map((document) => {
+        documents: documents.map((document: any) => {
           const submittedAt = document.helperProfile?.submittedAt ?? null;
           const hoursInQueue =
             submittedAt instanceof Date
@@ -137,7 +137,7 @@ export async function PATCH(request: NextRequest) {
 
     const now = new Date();
 
-    const updated = await db.transaction(async (tx) => {
+    const updated = await db.transaction(async (tx: typeof db) => {
       const [updatedDocument] = await tx
         .update(helperKycDocument)
         .set({
@@ -174,7 +174,7 @@ export async function PATCH(request: NextRequest) {
           columns: { status: true },
         });
 
-        const computed = computeProfileStatus(profileDocs.map((profileDoc) => profileDoc.status));
+        const computed = computeProfileStatus(profileDocs.map((profileDoc: any) => profileDoc.status));
         nextProfileStatus = computed.verificationStatus;
 
         const [updatedProfile] = await tx

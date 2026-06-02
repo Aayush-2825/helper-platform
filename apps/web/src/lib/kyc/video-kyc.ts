@@ -269,7 +269,7 @@ export async function scheduleVideoKYC(params: {
     userId: params.adminUserId,
   });
 
-  await db.transaction(async (tx) => {
+  await db.transaction(async (tx: typeof db) => {
     await tx.insert(videoKycSession).values({
       id: crypto.randomUUID(),
       helperProfileId: profile.id,
@@ -342,7 +342,7 @@ export async function bookVideoKycSlotForHelper(params: { helperUserId: string; 
       attendees,
     });
 
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: typeof db) => {
       await tx.insert(videoKycSession).values({
         id: sessionId,
         helperProfileId: profile.id,
@@ -518,7 +518,7 @@ export async function cancelVideoKYC(params: {
   const calendarId = params.adminUserId ? "primary" : getAdminCalendarId(params.adminEmail);
   await deleteGoogleEvent({ calendarId, calendarEventId: session.calendarEventId, userId: params.adminUserId });
 
-  await db.transaction(async (tx) => {
+  await db.transaction(async (tx: typeof db) => {
     await tx
       .update(videoKycSession)
       .set({
@@ -567,7 +567,7 @@ export async function cancelVideoKycByHelper(params: { helperUserId: string; ses
   const calendarId = getSharedKycCalendarId();
   await deleteGoogleEvent({ calendarId, calendarEventId: session.calendarEventId });
 
-  await db.transaction(async (tx) => {
+  await db.transaction(async (tx: typeof db) => {
     await tx
       .update(videoKycSession)
       .set({

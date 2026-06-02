@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@repo/ui/components/ui/card";
-import { StatusBadge } from "@/components/StatusBadge";
+import { StatusBadge } from "@features/shared/components/StatusBadge";
 import Link from "next/link";
 
 const categoryLabels: Record<string, string> = {

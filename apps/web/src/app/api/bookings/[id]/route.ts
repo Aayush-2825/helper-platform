@@ -23,7 +23,7 @@ export async function GET(
     }
 
     const bookingResult = await db.query.booking.findFirst({
-      where: (bookingRecord, { eq: equals }) => equals(bookingRecord.id, bookingId),
+      where: (bookingRecord: any, { eq: equals }: any) => equals(bookingRecord.id, bookingId),
       with: {
           category: true,
           customer: true,
@@ -61,7 +61,7 @@ export async function GET(
 
     const statusEvents = await db.query.bookingStatusEvent.findMany({
       where: eq(bookingStatusEvent.bookingId, bookingId),
-      orderBy: (event, { asc }) => asc(event.createdAt),
+      orderBy: (event: any, { asc }: any) => asc(event.createdAt),
       with: {
         actorUser: {
           columns: {

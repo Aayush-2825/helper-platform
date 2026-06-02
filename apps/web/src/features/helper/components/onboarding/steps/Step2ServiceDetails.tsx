@@ -45,7 +45,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
           What services do you offer?
         </h1>
         <p className="mt-2 text-gray-600">
-          Tell us about your expertise and availability
+          Describe the services you provide, your experience, and the languages you speak so customers can find you.
         </p>
       </div>
 
@@ -107,7 +107,7 @@ export function Step2ServiceDetails<T extends FieldValues>({
             <Label htmlFor="bio">Bio / Description (Optional)</Label>
             <Textarea
               id="bio"
-              placeholder="Tell customers about your experience, specialties, and what makes you unique... (500 chars max)"
+              placeholder="Briefly describe your experience, specialties, and what makes you a great choice. (500 chars max)"
               maxLength={500}
               {...field}
               value={typeof field.value === "string" ? field.value : ""}

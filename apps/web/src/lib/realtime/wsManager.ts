@@ -4,12 +4,17 @@ const _queue: object[] = [];
 
 export function registerWsSend(fn: (msg: object) => boolean) {
   _send = fn;
-  const pending = _queue.splice(0, _queue.length);
-  for (const msg of pending) {
-    const delivered = _send(msg);
-    if (!delivered) {
-      console.warn("[WSManager] flush send failed, re-queueing message", msg);
-      _queue.push(msg);
+  // Flush queued messages. Use a loop so that any messages queued while
+  // flushing are also processed before we return.
+  while (true) {
+    const pending = _queue.splice(0, _queue.length);
+    if (pending.length === 0) break;
+    for (const msg of pending) {
+      const delivered = _send(msg);
+      if (!delivered) {
+        console.warn("[WSManager] flush send failed, re-queueing message", msg);
+        _queue.push(msg);
+      }
     }
   }
 }
@@ -26,4 +31,9 @@ export function wsSend(msg: object) {
     _queue.push(msg);
     return;
   }
+}
+
+export function resetWsManager() {
+  _send = null;
+  _queue.length = 0;
 }

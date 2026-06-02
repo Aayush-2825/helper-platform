@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
         : bookingRecord.customerId;
 
     const now = new Date();
-    const [createdDispute] = await db.transaction(async (tx) => {
+    const [createdDispute] = await db.transaction(async (tx: typeof db) => {
       const [newDispute] = await tx
         .insert(dispute)
         .values({
@@ -210,7 +210,7 @@ export async function PATCH(request: NextRequest) {
     const now = new Date();
     const isFinalState = parsed.data.status === "resolved" || parsed.data.status === "rejected";
 
-    const [updated] = await db.transaction(async (tx) => {
+    const [updated] = await db.transaction(async (tx: typeof db) => {
       const [updatedDispute] = await tx
         .update(dispute)
         .set({

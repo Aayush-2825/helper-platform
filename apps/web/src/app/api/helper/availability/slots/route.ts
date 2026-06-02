@@ -118,7 +118,7 @@ export async function PUT(request: Request) {
       duplicateKeySet.add(key);
     }
 
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: typeof db) => {
       await tx
         .delete(helperAvailabilitySlot)
         .where(eq(helperAvailabilitySlot.helperProfileId, profile.id));

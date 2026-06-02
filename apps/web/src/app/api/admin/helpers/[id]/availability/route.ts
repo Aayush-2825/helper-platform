@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const now = new Date();
 
-    const [updated] = await db.transaction(async (tx) => {
+    const [updated] = await db.transaction(async (tx: typeof db) => {
       const [updatedHelper] = await tx
         .update(helperProfile)
         .set({

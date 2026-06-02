@@ -23,12 +23,12 @@ export function Step1BasicInfo<T extends FieldValues>({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
-          {isIndividual ? "Personal Information" : "Business Information"}
+          {isIndividual ? "Your profile details" : "Business details"}
         </h1>
         <p className="mt-2 text-gray-600">
           {isIndividual
-            ? "Tell us about yourself"
-            : "Tell us about your business"}
+            ? "Provide your name, contact, and a profile photo so customers can recognize you."
+            : "Provide business and contact details so customers can reach your team."}
         </p>
       </div>
 
@@ -73,10 +73,11 @@ export function Step1BasicInfo<T extends FieldValues>({
             render={({ field }) => (
               <FormField
                 {...field}
-                label="Email (Optional)"
+                label="Email (optional)"
                 type="email"
                 placeholder="hello@example.com"
                 icon={<Mail className="h-4 w-4" />}
+                helperText="Used for account recovery and important notifications"
               />
             )}
           />
@@ -103,7 +104,7 @@ export function Step1BasicInfo<T extends FieldValues>({
             accept="image/*"
             maxSize={3}
             category="image"
-            hint="Upload a clear, recent photo of yourself. This helps build trust with customers."
+            hint="Upload a clear, recent headshot. Use a plain background and face-forward photo."
           />
         </>
       ) : (

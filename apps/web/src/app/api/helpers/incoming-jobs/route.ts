@@ -132,8 +132,8 @@ export async function GET() {
 
     const now = new Date();
     const expiredCandidateIds = pendingCandidates
-      .filter((candidate) => candidate.expiresAt && candidate.expiresAt <= now)
-      .map((candidate) => candidate.id);
+      .filter((candidate: any) => candidate.expiresAt && candidate.expiresAt <= now)
+      .map((candidate: any) => candidate.id);
 
     if (expiredCandidateIds.length > 0) {
       await db
@@ -148,11 +148,11 @@ export async function GET() {
     const jobs = canReceiveJobs(profile)
       ? pendingCandidates
           .filter(
-            (candidate) =>
+            (candidate: any) =>
               (!candidate.expiresAt || candidate.expiresAt > now) &&
               ["requested", "matched"].includes(candidate.booking.status)
           )
-          .map((candidate) => ({
+          .map((candidate: any) => ({
             candidateId: candidate.id,
             bookingId: candidate.booking.id,
             customer: candidate.booking.customer,

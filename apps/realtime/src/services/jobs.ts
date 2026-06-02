@@ -2,7 +2,7 @@ import { and, inArray, lt } from "drizzle-orm";
 import { webDb } from "../db/index.js";
 import { booking } from "../db/schema.js";
 import { logger } from "./logger.js";
-import { broadcastEvent } from "../index.js"; // This might circular, need to fix later
+import { broadcastEvent } from "../ws/dispatch.js";
 
 const EXPIRATION_INTERVAL = 30000; // 30s
 
@@ -27,16 +27,15 @@ export function startBackgroundJobs() {
       if (expired.length > 0) {
         logger.info(`🕒 [Expiration] Marked ${expired.length} bookings as expired`);
         expired.forEach((b) => {
-          // Note: we'll need to move broadcastEvent to a better location or use dispatcher directly
-          // Using dispatcher directly here to avoid circular dependencies in the final refactor
-          /* 
-          import { dispatcher } from "../ws/dispatcher.js";
-          dispatcher.sendToUser(b.customerId, {
-             type: "event",
-             event: "booking_update",
-             data: { bookingId: b.id, status: "expired", eventType: "expired" }
-          });
-          */
+          try {
+            broadcastEvent({
+              event: "booking_update",
+              data: { bookingId: b.id, status: "expired", eventType: "expired" },
+              targetUserIds: [b.customerId as string],
+            });
+          } catch (err: any) {
+            logger.debug("[Expiration] broadcastEvent failed", { error: err?.message });
+          }
         });
       }
     } catch (err: any) {

@@ -1,6 +1,7 @@
 import { WebSocket } from "ws";
 import { logger } from "../services/logger.js";
 import { AnyWsMessage } from "@repo/types";
+import { addNodeForUser, removeNodeForUser } from "./redisRegistry.js";
 
 /**
  * Manages active WebSocket clients grouped by User ID
@@ -27,6 +28,9 @@ export class WsDispatcher {
     this.clients.set(userId, existing);
     
     logger.debug(`[Dispatcher] Registered client for user=${userId}. Total users=${this.clients.size}`);
+    // inform Redis that this node holds the user
+    const nodeId = process.env.NODE_ID || `${process.pid}`;
+    addNodeForUser(userId, nodeId).catch(() => {});
   }
 
   /**
@@ -41,6 +45,9 @@ export class WsDispatcher {
       }
     }
     logger.debug(`[Dispatcher] Unregistered client for user=${userId}. Remaining=${userSockets?.size ?? 0}`);
+    // remove mapping
+    const nodeId = process.env.NODE_ID || `${process.pid}`;
+    removeNodeForUser(userId, nodeId).catch(() => {});
   }
 
   /**

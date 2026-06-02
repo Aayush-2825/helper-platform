@@ -6,7 +6,7 @@ import { Card } from "@repo/ui/components/ui/card";
 import { Button } from "@repo/ui/components/ui/button";
 import Link from "next/link";
 import { Booking } from "@/features/booking/components/BookingCard";
-import { StatusBadge } from "@/features/shared/components/StatusBadge";
+import { StatusBadge } from "@features/shared/components/StatusBadge";
 
 const categoryLabels: Record<string, string> = {
   driver: "Driver",

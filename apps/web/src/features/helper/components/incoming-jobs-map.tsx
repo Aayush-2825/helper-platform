@@ -180,7 +180,7 @@ export function IncomingJobsMap({ jobs, workerLocation }: IncomingJobsMapProps) 
                     <MapPin className="size-5 text-white fill-white" />
                   </div>
                   <div className="mt-2 text-xs font-black text-white bg-orange-600 rounded-lg px-2 py-0.5 shadow-lg group-hover:bg-orange-700 transition-colors uppercase tracking-tight">
-                    ₹{job.quotedAmount}
+                    ₹{job.quotedAmount.toLocaleString("en-IN")}
                   </div>
                 </div>
               </MarkerContent>

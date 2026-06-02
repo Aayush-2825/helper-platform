@@ -63,7 +63,7 @@ export async function getGoogleCalendarAccessToken(userId?: string) {
   }
 
   const googleAccount = await db.query.account.findFirst({
-    where: and(eq(account.userId, targetUserId), eq(account.providerId, "google")),
+    where: and(eq(account.userId, targetUserId!), eq(account.providerId, "google")),
   });
 
   if (!googleAccount) {

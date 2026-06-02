@@ -41,12 +41,8 @@ export function Step6FinalReview<T extends FieldValues>({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Review & Verify
-        </h1>
-        <p className="mt-2 text-gray-600">
-          Please review your information before submitting for verification
-        </p>
+        <h1 className="text-2xl font-bold text-gray-900">Review & submit</h1>
+        <p className="mt-2 text-gray-600">Confirm everything looks correct — you can edit any step before submitting.</p>
       </div>
 
       {/* Summary Cards */}
@@ -241,7 +237,7 @@ export function Step6FinalReview<T extends FieldValues>({
       <div className="rounded-lg bg-green-50 border border-green-200 p-4">
         <p className="text-sm text-green-900">
           <Check className="inline h-4 w-4 mr-1" />
-          <strong>You are all set!</strong> Submit your application and start receiving bookings once verified.
+          <strong>Ready to submit?</strong> Submit your application for verification. Once approved, you can start receiving bookings.
         </p>
       </div>
     </div>

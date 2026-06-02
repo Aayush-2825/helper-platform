@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
       .limit(pageSize)
       .offset((page - 1) * pageSize);
 
-    const helpers = rows.map((row) => ({
+    const helpers = rows.map((row: any) => ({
       ...row,
       averageRating: Number(row.averageRating),
       jobsLabel: row.completedJobs > 0 ? `${row.completedJobs} jobs` : "New helper",

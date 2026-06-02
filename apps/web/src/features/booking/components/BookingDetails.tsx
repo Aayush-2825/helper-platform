@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRealtimeEvents } from "@features/booking/hooks/use-realtime-events";
 import { useSession } from "@/lib/auth/session";
 import { openRazorpayCheckout } from "@/lib/payments/checkout";
-import { StatusBadge } from "@/components/StatusBadge";
-import { BookingStatusTimeline, type BookingTimelineEvent } from "@/components/BookingStatusTimeline";
+import { StatusBadge } from "@features/shared/components/StatusBadge";
+import { BookingStatusTimeline, type BookingTimelineEvent } from "@features/booking/components/BookingStatusTimeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
 import { Button } from "@repo/ui/components/ui/button";
 import { buttonVariants } from "@repo/ui/components/ui/button-variants";
@@ -242,31 +242,33 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
       return;
     }
 
-    const latest = eventMessages[0];
-    if (latest.type !== "event") {
-      return;
-    }
+    // Process all inbound event messages in order and apply any updates
+    for (const latest of eventMessages) {
+      if (latest.type !== "event") {
+        continue;
+      }
 
-    const data = latest.data as RealtimeBookingUpdate | undefined;
-    if (data?.bookingId !== bookingId) {
-      return;
-    }
+      const data = latest.data as RealtimeBookingUpdate | undefined;
+      if (data?.bookingId !== bookingId) {
+        continue;
+      }
 
-    const nextEventKey = `${latest.event}:${latest.occurredAt ?? "na"}:${data?.bookingId ?? "na"}:${data?.status ?? "na"}`;
-    if (lastProcessedEventKey.current === nextEventKey) {
-      return;
-    }
-    lastProcessedEventKey.current = nextEventKey;
+      const nextEventKey = `${latest.event}:${latest.occurredAt ?? "na"}:${data?.bookingId ?? "na"}:${data?.status ?? "na"}`;
+      if (lastProcessedEventKey.current === nextEventKey) {
+        continue;
+      }
+      lastProcessedEventKey.current = nextEventKey;
 
-    if (latest.event === "booking_update") {
-      const snapshot = buildBookingPatch(data);
-      applyRealtimeBookingUpdate(snapshot);
+      if (latest.event === "booking_update") {
+        const snapshot = buildBookingPatch(data);
+        applyRealtimeBookingUpdate(snapshot);
 
-      if (snapshot.status === "completed" || data.eventType === "completed") {
+        if (snapshot.status === "completed" || data.eventType === "completed") {
+          void fetchPayment();
+        }
+      } else if (latest.event === "payment_update") {
         void fetchPayment();
       }
-    } else if (latest.event === "payment_update") {
-      void fetchPayment();
     }
   }, [applyRealtimeBookingUpdate, buildBookingPatch, eventMessages, bookingId, fetchPayment]);
 

@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       .limit(pageSize)
       .offset((page - 1) * pageSize);
 
-    const userIds = rows.map((row) => row.id);
+    const userIds = rows.map((row: any) => row.id);
 
     const helperProfiles = userIds.length
       ? await db
@@ -128,12 +128,12 @@ export async function GET(request: NextRequest) {
           .groupBy(paymentTransaction.customerId)
       : [];
 
-    const helperByUserId = new Map(helperProfiles.map((profile) => [profile.userId, profile]));
-    const bookingByUserId = new Map(bookingCounts.map((item) => [item.userId, item.bookingCount]));
-    const spendByUserId = new Map(spending.map((item) => [item.userId, Number(item.totalSpent)]));
+    const helperByUserId = new Map(helperProfiles.map((profile: any) => [profile.userId, profile]));
+    const bookingByUserId = new Map(bookingCounts.map((item: any) => [item.userId, item.bookingCount]));
+    const spendByUserId = new Map(spending.map((item: any) => [item.userId, Number(item.totalSpent)]));
 
-    const users = rows.map((row) => {
-      const helper = helperByUserId.get(row.id);
+    const users = rows.map((row: any) => {
+      const helper = helperByUserId.get(row.id) as any;
       const normalizedRole = normalizeRole(row.role);
       const status = helper
         ? helper.isActive
@@ -153,8 +153,8 @@ export async function GET(request: NextRequest) {
         twoFactorEnabled: Boolean(row.twoFactorEnabled),
         createdAt: row.createdAt,
         status,
-        bookingCount: bookingByUserId.get(row.id) ?? 0,
-        totalSpent: spendByUserId.get(row.id) ?? 0,
+        bookingCount: (bookingByUserId.get(row.id) as any) ?? 0,
+        totalSpent: (spendByUserId.get(row.id) as any) ?? 0,
         helperProfile: helper
           ? {
               id: helper.helperProfileId,

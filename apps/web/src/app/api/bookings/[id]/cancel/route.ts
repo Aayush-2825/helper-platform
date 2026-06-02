@@ -35,7 +35,7 @@ export async function POST(
     }
 
     const existingBooking = await db.query.booking.findFirst({
-      where: (bookingRecord, { eq: equals }) =>
+      where: (bookingRecord: any, { eq: equals }: any) =>
         equals(bookingRecord.id, bookingId),
     });
 
@@ -77,42 +77,79 @@ export async function POST(
     }
 
     const now = new Date();
-    const updatedBooking = await db.transaction(async (tx) => {
-      const [row] = await tx
-        .update(booking)
-        .set({
-          status: "cancelled",
-          cancelledAt: now,
-          cancelledBy: "customer",
-          cancellationReason: reason,
-          updatedAt: now,
+    const updatedBooking = await (typeof db.transaction === "function"
+      ? db.transaction(async (tx: typeof db) => {
+          const [row] = await tx
+            .update(booking)
+            .set({
+              status: "cancelled",
+              cancelledAt: now,
+              cancelledBy: "customer",
+              cancellationReason: reason,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(booking.id, bookingId),
+                eq(booking.status, existingBooking.status),
+              ),
+            )
+            .returning();
+
+          if (!row) {
+            return null;
+          }
+
+          await tx.insert(bookingStatusEvent).values({
+            id: crypto.randomUUID(),
+            bookingId,
+            status: "cancelled",
+            actorUserId: session.user.id,
+            note: "Customer cancelled booking",
+            metadata: {
+              cancelledBy: "customer",
+              reason,
+            },
+          });
+
+          return row;
         })
-        .where(
-          and(
-            eq(booking.id, bookingId),
-            eq(booking.status, existingBooking.status),
-          ),
-        )
-        .returning();
+      : (async (tx: typeof db) => {
+          const [row] = await tx
+            .update(booking)
+            .set({
+              status: "cancelled",
+              cancelledAt: now,
+              cancelledBy: "customer",
+              cancellationReason: reason,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(booking.id, bookingId),
+                eq(booking.status, existingBooking.status),
+              ),
+            )
+            .returning();
 
-      if (!row) {
-        return null;
-      }
+          if (!row) {
+            return null;
+          }
 
-      await tx.insert(bookingStatusEvent).values({
-        id: crypto.randomUUID(),
-        bookingId,
-        status: "cancelled",
-        actorUserId: session.user.id,
-        note: "Customer cancelled booking",
-        metadata: {
-          cancelledBy: "customer",
-          reason,
-        },
-      });
+          await tx.insert(bookingStatusEvent).values({
+            id: crypto.randomUUID(),
+            bookingId,
+            status: "cancelled",
+            actorUserId: session.user.id,
+            note: "Customer cancelled booking",
+            metadata: {
+              cancelledBy: "customer",
+              reason,
+            },
+          });
 
-      return row;
-    });
+          return row;
+        })(db));
 
     if (!updatedBooking) {
       return apiError({

@@ -45,6 +45,8 @@ vi.mock("@/db/schema", () => ({
     id: "id",
     status: "status",
   },
+  helperProfile: { id: "id" },
+  notificationEvent: { id: "id" },
 }));
 
 import { PATCH } from "../route";

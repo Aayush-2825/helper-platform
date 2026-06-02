@@ -23,10 +23,10 @@ export function Step5BankPayout<T extends FieldValues>({
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
           <CreditCard className="inline h-6 w-6 mr-2 text-blue-600" />
-          Payout Details
+          Payout details
         </h1>
         <p className="mt-2 text-gray-600">
-          Where should we send your earnings?
+          Provide bank or UPI details to receive payments. We securely process payouts on your schedule.
         </p>
       </div>
 
@@ -38,7 +38,7 @@ export function Step5BankPayout<T extends FieldValues>({
               Information is secure and encrypted
             </p>
             <p className="text-xs text-blue-700 mt-1">
-              Your bank details are never shared with customers. Payouts happen automatically every Monday.
+              Your bank details are never shared with customers. Payouts are typically processed weekly.
             </p>
           </div>
         </div>
@@ -55,7 +55,7 @@ export function Step5BankPayout<T extends FieldValues>({
           error={errors.accountHolderName?.message as string}
         />
         <p className="mt-1 text-xs text-gray-500">
-          Must match your bank account name exactly
+          This should match the name on your bank account to avoid payout delays.
         </p>
       </div>
 
@@ -71,7 +71,7 @@ export function Step5BankPayout<T extends FieldValues>({
           error={errors.bankAccountNumber?.message as string}
         />
         <p className="mt-1 text-xs text-gray-500">
-          Your account number (9-18 digits)
+          Enter your full bank account number (typically 9-18 digits). We mask this in the UI for security.
         </p>
       </div>
 
@@ -87,7 +87,7 @@ export function Step5BankPayout<T extends FieldValues>({
           error={errors.ifscCode?.message as string}
         />
         <p className="mt-1 text-xs text-gray-500">
-          11-character bank code (e.g., HDFC0000001 for HDFC Bank)
+          Enter the 11-character IFSC (e.g., HDFC0000001). You can find this in your bank app or website.
         </p>
       </div>
 
@@ -104,7 +104,7 @@ export function Step5BankPayout<T extends FieldValues>({
           error={errors.upiId?.message as string}
         />
         <p className="mt-1 text-xs text-gray-500">
-          You can receive payouts via UPI instead of bank transfer (up to ₹1,00,000/day)
+          Optionally add a UPI ID to receive instant payouts (limits may apply).
         </p>
       </div>
 
@@ -129,7 +129,7 @@ export function Step5BankPayout<T extends FieldValues>({
       {/* Security Note */}
       <div className="rounded-lg bg-green-50 border border-green-200 p-4">
         <p className="text-xs text-green-900">
-          <strong>Your data is secure:</strong> Uses AES-256 encryption. No one sees your full account number.
+          <strong>Your data is secure:</strong> We encrypt payout details and only use them to process payments.
         </p>
       </div>
     </div>

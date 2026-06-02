@@ -58,7 +58,7 @@ export async function POST(
     }
 
     const existingBooking = await db.query.booking.findFirst({
-      where: (bookingRecord, { eq: equals }) => equals(bookingRecord.id, bookingId),
+      where: (bookingRecord: any, { eq: equals }: any) => equals(bookingRecord.id, bookingId),
     });
 
     if (!existingBooking) {
@@ -200,7 +200,7 @@ export async function POST(
       },
     });
 
-    const updatedRows = await db.transaction(async (tx) => {
+    const updatedRows = await db.transaction(async (tx: typeof db) => {
       if (!isScheduledBooking) {
         // Serialize immediate-accept attempts per helper to avoid double acceptance races.
         await tx.execute(

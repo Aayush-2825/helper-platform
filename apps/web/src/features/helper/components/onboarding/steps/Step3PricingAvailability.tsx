@@ -61,10 +61,10 @@ export function Step3PricingAvailability<T extends FieldValues>({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
-          Pricing & Availability
+          Pricing & availability
         </h1>
         <p className="mt-2 text-gray-600">
-          Set your rates and when you&apos;re available to work
+          Choose how you want to charge customers and set the hours and days you can work.
         </p>
       </div>
 
@@ -282,7 +282,7 @@ export function Step3PricingAvailability<T extends FieldValues>({
 
       <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
         <p className="text-sm text-amber-900">
-          💡 <strong>Tip:</strong> You can update these anytime from your profile settings to match your actual availability.
+          <strong>Tip:</strong> You can update your rates and availability anytime from your profile settings.
         </p>
       </div>
     </div>

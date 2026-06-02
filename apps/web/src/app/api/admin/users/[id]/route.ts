@@ -61,7 +61,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const activate = parsed.data.action === "activate";
 
     const now = new Date();
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: typeof db) => {
       await tx
         .update(helperProfile)
         .set({

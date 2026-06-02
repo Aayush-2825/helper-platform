@@ -149,7 +149,7 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
 
       if (nearbyHelperIds.length > 0) {
         const eligibleRadiusHelpers = (await db.query.helperProfile.findMany({
-          where: (helper, { inArray: inArrayOp, eq: eqOp, and: andOp }) =>
+          where: (helper: any, { inArray: inArrayOp, eq: eqOp, and: andOp }: any) =>
             andOp(
               inArrayOp(helper.userId, nearbyHelperIds),
               eqOp(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
@@ -170,7 +170,7 @@ export const startMatching = async (bookingData: BookingDataForMatching) => {
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       const currentBooking = await db.query.booking.findFirst({
-        where: (bookingRecord, { eq: eqOp }) => eqOp(bookingRecord.id, bookingData.id),
+        where: (bookingRecord: any, { eq: eqOp }: any) => eqOp(bookingRecord.id, bookingData.id),
         columns: { status: true },
       });
 
@@ -215,7 +215,7 @@ async function createAndNotifyCandidates(
   now: Date,
 ) {
   const existingBooking = await db.query.booking.findFirst({
-    where: (bookingRecord, { eq: eqOp }) => eqOp(bookingRecord.id, bookingData.id),
+    where: (bookingRecord: any, { eq: eqOp }: any) => eqOp(bookingRecord.id, bookingData.id),
     columns: {
       status: true,
       acceptanceDeadline: true,
@@ -229,11 +229,11 @@ async function createAndNotifyCandidates(
 
   // Re-entrant safety: skip helpers that already have a candidate row for this booking.
   const existingCandidates = await db.query.bookingCandidate.findMany({
-    where: (candidate, { eq: eqOp }) => eqOp(candidate.bookingId, bookingData.id),
+    where: (candidate: any, { eq: eqOp }: any) => eqOp(candidate.bookingId, bookingData.id),
     columns: { helperProfileId: true },
   });
 
-  const existingHelperProfileIds = new Set(existingCandidates.map((candidate) => candidate.helperProfileId));
+  const existingHelperProfileIds = new Set(existingCandidates.map((candidate: any) => candidate.helperProfileId));
   const freshHelpers = helpers.filter((helper) => !existingHelperProfileIds.has(helper.id));
 
   if (freshHelpers.length === 0) {
@@ -251,7 +251,7 @@ async function createAndNotifyCandidates(
     expiresAt: deadline,
   }));
 
-  await db.transaction(async (tx) => {
+  await db.transaction(async (tx: typeof db) => {
     if (shouldPromoteToMatched) {
       await tx
         .update(booking)
@@ -346,7 +346,7 @@ export async function resumeMatchingIfNeeded(bookingId: string) {
     );
 
   const bookingRow = await db.query.booking.findFirst({
-    where: (bookingRecord, { eq: eqOp }) => eqOp(bookingRecord.id, bookingId),
+    where: (bookingRecord: any, { eq: eqOp }: any) => eqOp(bookingRecord.id, bookingId),
     columns: {
       id: true,
       customerId: true,
@@ -380,7 +380,7 @@ export async function resumeMatchingIfNeeded(bookingId: string) {
   });
 
   const hasActivePendingCandidates = pendingCandidates.some(
-    (candidate) => !candidate.expiresAt || candidate.expiresAt > now,
+    (candidate: any) => !candidate.expiresAt || candidate.expiresAt > now,
   );
 
   if (hasActivePendingCandidates) {
@@ -415,7 +415,7 @@ async function findScheduledEligibleHelpers(
   notifiedHelperIds: Set<string>,
 ) {
   let candidateHelpers = (await db.query.helperProfile.findMany({
-    where: (helper, { eq: eqOp, and: andOp }) =>
+    where: (helper: any, { eq: eqOp, and: andOp }: any) =>
       andOp(
         eqOp(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
         eqOp(helper.isActive, true),
@@ -435,7 +435,7 @@ async function findScheduledEligibleHelpers(
   const helperProfileIds = candidateHelpers.map((helper) => helper.id);
 
   const slotRows = await db.query.helperAvailabilitySlot.findMany({
-    where: (slot, { and: andOp, inArray: inArrayOp, eq: eqOp }) =>
+    where: (slot: any, { and: andOp, inArray: inArrayOp, eq: eqOp }: any) =>
       andOp(
         inArrayOp(slot.helperProfileId, helperProfileIds),
         eqOp(slot.isActive, true),
@@ -532,7 +532,7 @@ async function findActiveWebsiteHelperIds() {
 
 async function findAvailabilityOnlineHelperIds() {
   const onlineHelpers = await db.query.helperProfile.findMany({
-    where: (helper, { and: andOp, eq: eqOp }) =>
+    where: (helper: any, { and: andOp, eq: eqOp }: any) =>
       andOp(
         eqOp(helper.availabilityStatus, "online"),
         eqOp(helper.isActive, true),
@@ -544,7 +544,7 @@ async function findAvailabilityOnlineHelperIds() {
     },
   });
 
-  return [...new Set(onlineHelpers.map((helper) => helper.userId))];
+  return [...new Set(onlineHelpers.map((helper: any) => helper.userId))];
 }
 
 async function findCityConnectedOrOnlineHelpers(
@@ -569,7 +569,7 @@ async function findCityConnectedOrOnlineHelpers(
   }
 
   const cityHelpers = (await db.query.helperProfile.findMany({
-    where: (helper, { eq: eqOp, and: andOp, inArray: inArrayOp }) =>
+    where: (helper: any, { eq: eqOp, and: andOp, inArray: inArrayOp }: any) =>
       andOp(
         inArrayOp(helper.userId, availableNowHelperIds),
         eqOp(helper.primaryCategory, bookingData.categoryId as HelperServiceCategory),
@@ -580,13 +580,13 @@ async function findCityConnectedOrOnlineHelpers(
   })) as MatchedHelperProfile[];
 
   return cityHelpers.filter(
-    (helper) => cityMatches(bookingData.city!, helper.serviceCity) && !notifiedHelperIds.has(helper.userId),
+    (helper: any) => cityMatches(bookingData.city!, helper.serviceCity) && !notifiedHelperIds.has(helper.userId),
   );
 }
 
 async function isBookingNoLongerMatchable(bookingId: string) {
   const currentBooking = await db.query.booking.findFirst({
-    where: (bookingRecord, { eq: eqOp }) => eqOp(bookingRecord.id, bookingId),
+    where: (bookingRecord: any, { eq: eqOp }: any) => eqOp(bookingRecord.id, bookingId),
     columns: { status: true },
   });
 
@@ -599,7 +599,7 @@ async function markBookingExpired(
   city: string | null,
   now: Date,
 ) {
-  await db.transaction(async (tx) => {
+  await db.transaction(async (tx: typeof db) => {
     const updatedRows = await tx
       .update(booking)
       .set({

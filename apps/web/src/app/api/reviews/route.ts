@@ -35,7 +35,7 @@ export async function GET() {
         comment: true,
         createdAt: true,
       },
-      orderBy: (reviewRecord, { desc }) => [desc(reviewRecord.createdAt)],
+      orderBy: (reviewRecord: any, { desc }: any) => [desc(reviewRecord.createdAt)],
     });
 
     return NextResponse.json(
@@ -152,7 +152,7 @@ export async function POST(request: Request) {
 
     const reviewId = crypto.randomUUID();
 
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: typeof db) => {
       await tx.insert(review).values({
         id: reviewId,
         bookingId,

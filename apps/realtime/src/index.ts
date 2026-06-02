@@ -9,7 +9,9 @@ import { webDb } from "./db/index.js";
 import { env } from "./config/env.js";
 import { logger } from "./services/logger.js";
 import { initWsServer } from "./ws/server.js";
+import os from "os";
 import { startBackgroundJobs } from "./services/jobs.js";
+import { startRedisSubscriber } from "./ws/redisSubscriber.js";
 
 const PORT = env.PORT || 3001;
 
@@ -62,8 +64,16 @@ app.use("/api/realtime", realtimeRouter);
 // =========================
 const server = http.createServer(app);
 
+// Ensure this process has a NODE_ID for routing; prefer env override
+process.env.NODE_ID = process.env.NODE_ID || `${os.hostname()}-${process.pid}`;
+
 // 1. Initialize WebSocket Server
 initWsServer(server);
+
+// 1b. Start Redis subscriber (if configured)
+startRedisSubscriber().catch((err) => {
+  logger.error("[RedisSubscriber] Failed to start", { error: (err as any)?.message });
+});
 
 // 2. Start Background Jobs
 startBackgroundJobs();

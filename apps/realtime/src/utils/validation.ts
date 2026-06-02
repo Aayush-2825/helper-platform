@@ -17,7 +17,7 @@ export function validateRequired(
   fields: string[],
   context: string = ""
 ): void {
-  const missing = fields.filter((field) => !data[field]);
+  const missing = fields.filter((field) => data[field] === undefined || data[field] === null);
 
   if (missing.length > 0) {
     throw new ValidationError(

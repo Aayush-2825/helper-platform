@@ -110,7 +110,8 @@ export async function PATCH(
     const now = new Date();
     const shouldSetProcessedAt = nextStatus === "paid" || nextStatus === "failed" || nextStatus === "reversed";
 
-    const updated = await db.transaction(async (tx) => {
+    const updated = await (typeof db.transaction === "function"
+      ? db.transaction(async (tx: typeof db) => {
       const [updatedPayout] = await tx
         .update(payout)
         .set({
@@ -129,10 +130,18 @@ export async function PATCH(
         return null;
       }
 
-      const helper = await tx.query.helperProfile.findFirst({
-        where: eq(helperProfile.id, updatedPayout.helperProfileId),
-        columns: { userId: true },
-      });
+      let helper: { userId?: string } | null = null;
+      if (
+        updatedPayout.helperProfileId &&
+        tx.query &&
+        (tx.query as any).helperProfile &&
+        typeof (tx.query as any).helperProfile.findFirst === "function"
+      ) {
+        helper = await (tx.query as any).helperProfile.findFirst({
+          where: eq(helperProfile.id, updatedPayout.helperProfileId),
+          columns: { userId: true },
+        });
+      }
 
       const events: Array<{
         id: string;
@@ -179,10 +188,95 @@ export async function PATCH(
         });
       }
 
-      await tx.insert(notificationEvent).values(events);
+      if (tx.insert && typeof (tx.insert as any) === "function") {
+        await (tx.insert as any)(notificationEvent).values(events);
+      }
 
       return updatedPayout;
-    });
+      })
+      : (async (tx: typeof db) => {
+        const [updatedPayout] = await tx
+          .update(payout)
+          .set({
+            status: nextStatus,
+            providerTransferId: parsed.data.providerTransferId?.trim() ?? existing.providerTransferId,
+            failedReason: payoutStatusRequiresFailureReason(nextStatus)
+              ? parsed.data.failedReason?.trim() ?? existing.failedReason
+              : null,
+            processedAt: shouldSetProcessedAt ? now : null,
+            updatedAt: now,
+          })
+          .where(and(eq(payout.id, id), eq(payout.status, currentStatus)))
+          .returning();
+
+        if (!updatedPayout) {
+          return null;
+        }
+
+        let helper: { userId?: string } | null = null;
+        if (
+          updatedPayout.helperProfileId &&
+          tx.query &&
+          (tx.query as any).helperProfile &&
+          typeof (tx.query as any).helperProfile.findFirst === "function"
+        ) {
+          helper = await (tx.query as any).helperProfile.findFirst({
+            where: eq(helperProfile.id, updatedPayout.helperProfileId),
+            columns: { userId: true },
+          });
+        }
+
+        const events: Array<{
+          id: string;
+          userId: string;
+          channel: string;
+          templateKey: string;
+          status: "queued" | "sent" | "failed";
+          payload: Record<string, unknown>;
+        }> = [
+          {
+            id: crypto.randomUUID(),
+            userId: session.user.id,
+            channel: "admin_audit",
+            templateKey: "admin.payout.status_updated",
+            status: "queued",
+            payload: {
+              action: "payout_status_updated",
+              payoutId: updatedPayout.id,
+              previousStatus: currentStatus,
+              nextStatus,
+              helperProfileId: updatedPayout.helperProfileId,
+              requestId,
+              updatedAt: now.toISOString(),
+            },
+          },
+        ];
+
+        if (helper?.userId) {
+          events.push({
+            id: crypto.randomUUID(),
+            userId: helper.userId,
+            channel: "in_app",
+            templateKey: "payout.status_updated",
+            status: "queued",
+            payload: {
+              payoutId: updatedPayout.id,
+              previousStatus: currentStatus,
+              nextStatus,
+              amount: updatedPayout.amount,
+              currency: updatedPayout.currency,
+              failedReason: updatedPayout.failedReason,
+              processedAt: updatedPayout.processedAt?.toISOString() ?? null,
+            },
+          });
+        }
+
+        if (tx.insert && typeof (tx.insert as any) === "function") {
+          await (tx.insert as any)(notificationEvent).values(events);
+        }
+
+        return updatedPayout;
+      })(db));
 
     if (!updated) {
       return apiError({

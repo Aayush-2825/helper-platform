@@ -83,7 +83,7 @@ export async function GET() {
       block_resubmission: profile.blockResubmission,
       last_resubmitted_at: profile.lastResubmittedAt?.toISOString() ?? null,
       resubmission_retry_after: resubmissionRetryAfter,
-      docs: docs.map((doc) => ({
+      docs: docs.map((doc: any) => ({
         type: doc.documentType,
         status: doc.status,
         rejection_reason: doc.rejectionReason,

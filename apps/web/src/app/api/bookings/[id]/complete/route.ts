@@ -48,7 +48,7 @@ export async function POST(
     }
 
     const existingBooking = await db.query.booking.findFirst({
-      where: (bookingRecord, { eq: equals }) =>
+      where: (bookingRecord: any, { eq: equals }: any) =>
         equals(bookingRecord.id, bookingId),
     });
 
@@ -81,7 +81,7 @@ export async function POST(
       );
     }
 
-    const updatedBooking = await db.transaction(async (tx) => {
+    const updatedBooking = await db.transaction(async (tx: typeof db) => {
       const [row] = await tx
         .update(booking)
         .set({

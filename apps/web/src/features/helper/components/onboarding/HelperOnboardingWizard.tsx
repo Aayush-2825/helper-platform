@@ -13,13 +13,17 @@ import { Button } from "@repo/ui/components/ui/button";
 import { Save, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Step4KYCVerification } from "./steps/Step4KYCVerification";
+import OnboardingShell from "./ui/OnboardingShell";
+import SummaryPanel from "./ui/SummaryPanel";
+import SectionCard from "./ui/SectionCard";
 import { FieldPath } from "react-hook-form";
+import { UploadFocusProvider } from "./ui/UploadFocusContext";
 
 const TOTAL_STEPS = 7; // 0-6
 
 type OnboardingFieldPath = FieldPath<CompleteOnboarding>;
 
-function getStepFieldPaths(step: number, isIndividual: boolean): OnboardingFieldPath[] {
+export function getStepFieldPaths(step: number, isIndividual: boolean): OnboardingFieldPath[] {
   switch (step) {
     case 0:
       return ["helperType"];
@@ -27,27 +31,30 @@ function getStepFieldPaths(step: number, isIndividual: boolean): OnboardingField
       return isIndividual
         ? ["fullName", "phone", "city"]
         : ["businessName", "ownerName", "phone", "email", "businessAddress", "city"];
+    // New order: 2 = Identity Verification, 3 = Services, 4 = Pricing & Availability
     case 2:
       return isIndividual
-        ? ["primaryCategory", "yearsExperience", "serviceRadiusKm"]
+        ? ["dpdpConsentGiven", "idDocumentType", "idDocumentNumber", "idDocumentUrl"]
         : [
-            "primaryCategory",
-            "yearsExperience",
-            "serviceRadiusKm",
-            "numberOfWorkers",
-            "workerTypesOffered",
-          ];
-    case 3:
-      return ["pricingType", "workingHours.start", "workingHours.end", "availableDays"];
-    case 4:
-      return isIndividual
-        ? ["idDocumentType", "idDocumentNumber", "idDocumentUrl"]
-        : [
+            "dpdpConsentGiven",
             "businessRegistrationUrl",
             "ownerIdDocumentType",
             "ownerIdDocumentUrl",
             "workerDeclarationAgreed",
           ];
+    case 3:
+      return isIndividual
+        ? ["primaryCategory", "yearsExperience", "serviceRadiusKm", "languages"]
+        : [
+            "primaryCategory",
+            "yearsExperience",
+            "serviceRadiusKm",
+            "languages",
+            "numberOfWorkers",
+            "workerTypesOffered",
+          ];
+    case 4:
+      return ["pricingType", "workingHours.start", "workingHours.end", "availableDays"];
     case 5:
       return ["accountHolderName", "bankAccountNumber", "ifscCode"];
     case 6:
@@ -61,9 +68,9 @@ function getStepTitle(step: number): string {
   const titles = [
     "Choose Your Role",
     "Basic Information",
+    "Identity Verification",
     "Your Services",
     "Pricing & Availability",
-    "Identity Verification",
     "Payout Details",
     "Review & Submit",
   ];
@@ -497,117 +504,85 @@ export function HelperOnboardingWizard({
 
   const progressPercentage = Math.round(((currentStep + 1) / TOTAL_STEPS) * 100);
 
+  const completedStepsArr = Array.isArray(form.getValues().completedSteps)
+    ? (form.getValues().completedSteps as number[])
+    : [];
+
+  const sections = Array.from({ length: TOTAL_STEPS }).map((_, i) => {
+    const title = getStepTitle(i);
+    const status = completedStepsArr.includes(i) ? "completed" : i === currentStep ? "in-progress" : "required";
+    return { id: i, title, status } as const;
+  });
+
   return (
-    <div className="min-h-screen bg-linear-to-b from-gray-50 to-white">
-      {/* Header with Progress */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
-        <div className="mx-auto max-w-2xl px-4 py-4 sm:px-6 lg:px-8">
-          {/* Progress Bar */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <h2 className="text-sm font-semibold text-gray-900">
-                  {getStepTitle(currentStep)}
-                </h2>
-                <p className="text-xs text-gray-500">
-                  Step {currentStep + 1} of {TOTAL_STEPS}
-                </p>
-              </div>
-              <div className="text-sm font-medium text-gray-600">
-                {progressPercentage}%
-              </div>
-            </div>
-            <div
-              className="h-2 bg-gray-100 rounded-full overflow-hidden"
-              role="progressbar"
-              aria-label="Onboarding progress"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={progressPercentage}
-            >
-              <div
-                className="h-full bg-linear-to-r from-blue-500 to-blue-600 transition-all duration-300"
-                style={{ width: `${progressPercentage}%` }}
-              />
-            </div>
-          </div>
+    <UploadFocusProvider>
+      <OnboardingShell
+      title={getStepTitle(currentStep)}
+      currentStep={currentStep}
+      totalSteps={TOTAL_STEPS}
+      progressPercentage={progressPercentage}
+      sections={sections}
+      summary={<SummaryPanel sections={sections} />}
+    >
+      {/* Form Container */}
+      <div>
+        {currentStep === 0 && (
+          <SectionCard title={getStepTitle(0)} subtitle="Choose how you want to work with us">
+            <Step0RoleSelection form={form} />
+          </SectionCard>
+        )}
 
-          {/* Step Indicators */}
-          <div className="hidden sm:flex gap-1">
-            {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-              <div key={i} className="flex-1 h-1 rounded-full overflow-hidden bg-gray-100">
-                <div
-                  className={`h-full transition-all ${
-                    i < currentStep
-                      ? "bg-blue-500"
-                      : i === currentStep
-                      ? "bg-blue-600"
-                      : "bg-gray-100"
-                  }`}
-                  aria-current={i === currentStep ? "step" : undefined}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Mobile Step Counter */}
-          <div className="sm:hidden text-center text-xs text-gray-500">
-            {currentStep + 1} / {TOTAL_STEPS}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Form Container */}
-        <div className="bg-white rounded-lg">
-          {currentStep === 0 && <Step0RoleSelection form={form} />}
-          {currentStep === 1 && (
+        {currentStep === 1 && (
+          <SectionCard title={getStepTitle(1)} subtitle="Tell us about yourself">
             <Step1BasicInfo form={form} />
-          )}
-          {currentStep === 2 && (
-            <Step2ServiceDetails form={form} isIndividual={isIndividual} />
-          )}
-          {currentStep === 3 && <Step3PricingAvailability form={form} />}
-          {currentStep === 4 && (
+          </SectionCard>
+        )}
+
+        {currentStep === 2 && (
+          <SectionCard title={getStepTitle(2)} subtitle="Confirm your identity and upload documents">
             <Step4KYCVerification form={form} isIndividual={isIndividual} />
-          )}
-          {currentStep === 5 && <Step5BankPayout form={form} />}
-          {currentStep === 6 && (
+          </SectionCard>
+        )}
+
+        {currentStep === 3 && (
+          <SectionCard title={getStepTitle(3)} subtitle="Tell customers what you do">
+            <Step2ServiceDetails form={form} isIndividual={isIndividual} />
+          </SectionCard>
+        )}
+
+        {currentStep === 4 && (
+          <SectionCard title={getStepTitle(4)} subtitle="Set pricing and availability">
+            <Step3PricingAvailability form={form} />
+          </SectionCard>
+        )}
+
+        {currentStep === 5 && (
+          <SectionCard title={getStepTitle(5)} subtitle="Where should we send payouts?">
+            <Step5BankPayout form={form} />
+          </SectionCard>
+        )}
+
+        {currentStep === 6 && (
+          <SectionCard title={getStepTitle(6)} subtitle="Review everything before submission">
             <Step6FinalReview form={form} isIndividual={isIndividual} />
-          )}
-        </div>
+          </SectionCard>
+        )}
 
         {/* Action Buttons */}
         <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
           {currentStep === 0 ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCancel}
-              className="w-full sm:w-auto"
-            >
+            <Button type="button" variant="outline" onClick={handleCancel} className="w-full sm:w-auto">
               Cancel
             </Button>
           ) : (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={goToPreviousStep}
-              className="w-full sm:w-auto"
-            >
+            <Button type="button" variant="outline" onClick={goToPreviousStep} className="w-full sm:w-auto">
               <ChevronLeft className="h-4 w-4 mr-2" />
               Previous
             </Button>
           )}
 
           {currentStep === TOTAL_STEPS - 1 ? (
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
-            >
+            <Button type="button" onClick={handleSubmit} disabled={isSubmitting} className="w-full sm:w-auto bg-green-600 hover:bg-green-700">
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -632,11 +607,7 @@ export function HelperOnboardingWizard({
               >
                 <Save className="h-4 w-4" />
               </Button>
-              <Button
-                type="button"
-                onClick={goToNextStep}
-                className="flex-1 sm:flex-none"
-              >
+              <Button type="button" onClick={goToNextStep} className="flex-1 sm:flex-none">
                 Next
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
@@ -650,20 +621,8 @@ export function HelperOnboardingWizard({
             ✓ Progress auto-saved to your browser
           </div>
         )}
-      </main>
-
-      {/* Floating Help Badge */}
-      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6">
-        <button
-          type="button"
-          onClick={() => toast.info("Need help? Contact support@helperplatform.com")}
-          className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors"
-          title="Help & Support"
-          aria-label="Help and support"
-        >
-          ?
-        </button>
       </div>
-    </div>
+    </OnboardingShell>
+    </UploadFocusProvider>
   );
 }
