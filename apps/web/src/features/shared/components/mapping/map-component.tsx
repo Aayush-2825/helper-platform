@@ -14,6 +14,8 @@ import { MapPin, Search, Star, X, Users } from "lucide-react";
 import { BookingForm, type LiveHelper } from "@features/booking/components/BookingForm";
 import { BookingStatus } from "@features/booking/components/BookingStatus";
 import { useRealtimeEvents } from "@features/booking/hooks/use-realtime-events";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { SERVICE_TO_BOOKING_CATEGORY } from "@/config/services";
 import type MapLibreGL from "maplibre-gl";
 
 type NearbyHelper = LiveHelper & {
@@ -59,18 +61,53 @@ function LocationSearchBar({ onSelect }: { onSelect: (loc: GeocodedLocation) => 
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const search = useCallback((q: string) => {
-    if (q.trim().length < 3) { setResults([]); return; }
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+
+    if (q.trim().length < 3) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
     setSearching(true);
+
     fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=in`,
-      { headers: { "Accept-Language": "en" } },
+      { headers: { "Accept-Language": "en" }, signal: controller.signal },
     )
       .then((r) => r.json() as Promise<NominatimResult[]>)
-      .then(setResults)
-      .catch(() => setResults([]))
-      .finally(() => setSearching(false));
+      .then((nextResults) => {
+        if (!controller.signal.aborted) {
+          setResults(nextResults);
+        }
+      })
+      .catch((error) => {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+        setResults([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setSearching(false);
+        }
+      });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      abortRef.current?.abort();
+    };
   }, []);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -284,25 +321,31 @@ const HelperMarkersLayer = memo(function HelperMarkersLayer({ helpers }: { helpe
 
 type MyMapProps = {
   userId?: string;
+  serviceSlug?: string;
   initialCategoryId?: string;
   initialSubcategoryId?: string;
 };
 
-export function MyMap({ userId, initialCategoryId, initialSubcategoryId }: MyMapProps) {
+export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcategoryId }: MyMapProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 28.6139, lng: 77.209 });
   const [draggableMarker, setDraggableMarker] = useState({ lng: 77.209, lat: 28.6139 });
   const [nearbyHelpers, setNearbyHelpers] = useState<NearbyHelper[]>([]);
-  const selectedCategory = initialCategoryId ?? "";
   const [prefillAddress, setPrefillAddress] = useState({ addressLine: "", area: "", city: "", state: "", postalCode: "" });
   const [currentBookingId, setCurrentBookingId] = useState<string | null>(null);
-  const formRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<MapLibreGL.Map | null>(null);
-  // Track the city we last fetched helpers for
   const [fetchCity, setFetchCity] = useState<string>("");
 
-  // Track helper updates to batch/debounce them
+  const selectedCategory = initialCategoryId ?? "";
+  const currentSlug = serviceSlug ?? searchParams.get("service") ?? "all";
+
+  const formRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<MapLibreGL.Map | null>(null);
   const helperUpdatesRef = useRef<Record<string, NearbyHelper>>({});
+  const helperRemovalsRef = useRef<Set<string>>(new Set());
   const batchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // On mount, get the user's position and reverse-geocode for city
@@ -345,6 +388,11 @@ export function MyMap({ userId, initialCategoryId, initialSubcategoryId }: MyMap
         const newHelpers = [...prev];
         const existingMap = new Map(newHelpers.map((h) => [h.userId, h]));
 
+        helperRemovalsRef.current.forEach((uid) => {
+          existingMap.delete(uid);
+        });
+        helperRemovalsRef.current.clear();
+
         // Apply all pending updates
         Object.entries(helperUpdatesRef.current).forEach(([uid, updated]) => {
           existingMap.set(uid, updated);
@@ -379,6 +427,7 @@ export function MyMap({ userId, initialCategoryId, initialSubcategoryId }: MyMap
           !Number.isNaN(longitude);
 
         if (d.status === "offline") {
+          helperRemovalsRef.current.add(uid);
           delete helperUpdatesRef.current[uid];
           continue;
         }
@@ -439,6 +488,17 @@ export function MyMap({ userId, initialCategoryId, initialSubcategoryId }: MyMap
     };
   }, []);
 
+  function handleServiceChange(newSlug: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newSlug && newSlug !== "all") {
+      params.set("service", newSlug);
+    } else {
+      params.delete("service");
+    }
+    // Replace URL cleanly without scrolling to top or reloading the page
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
   const handleHelpersFound = useCallback((helpers: LiveHelper[]) => {
     setNearbyHelpers(
       helpers.map((helper) => ({
@@ -487,11 +547,31 @@ export function MyMap({ userId, initialCategoryId, initialSubcategoryId }: MyMap
 
   return (
     <div className="space-y-3">
-      <LocationSearchBar onSelect={handleLocationSelect} />
+      {/* 2. Top Bar: Search + Category Dropdown */}
+      <div className="flex flex-col sm:flex-row gap-3 z-10 relative">
+        <div className="flex-1">
+          <LocationSearchBar onSelect={handleLocationSelect} />
+        </div>
+
+        <div className="w-full sm:w-60">
+          <select
+            value={currentSlug}
+            onChange={(event) => handleServiceChange(event.target.value)}
+            className="w-full rounded-lg border bg-background px-3 py-2 text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-ring"
+          >
+            <option value="all">All Services</option>
+            {Object.keys(SERVICE_TO_BOOKING_CATEGORY).map((slug) => (
+              <option key={slug} value={slug}>
+                {slug.replace(/-/g, " ")}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       <HelpersInAreaBadge count={helpersWithoutCoords.length} city={fetchCity} />
 
-      <Card className="h-105 p-0 overflow-hidden">
+      <Card className="h-105 p-0 overflow-hidden relative">
         <MapComponent
           ref={mapRef}
           center={[mapCenter.lng, mapCenter.lat]}
@@ -501,27 +581,16 @@ export function MyMap({ userId, initialCategoryId, initialSubcategoryId }: MyMap
             dark: "https://tiles.openfreemap.org/styles/liberty",
           }}
         >
-          <MapControls
-            position="bottom-right"
-            showZoom
-            showCompass
-            showLocate
-            showFullscreen
-            onLocate={async (coords) => {
-              const { latitude: lat, longitude: lng } = coords;
-              setDraggableMarker({ lat, lng });
-              const { addressLine, area, city, state, postalCode } = await reverseGeocode(lat, lng);
-              setFetchCity(city);
-              setPrefillAddress({ addressLine, area, city, state, postalCode });
-            }}
-          />
-
+          <MapControls position="bottom-right" showZoom showCompass showLocate />
           <ServiceLocationMarker
             lat={draggableMarker.lat}
             lng={draggableMarker.lng}
-            onDragEnd={setDraggableMarker}
+            onDragEnd={(coords) => {
+              setMapCenter({ lat: coords.lat, lng: coords.lng });
+              setDraggableMarker({ lat: coords.lat, lng: coords.lng });
+              setPrefillAddress((prev) => ({ ...prev, addressLine: "", area: "", city: prev.city, state: prev.state, postalCode: prev.postalCode }));
+            }}
           />
-
           <HelperMarkersLayer helpers={helpersWithCoords} />
         </MapComponent>
       </Card>
@@ -533,6 +602,8 @@ export function MyMap({ userId, initialCategoryId, initialSubcategoryId }: MyMap
         />
       ) : (
         <BookingForm
+          // Add a key so the form completely resets its internal state when the category changes
+          key={selectedCategory || "default"}
           latitude={draggableMarker.lat}
           longitude={draggableMarker.lng}
           userId={userId}

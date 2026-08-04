@@ -1,41 +1,37 @@
 "use client";
 
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { MyMap } from "@features/shared/components/mapping/map-component";
 import { useSession } from "@/lib/auth/session";
-import { useSearchParams } from "next/navigation";
+import { SERVICE_TO_BOOKING_CATEGORY } from "@/config/services";
 
-const SERVICE_TO_BOOKING_CATEGORY: Record<string, { categoryId: string; subcategoryId?: string }> = {
-  cleaning: { categoryId: "cleaner", subcategoryId: "home_cleaning" },
-  "deep-cleaning": { categoryId: "cleaner", subcategoryId: "home_cleaning" },
-  electrician: { categoryId: "electrician" },
-  plumbing: { categoryId: "plumber" },
-  "ac-repair": { categoryId: "electrician" },
-  appliance: { categoryId: "electrician" },
-  carpenter: { categoryId: "other" },
-  "pest-control": { categoryId: "other" },
-  painting: { categoryId: "other" },
-  laundry: { categoryId: "cleaner" },
-  sanitization: { categoryId: "cleaner" },
-  driver: { categoryId: "driver", subcategoryId: "car_driver" },
-  delivery: { categoryId: "delivery_helper" },
-  chef: { categoryId: "chef", subcategoryId: "cook" },
-  babysitter: { categoryId: "caretaker" },
-  security: { categoryId: "security_guard", subcategoryId: "security_night" },
-  "car-washer": { categoryId: "cleaner" },
-  "pet-groomer": { categoryId: "other" },
-  fitness: { categoryId: "other" },
-  "event-helper": { categoryId: "other" },
-  moving: { categoryId: "other" },
-  elderly: { categoryId: "caretaker" },
-  assistant: { categoryId: "other" },
-};
-
-export default function CustomerBookPage() {
+function MapContainer() {
   const { session } = useSession();
   const searchParams = useSearchParams();
+  
   const serviceSlug = searchParams.get("service") ?? "";
-  const selectedService = SERVICE_TO_BOOKING_CATEGORY[serviceSlug] ?? undefined;
+  const selectedService = SERVICE_TO_BOOKING_CATEGORY[serviceSlug];
+  const isInvalidSlug = Boolean(serviceSlug && !selectedService);
 
+  return (
+    <div className="space-y-4">
+      {isInvalidSlug && (
+        <div className="rounded-md bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400">
+          Service &quot;{serviceSlug}&quot; was not recognized. Showing all available categories.
+        </div>
+      )}
+
+      <MyMap
+        userId={session?.user?.id}
+        initialCategoryId={selectedService?.categoryId}
+        initialSubcategoryId={selectedService?.subcategoryId}
+      />
+    </div>
+  );
+}
+
+export default function CustomerBookPage() {
   return (
     <div className="max-w-6xl mx-auto pb-16 px-4 sm:px-6 lg:px-8">
       <div className="py-6 sm:py-8">
@@ -45,11 +41,9 @@ export default function CustomerBookPage() {
         </p>
       </div>
 
-      <MyMap
-        userId={session?.user.id}
-        initialCategoryId={selectedService?.categoryId}
-        initialSubcategoryId={selectedService?.subcategoryId}
-      />
+      <Suspense fallback={null}>
+        <MapContainer />
+      </Suspense>
     </div>
   );
 }

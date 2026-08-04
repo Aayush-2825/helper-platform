@@ -25,6 +25,8 @@
   --radius-2xl: 1.25rem;
   --radius-3xl: 1.5rem;
   --radius-4xl: 2rem;
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
 }
 
 :root {
@@ -38,6 +40,9 @@
   /* Deep Indigo Base */
   --primary: #1E1B4B;
   --primary-foreground: #FFFFFF;
+
+  --popover: #F8FAFC;
+  --popover-foreground: #0F172A;
 
   /* Bright Orange CTA */
   --accent: #F97316;
@@ -70,6 +75,9 @@
 
   --primary: #818CF8;
   --primary-foreground: #111827;
+
+  --popover: #0F172A;
+  --popover-foreground: #F8FAFC;
 
   --accent: #F97316;
   --accent-foreground: #111827;

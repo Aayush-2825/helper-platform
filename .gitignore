@@ -4,6 +4,7 @@
 node_modules
 .pnp
 .pnp.js
+.qoder
 
 # Local env files
 .env

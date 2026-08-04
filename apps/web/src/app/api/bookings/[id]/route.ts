@@ -5,7 +5,6 @@ import { db } from "@/db";
 import { bookingStatusEvent, helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
-import { resumeMatchingIfNeeded } from "@/services/matching/matching";
 
 export async function GET(
   _request: Request,
@@ -42,10 +41,6 @@ export async function GET(
 
     const isCustomer = bookingResult.customerId === session.user.id;
     const isAssignedHelper = bookingResult.helperId === session.user.id;
-
-    if (isCustomer && ["requested", "matched"].includes(bookingResult.status) && !bookingResult.helperId) {
-      await resumeMatchingIfNeeded(bookingId);
-    }
 
     // Check if the user is authorized to see this booking (customer or helper)
     if (!isCustomer && !isAssignedHelper) {

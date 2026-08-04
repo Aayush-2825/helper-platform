@@ -1,4 +1,3 @@
-// Booking update handler
 import { broadcastEvent } from "../../index.js";
 
 export function bookingUpdateHandler(_userId: string, data: unknown) {
