@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
 import { connection, NextRequest } from "next/server";
-import { db } from "@/db";
-import { account } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
@@ -24,26 +21,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
-    const googleAccount = await db.query.account.findFirst({
-      where: and(
-        eq(account.userId, session.user.id),
-        eq(account.providerId, "google")
-      ),
-      columns: {
-        scope: true,
-        refreshToken: true,
-      }
-    });
+    // Check for service account configuration (preferred method)
+    const hasServiceAccount = !!(
+      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
+      process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+    );
 
-    const isConnected = !!googleAccount;
-    const hasCalendarScope = googleAccount?.scope?.includes("https://www.googleapis.com/auth/calendar") ?? false;
-    const hasRefreshToken = !!googleAccount?.refreshToken;
+    // Fallback: check if admin has Google OAuth linked (for backward compatibility)
+    const hasGoogleOAuth = !!session.user.email?.endsWith("@gmail.com");
 
     return NextResponse.json({
-      isConnected,
-      hasCalendarScope,
-      hasRefreshToken,
+      hasServiceAccount,
+      hasGoogleOAuth,
       email: session.user.email,
+      configured: hasServiceAccount || hasGoogleOAuth,
     }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     if (!isPrerenderHangError(error)) {

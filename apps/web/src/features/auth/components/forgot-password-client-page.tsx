@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { KeyRound } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { authClient } from "@/lib/auth/client";
 import { showFormError, showFormSuccess } from "@/lib/ui/form-feedback";
 import { forgotPasswordSchema, type ForgotPasswordFormValues } from "@/lib/validation/auth";
 import { Alert, AlertDescription, AlertTitle } from "@repo/ui/components/ui/alert";
-import { Badge } from "@repo/ui/components/ui/badge";
 import { Button, buttonVariants } from "@repo/ui/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@repo/ui/components/ui/field";
@@ -53,45 +53,50 @@ export function ForgotPasswordClientPage() {
   if (success) {
     return (
       <div className="auth-shell">
-        <Card className="surface-card-strong gradient-outline reveal-up w-full max-w-md border-none">
-          <CardHeader>
-            <Badge variant="secondary" className="w-fit">
-              Email sent
-            </Badge>
-            <CardTitle>Check your email</CardTitle>
-            <CardDescription>
-              We&apos;ve sent a password reset link to <strong>{submittedEmail}</strong>.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              The link expires in 30 minutes. If you don&apos;t see the email, check your spam folder.
-            </p>
-          </CardContent>
-          <CardFooter>
-            <Link href="/auth/signin" className={buttonVariants({ className: "min-h-11 w-full" })}>
-              Back to sign in
-            </Link>
-          </CardFooter>
-        </Card>
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center space-y-2">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/5">
+              <KeyRound className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">Check your email</h1>
+            <p className="text-muted-foreground">We&apos;ve sent a password reset link to <strong>{submittedEmail}</strong></p>
+          </div>
+
+          <Card className="border-border/60 shadow-lg">
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground text-center">
+                The link expires in 30 minutes. If you don&apos;t see the email, check your spam folder.
+              </p>
+            </CardContent>
+            <CardFooter className="flex flex-col gap-4">
+              <Link href="/auth/signin" className={buttonVariants({ className: "h-11 w-full" })}>
+                Back to sign in
+              </Link>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="auth-shell">
-      <Card className="surface-card-strong gradient-outline reveal-up w-full max-w-md border-none">
-        <CardHeader>
-          <Badge variant="secondary" className="w-fit">
-            Account recovery
-          </Badge>
-          <CardTitle>Reset your password</CardTitle>
-          <CardDescription>
-            Enter your email address and we&apos;ll send you a link to reset your password.
-          </CardDescription>
-        </CardHeader>
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center space-y-2">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5">
+            <KeyRound className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Reset your password</h1>
+          <p className="text-muted-foreground">Enter your email address and we&apos;ll send you a reset link</p>
+        </div>
 
-        <CardContent>
+        <Card className="border-border/60 shadow-lg">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="text-2xl">Forgot password</CardTitle>
+            <CardDescription>We&apos;ll send you a link to reset your password</CardDescription>
+          </CardHeader>
+
+        <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
             <FieldGroup>
               {formError ? (
@@ -114,25 +119,27 @@ export function ForgotPasswordClientPage() {
                       autoComplete="email"
                       placeholder="you@example.com"
                       aria-invalid={fieldState.invalid}
+                      className="h-11"
                     />
                     {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
                   </Field>
                 )}
               />
 
-              <Button type="submit" className="min-h-11 w-full" disabled={isSubmitting}>
+              <Button type="submit" className="h-11 w-full" disabled={isSubmitting}>
                 {isSubmitting ? "Sending..." : "Send reset link"}
               </Button>
             </FieldGroup>
           </form>
         </CardContent>
 
-        <CardFooter className="justify-center">
-          <Link href="/auth/signin" className="text-sm text-primary underline-offset-4 hover:underline">
+        <CardFooter className="flex flex-col items-center gap-4 pt-6">
+          <Link href="/auth/signin" className="text-sm font-medium text-primary hover:underline">
             Back to sign in
           </Link>
         </CardFooter>
       </Card>
+      </div>
     </div>
   );
 }

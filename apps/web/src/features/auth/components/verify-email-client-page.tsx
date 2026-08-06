@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, LoaderCircle, XCircle } from "lucide-react";
-import { Badge } from "@repo/ui/components/ui/badge";
+import { CheckCircle2, LoaderCircle, XCircle, Mail } from "lucide-react";
 import { buttonVariants } from "@repo/ui/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
 
@@ -26,18 +25,21 @@ export function VerifyEmailClientPage() {
   if (status === "verifying") {
     return (
       <div className="auth-shell">
-        <Card className="surface-card-strong gradient-outline reveal-up w-full max-w-md border-none">
-          <CardHeader>
-            <Badge variant="secondary" className="w-fit">
-              Email verification
-            </Badge>
-            <CardTitle>Verifying your email</CardTitle>
-            <CardDescription>Please wait while we verify your account.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center pb-6">
-            <LoaderCircle className="animate-spin text-primary" />
-          </CardContent>
-        </Card>
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center space-y-2">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5">
+              <LoaderCircle className="h-8 w-8 text-primary animate-spin" />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">Verifying your email</h1>
+            <p className="text-muted-foreground">Please wait while we verify your account</p>
+          </div>
+
+          <Card className="border-border/60 shadow-lg">
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground text-center">Verifying email address...</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -45,49 +47,55 @@ export function VerifyEmailClientPage() {
   if (status === "success") {
     return (
       <div className="auth-shell">
-        <Card className="surface-card-strong gradient-outline reveal-up w-full max-w-md border-none">
-          <CardHeader>
-            <Badge variant="secondary" className="w-fit">
-              Verified
-            </Badge>
-            <CardTitle>Email verified</CardTitle>
-            <CardDescription>Your email is confirmed. Redirecting to dashboard...</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <CheckCircle2 className="text-primary" />
-          </CardContent>
-          <CardFooter>
-            <Link href="/dashboard" className={buttonVariants({ className: "min-h-11 w-full" })}>
-              Go to dashboard
-            </Link>
-          </CardFooter>
-        </Card>
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center space-y-2">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/5">
+              <CheckCircle2 className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">Email verified</h1>
+            <p className="text-muted-foreground">Your email is confirmed successfully</p>
+          </div>
+
+          <Card className="border-border/60 shadow-lg">
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground text-center">Redirecting to dashboard...</p>
+            </CardContent>
+            <CardFooter className="flex flex-col gap-4">
+              <Link href="/dashboard" className={buttonVariants({ className: "h-11 w-full" })}>
+                Go to dashboard
+              </Link>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="auth-shell">
-      <Card className="surface-card-strong gradient-outline reveal-up w-full max-w-md border-none">
-        <CardHeader>
-          <Badge variant="secondary" className="w-fit">
-            Verification failed
-          </Badge>
-          <CardTitle>Verification link expired</CardTitle>
-          <CardDescription>This link is invalid or expired. Please request another verification flow.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center">
-          <XCircle className="text-destructive" />
-        </CardContent>
-        <CardFooter className="flex flex-col gap-2">
-          <Link href="/auth/signup" className={buttonVariants({ className: "min-h-11 w-full" })}>
-            Sign up again
-          </Link>
-          <Link href="/auth/signin" className={buttonVariants({ variant: "outline", className: "min-h-11 w-full" })}>
-            Back to sign in
-          </Link>
-        </CardFooter>
-      </Card>
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center space-y-2">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/5">
+            <XCircle className="h-8 w-8 text-destructive" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Verification failed</h1>
+          <p className="text-muted-foreground">This link is invalid or expired</p>
+        </div>
+
+        <Card className="border-border/60 shadow-lg">
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground text-center">Please request another verification flow</p>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-4">
+            <Link href="/auth/signup" className={buttonVariants({ className: "h-11 w-full" })}>
+              Sign up again
+            </Link>
+            <Link href="/auth/signin" className={buttonVariants({ variant: "outline", className: "h-11 w-full" })}>
+              Back to sign in
+            </Link>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   );
 }

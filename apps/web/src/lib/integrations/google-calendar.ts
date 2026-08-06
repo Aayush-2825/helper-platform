@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { account, user } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { GoogleAuth } from "google-auth-library";
 
 type GoogleApiErrorDetails = {
   raw: string;
@@ -48,7 +49,38 @@ async function refreshGoogleAccessToken(refreshToken: string) {
   return (await response.json()) as { access_token: string; expires_in: number };
 }
 
+async function getServiceAccountAccessToken(): Promise<string> {
+  const serviceAccountEmail = process.env.GOOGLE_CLIENT_ID;
+  const privateKey = process.env.GOOGLE_CLIENT_KEY;
+
+  if (!serviceAccountEmail || !privateKey) {
+    throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_KEY in environment.");
+  }
+
+  const auth = new GoogleAuth({
+    credentials: {
+      client_email: serviceAccountEmail,
+      private_key: privateKey.replace(/\\n/g, "\n"),
+    },
+    scopes: ["https://www.googleapis.com/auth/calendar"],
+  });
+
+  const client = await auth.getClient();
+  const accessToken = await client.getAccessToken();
+  if (!accessToken.token) {
+    throw new Error("Failed to obtain access token from service account.");
+  }
+  return accessToken.token;
+}
+
 export async function getGoogleCalendarAccessToken(userId?: string) {
+  // Prefer service account for calendar operations to avoid OAuth scope issues
+  const serviceAccountEmail = process.env.GOOGLE_CLIENT_ID;
+  if (serviceAccountEmail) {
+    return getServiceAccountAccessToken();
+  }
+
+  // Fallback to user OAuth token if service account not configured
   let targetUserId = userId;
 
   if (!targetUserId) {

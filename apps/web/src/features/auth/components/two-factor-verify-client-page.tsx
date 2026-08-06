@@ -3,13 +3,13 @@
 import { useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Shield } from "lucide-react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { authClient } from "@/lib/auth/client";
 import { showFormError, showFormSuccess } from "@/lib/ui/form-feedback";
 import { twoFactorVerifySchema, type TwoFactorFormValues } from "@/lib/validation/auth";
 import { Alert, AlertDescription, AlertTitle } from "@repo/ui/components/ui/alert";
-import { Badge } from "@repo/ui/components/ui/badge";
 import { Button } from "@repo/ui/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
 import { Checkbox } from "@repo/ui/components/ui/checkbox";
@@ -66,16 +66,22 @@ export function TwoFactorVerifyClientPage() {
 
   return (
     <div className="auth-shell">
-      <Card className="surface-card-strong gradient-outline reveal-up w-full max-w-md border-none">
-        <CardHeader>
-          <Badge variant="secondary" className="w-fit">
-            Extra protection
-          </Badge>
-          <CardTitle>Two-factor authentication</CardTitle>
-          <CardDescription>Enter your verification code to continue.</CardDescription>
-        </CardHeader>
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center space-y-2">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5">
+            <Shield className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Two-factor authentication</h1>
+          <p className="text-muted-foreground">Enter your verification code to continue</p>
+        </div>
 
-        <CardContent>
+        <Card className="border-border/60 shadow-lg">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="text-2xl">Verify your identity</CardTitle>
+            <CardDescription>Enter the code from your authenticator app or backup code</CardDescription>
+          </CardHeader>
+
+        <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
             <FieldGroup>
               {formError ? (
@@ -106,10 +112,10 @@ export function TwoFactorVerifyClientPage() {
                         }
                       }}
                     >
-                      <ToggleGroupItem value="totp" className="min-h-11 flex-1">
+                      <ToggleGroupItem value="totp" className="h-11 flex-1">
                         Authenticator app
                       </ToggleGroupItem>
-                      <ToggleGroupItem value="backup" className="min-h-11 flex-1">
+                      <ToggleGroupItem value="backup" className="h-11 flex-1">
                         Backup code
                       </ToggleGroupItem>
                     </ToggleGroup>
@@ -131,7 +137,7 @@ export function TwoFactorVerifyClientPage() {
                       maxLength={method === "totp" ? 6 : 24}
                       placeholder={method === "totp" ? "000000" : "XXXX-XXXX-XXXX"}
                       aria-invalid={fieldState.invalid}
-                      className="text-center tracking-wider"
+                      className="text-center tracking-wider h-11"
                       onChange={(event: ChangeEvent<HTMLInputElement>) => {
                         const nextValue =
                           method === "totp"
@@ -162,19 +168,20 @@ export function TwoFactorVerifyClientPage() {
                 )}
               />
 
-              <Button type="submit" className="min-h-11 w-full" disabled={isSubmitting}>
+              <Button type="submit" className="h-11 w-full" disabled={isSubmitting}>
                 {isSubmitting ? "Verifying..." : "Verify"}
               </Button>
             </FieldGroup>
           </form>
         </CardContent>
 
-        <CardFooter className="justify-center">
-          <Link href="/auth/signin" className="text-sm text-primary underline-offset-4 hover:underline">
+        <CardFooter className="flex flex-col items-center gap-4 pt-6">
+          <Link href="/auth/signin" className="text-sm font-medium text-primary hover:underline">
             Back to sign in
           </Link>
         </CardFooter>
       </Card>
+      </div>
     </div>
   );
 }

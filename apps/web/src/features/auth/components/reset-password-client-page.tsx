@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ShieldCheck, AlertCircle } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { authClient } from "@/lib/auth/client";
 import { showFormError, showFormSuccess } from "@/lib/ui/form-feedback";
 import { resetPasswordSchema, type ResetPasswordFormValues } from "@/lib/validation/auth";
 import { Alert, AlertDescription, AlertTitle } from "@repo/ui/components/ui/alert";
-import { Badge } from "@repo/ui/components/ui/badge";
 import { Button, buttonVariants } from "@repo/ui/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@repo/ui/components/ui/field";
@@ -66,20 +66,23 @@ export function ResetPasswordClientPage({ token }: ResetPasswordClientPageProps)
   if (!token) {
     return (
       <div className="auth-shell">
-        <Card className="surface-card-strong gradient-outline reveal-up w-full max-w-md border-none">
-          <CardHeader>
-            <Badge variant="secondary" className="w-fit">
-              Invalid link
-            </Badge>
-            <CardTitle>Invalid token</CardTitle>
-            <CardDescription>This password reset link is invalid or has expired.</CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <Link href="/auth/forgot-password" className={buttonVariants({ className: "min-h-11 w-full" })}>
-              Request a new link
-            </Link>
-          </CardFooter>
-        </Card>
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center space-y-2">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-destructive/20 to-destructive/5">
+              <AlertCircle className="h-8 w-8 text-destructive" />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">Invalid link</h1>
+            <p className="text-muted-foreground">This password reset link is invalid or has expired</p>
+          </div>
+
+          <Card className="border-border/60 shadow-lg">
+            <CardFooter className="flex flex-col gap-4">
+              <Link href="/auth/forgot-password" className={buttonVariants({ className: "h-11 w-full" })}>
+                Request a new link
+              </Link>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -87,31 +90,43 @@ export function ResetPasswordClientPage({ token }: ResetPasswordClientPageProps)
   if (success) {
     return (
       <div className="auth-shell">
-        <Card className="surface-card-strong gradient-outline reveal-up w-full max-w-md border-none">
-          <CardHeader>
-            <Badge variant="secondary" className="w-fit">
-              Password updated
-            </Badge>
-            <CardTitle>Password reset successful</CardTitle>
-            <CardDescription>Your password has been reset. Redirecting to sign in...</CardDescription>
-          </CardHeader>
-        </Card>
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center space-y-2">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/5">
+              <ShieldCheck className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">Password updated</h1>
+            <p className="text-muted-foreground">Your password has been reset successfully</p>
+          </div>
+
+          <Card className="border-border/60 shadow-lg">
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground text-center">Redirecting to sign in...</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="auth-shell">
-      <Card className="surface-card-strong gradient-outline reveal-up w-full max-w-md border-none">
-        <CardHeader>
-          <Badge variant="secondary" className="w-fit">
-            Security update
-          </Badge>
-          <CardTitle>Set new password</CardTitle>
-          <CardDescription>Enter your new password below.</CardDescription>
-        </CardHeader>
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center space-y-2">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5">
+            <ShieldCheck className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Set new password</h1>
+          <p className="text-muted-foreground">Enter your new password below</p>
+        </div>
 
-        <CardContent>
+        <Card className="border-border/60 shadow-lg">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="text-2xl">Reset password</CardTitle>
+            <CardDescription>Choose a secure password for your account</CardDescription>
+          </CardHeader>
+
+        <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
             <FieldGroup>
               {formError ? (
@@ -134,6 +149,7 @@ export function ResetPasswordClientPage({ token }: ResetPasswordClientPageProps)
                       autoComplete="new-password"
                       placeholder="********"
                       aria-invalid={fieldState.invalid}
+                      className="h-11"
                     />
                     <FieldDescription>At least 8 characters.</FieldDescription>
                     {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
@@ -154,25 +170,27 @@ export function ResetPasswordClientPage({ token }: ResetPasswordClientPageProps)
                       autoComplete="new-password"
                       placeholder="********"
                       aria-invalid={fieldState.invalid}
+                      className="h-11"
                     />
                     {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
                   </Field>
                 )}
               />
 
-              <Button type="submit" className="min-h-11 w-full" disabled={isSubmitting}>
+              <Button type="submit" className="h-11 w-full" disabled={isSubmitting}>
                 {isSubmitting ? "Resetting..." : "Reset password"}
               </Button>
             </FieldGroup>
           </form>
         </CardContent>
 
-        <CardFooter className="justify-center">
-          <Link href="/auth/signin" className="text-sm text-primary underline-offset-4 hover:underline">
+        <CardFooter className="flex flex-col items-center gap-4 pt-6">
+          <Link href="/auth/signin" className="text-sm font-medium text-primary hover:underline">
             Back to sign in
           </Link>
         </CardFooter>
       </Card>
+      </div>
     </div>
   );
 }

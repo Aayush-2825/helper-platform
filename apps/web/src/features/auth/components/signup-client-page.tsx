@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Chrome } from "lucide-react";
+import { Chrome, Sparkles } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { authClient } from "@/lib/auth/client";
@@ -72,13 +72,22 @@ export function SignUpClientPage() {
 
   return (
     <div className="auth-shell">
-      <Card className="surface-card-strong gradient-outline reveal-up w-full max-w-md border-none">
-        <CardHeader>
-          <CardTitle>Create your account</CardTitle>
-          <CardDescription>Book services quickly and manage orders in one place.</CardDescription>
-        </CardHeader>
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center space-y-2">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5">
+            <Sparkles className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Create your account</h1>
+          <p className="text-muted-foreground">Book services quickly and manage orders in one place</p>
+        </div>
 
-        <CardContent>
+        <Card className="border-border/60 shadow-lg">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="text-2xl">Sign up</CardTitle>
+            <CardDescription>Enter your details to get started</CardDescription>
+          </CardHeader>
+
+        <CardContent className="space-y-4">
           <form onSubmit={handleEmailSignUp} noValidate aria-busy={isLoading}>
             <FieldGroup>
               {formError ? (
@@ -100,6 +109,7 @@ export function SignUpClientPage() {
                       autoComplete="name"
                       placeholder="John Doe"
                       aria-invalid={fieldState.invalid}
+                      className="h-11"
                     />
                     {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
                   </Field>
@@ -119,6 +129,7 @@ export function SignUpClientPage() {
                       autoComplete="email"
                       placeholder="you@example.com"
                       aria-invalid={fieldState.invalid}
+                      className="h-11"
                     />
                     {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
                   </Field>
@@ -138,6 +149,7 @@ export function SignUpClientPage() {
                       autoComplete="new-password"
                       placeholder="********"
                       aria-invalid={fieldState.invalid}
+                      className="h-11"
                     />
                     <FieldDescription>At least 8 characters.</FieldDescription>
                     {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
@@ -158,35 +170,54 @@ export function SignUpClientPage() {
                       autoComplete="new-password"
                       placeholder="********"
                       aria-invalid={fieldState.invalid}
+                      className="h-11"
                     />
                     {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
                   </Field>
                 )}
               />
 
-              <Button type="submit" className="min-h-11 w-full" disabled={isLoading}>
+              <Button type="submit" className="h-11 w-full" disabled={isLoading}>
                 {form.formState.isSubmitting ? "Creating account..." : "Sign up"}
               </Button>
 
-              <FieldSeparator>Or continue with</FieldSeparator>
+              <FieldSeparator className="my-6" />
 
-              <Button type="button" variant="outline" className="min-h-11 w-full" onClick={handleGoogleSignUp} disabled={isLoading}>
-                <Chrome data-icon="inline-start" />
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 w-full gap-2"
+                onClick={handleGoogleSignUp}
+                disabled={isLoading}
+              >
+                <Chrome className="h-4 w-4" />
                 Continue with Google
               </Button>
             </FieldGroup>
           </form>
         </CardContent>
 
-        <CardFooter className="justify-center">
+        <CardFooter className="flex flex-col items-center gap-4 pt-6">
           <p className="text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/auth/signin" className="text-primary underline-offset-4 hover:underline">
+            <Link href="/auth/signin" className="font-medium text-primary hover:underline">
               Sign in
             </Link>
           </p>
         </CardFooter>
       </Card>
+
+      <p className="text-center text-xs text-muted-foreground">
+        By signing up, you agree to our{" "}
+        <Link href="/privacy" className="underline hover:text-foreground">
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="underline hover:text-foreground">
+          Privacy Policy
+        </Link>
+      </p>
+      </div>
     </div>
   );
 }

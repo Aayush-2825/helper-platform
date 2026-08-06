@@ -3,14 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Chrome } from "lucide-react";
+import { Chrome, Lock, Sparkles } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { authClient } from "@/lib/auth/client";
 import { showFormError } from "@/lib/ui/form-feedback";
 import { signInSchema, type SignInFormValues } from "@/lib/validation/auth";
 import { Alert, AlertDescription, AlertTitle } from "@repo/ui/components/ui/alert";
-import { Badge } from "@repo/ui/components/ui/badge";
 import { Button } from "@repo/ui/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@repo/ui/components/ui/card";
 import { Field, FieldError, FieldGroup, FieldLabel, FieldSeparator } from "@repo/ui/components/ui/field";
@@ -76,92 +75,118 @@ export function SignInClientPage({ nextPath }: SignInClientPageProps) {
 
   return (
     <div className="auth-shell">
-      <Card className="surface-card-strong gradient-outline reveal-up w-full max-w-md border-none">
-        <CardHeader>
-          <Badge variant="secondary" className="w-fit">
-            Welcome back
-          </Badge>
-          <CardTitle>Sign in to your account</CardTitle>
-          <CardDescription>Continue booking trusted services for your home or business.</CardDescription>
-        </CardHeader>
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center space-y-2">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5">
+            <Lock className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
+          <p className="text-muted-foreground">Sign in to continue booking trusted services</p>
+        </div>
 
-        <CardContent>
-          <form onSubmit={handleEmailSignIn} noValidate aria-busy={isLoading}>
-            <FieldGroup>
-              {formError ? (
-                <Alert variant="destructive">
-                  <AlertTitle>Sign-in failed</AlertTitle>
-                  <AlertDescription>{formError}</AlertDescription>
-                </Alert>
-              ) : null}
+        <Card className="border-border/60 shadow-lg">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="text-2xl">Sign in</CardTitle>
+            <CardDescription>Enter your credentials to access your account</CardDescription>
+          </CardHeader>
 
-              <Controller
-                name="email"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={field.name}>Email address</FieldLabel>
-                    <Input
-                      {...field}
-                      id={field.name}
-                      type="email"
-                      autoComplete="email"
-                      placeholder="you@example.com"
-                      aria-invalid={fieldState.invalid}
-                    />
-                    {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-                  </Field>
-                )}
-              />
+          <CardContent className="space-y-4">
+            <form onSubmit={handleEmailSignIn} noValidate aria-busy={isLoading}>
+              <FieldGroup>
+                {formError ? (
+                  <Alert variant="destructive">
+                    <AlertTitle>Sign-in failed</AlertTitle>
+                    <AlertDescription>{formError}</AlertDescription>
+                  </Alert>
+                ) : null}
 
-              <Controller
-                name="password"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={field.name}>Password</FieldLabel>
-                    <Input
-                      {...field}
-                      id={field.name}
-                      type="password"
-                      autoComplete="current-password"
-                      placeholder="********"
-                      aria-invalid={fieldState.invalid}
-                    />
-                    {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-                  </Field>
-                )}
-              />
+                <Controller
+                  name="email"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor={field.name}>Email address</FieldLabel>
+                      <Input
+                        {...field}
+                        id={field.name}
+                        type="email"
+                        autoComplete="email"
+                        placeholder="you@example.com"
+                        aria-invalid={fieldState.invalid}
+                        className="h-11"
+                      />
+                      {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+                    </Field>
+                  )}
+                />
 
-              <div className="flex justify-end">
-                <Link href="/auth/forgot-password" className="text-sm text-primary underline-offset-4 hover:underline">
-                  Forgot your password?
-                </Link>
-              </div>
+                <Controller
+                  name="password"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor={field.name}>Password</FieldLabel>
+                      <Input
+                        {...field}
+                        id={field.name}
+                        type="password"
+                        autoComplete="current-password"
+                        placeholder="********"
+                        aria-invalid={fieldState.invalid}
+                        className="h-11"
+                      />
+                      {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+                    </Field>
+                  )}
+                />
 
-              <Button type="submit" className="min-h-11 w-full" disabled={isLoading}>
-                {form.formState.isSubmitting ? "Signing in..." : "Sign in"}
-              </Button>
+                <div className="flex justify-end">
+                  <Link href="/auth/forgot-password" className="text-sm font-medium text-primary hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
 
-              <FieldSeparator>Or continue with</FieldSeparator>
+                <Button type="submit" className="h-11 w-full" disabled={isLoading}>
+                  {form.formState.isSubmitting ? "Signing in..." : "Sign in"}
+                </Button>
 
-              <Button type="button" variant="outline" className="min-h-11 w-full" onClick={handleGoogleSignIn} disabled={isLoading}>
-                <Chrome data-icon="inline-start" />
-                Continue with Google
-              </Button>
-            </FieldGroup>
-          </form>
-        </CardContent>
+                <FieldSeparator className="my-6" />
 
-        <CardFooter className="justify-center">
-          <p className="text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/auth/signup" className="text-primary underline-offset-4 hover:underline">
-              Sign up
-            </Link>
-          </p>
-        </CardFooter>
-      </Card>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-full gap-2"
+                  onClick={handleGoogleSignIn}
+                  disabled={isLoading}
+                >
+                  <Chrome className="h-4 w-4" />
+                  Continue with Google
+                </Button>
+              </FieldGroup>
+            </form>
+          </CardContent>
+
+          <CardFooter className="flex flex-col items-center gap-4 pt-6">
+            <p className="text-sm text-muted-foreground">
+              Don&apos;t have an account?{" "}
+              <Link href="/auth/signup" className="font-medium text-primary hover:underline">
+                Sign up for free
+              </Link>
+            </p>
+          </CardFooter>
+        </Card>
+
+        <p className="text-center text-xs text-muted-foreground">
+          By signing in, you agree to our{" "}
+          <Link href="/privacy" className="underline hover:text-foreground">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="underline hover:text-foreground">
+            Privacy Policy
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
