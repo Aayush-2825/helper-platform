@@ -5,9 +5,10 @@ import { organization } from "better-auth/plugins/organization";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { sendInvitationEmail, sendPasswordResetEmail, sendVerificationEmail } from "@/lib/notifications/email";
+import { nextCookies } from "better-auth/next-js";
 
 export const auth = betterAuth({
-  appName: "Helper Platform",
+  appName: "DOZO",
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
@@ -52,7 +53,7 @@ export const auth = betterAuth({
   plugins: [
     // Two-Factor Authentication
     twoFactor({
-      issuer: "Zapier Clone",
+      issuer: "DOZO",
       totpOptions: {
         digits: 6,
         period: 30,
@@ -79,6 +80,7 @@ export const auth = betterAuth({
         enabled: true,
       },
     }),
+    nextCookies()
   ],
 
   // Session Management
@@ -114,7 +116,7 @@ export const auth = betterAuth({
   advanced: {
     useSecureCookies: process.env.NODE_ENV === "production",
     disableCSRFCheck: false,
-    cookiePrefix: "zapier",
+    cookiePrefix: "dozo",
   },
 
   // User Configuration
