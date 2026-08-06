@@ -63,9 +63,6 @@ export function Step3PricingAvailability<T extends FieldValues>({
         <h1 className="text-2xl font-bold text-gray-900">
           Pricing & availability
         </h1>
-        <p className="mt-2 text-gray-600">
-          Choose how you want to charge customers and set the hours and days you can work.
-        </p>
       </div>
 
       {/* Pricing Type */}
@@ -142,11 +139,6 @@ export function Step3PricingAvailability<T extends FieldValues>({
                 value={field.value ?? ""}
                 label={`Base ${pricingType === "fixed" ? "Price" : "Hourly Rate"} (Optional)`}
                 error={error?.message}
-                helperText={
-                  pricingType === "fixed"
-                    ? "You can adjust per job based on requirements"
-                    : "Per hour of work in INR"
-                }
                 onChange={(e: ChangeEvent<HTMLInputElement>) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
               />
             </div>
@@ -171,9 +163,6 @@ export function Step3PricingAvailability<T extends FieldValues>({
             />
             <div>
               <p className="text-sm font-medium text-gray-900">Go Online Now</p>
-              <p className="text-xs text-gray-500">
-                Make your profile visible and start receiving job requests
-              </p>
             </div>
           </label>
         )}
@@ -280,11 +269,6 @@ export function Step3PricingAvailability<T extends FieldValues>({
         )}
       </div>
 
-      <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
-        <p className="text-sm text-amber-900">
-          <strong>Tip:</strong> You can update your rates and availability anytime from your profile settings.
-        </p>
-      </div>
     </div>
   );
 }

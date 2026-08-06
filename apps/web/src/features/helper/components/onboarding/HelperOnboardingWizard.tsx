@@ -215,6 +215,38 @@ export function HelperOnboardingWizard({
       }
 
       case 2: {
+        if (!values.dpdpConsentGiven || !hasText(values.dpdpConsentAt) || !hasText(values.dpdpConsentVersion)) {
+          addError("dpdpConsentGiven", "DPDP consent is required before document upload.");
+        }
+
+        if (isIndividual) {
+          if (!hasText(values.idDocumentType)) {
+            addError("idDocumentType", "Select a government ID type");
+          }
+          if (!hasText(values.idDocumentNumber) || values.idDocumentNumber.trim().length < 5) {
+            addError("idDocumentNumber", "Invalid document number");
+          }
+          if (!hasUploadValue(values.idDocumentUrl)) {
+            addError("idDocumentUrl", "Upload your ID document");
+          }
+        } else {
+          if (!hasUploadValue(values.businessRegistrationUrl)) {
+            addError("businessRegistrationUrl", "Upload your business registration document");
+          }
+          if (!hasText(values.ownerIdDocumentType)) {
+            addError("ownerIdDocumentType", "Select the owner or manager ID type");
+          }
+          if (!hasUploadValue(values.ownerIdDocumentUrl)) {
+            addError("ownerIdDocumentUrl", "Upload the owner or manager ID document");
+          }
+          if (!values.workerDeclarationAgreed) {
+            addError("workerDeclarationAgreed", "You must confirm worker identity verification");
+          }
+        }
+        break;
+      }
+
+      case 3: {
         if (!hasText(values.primaryCategory)) {
           addError("primaryCategory", "Select a service category");
         }
@@ -243,7 +275,7 @@ export function HelperOnboardingWizard({
         break;
       }
 
-      case 3: {
+      case 4: {
         if (!hasText(values.pricingType)) {
           addError("pricingType", "Choose a pricing model");
         }
@@ -269,38 +301,6 @@ export function HelperOnboardingWizard({
           values.basePrice < 0
         ) {
           addError("basePrice", "Price must be positive");
-        }
-        break;
-      }
-
-      case 4: {
-        if (!values.dpdpConsentGiven || !hasText(values.dpdpConsentAt) || !hasText(values.dpdpConsentVersion)) {
-          addError("dpdpConsentGiven", "DPDP consent is required before document upload.");
-        }
-
-        if (isIndividual) {
-          if (!hasText(values.idDocumentType)) {
-            addError("idDocumentType", "Select a government ID type");
-          }
-          if (!hasText(values.idDocumentNumber) || values.idDocumentNumber.trim().length < 5) {
-            addError("idDocumentNumber", "Invalid document number");
-          }
-          if (!hasUploadValue(values.idDocumentUrl)) {
-            addError("idDocumentUrl", "Upload your ID document");
-          }
-        } else {
-          if (!hasUploadValue(values.businessRegistrationUrl)) {
-            addError("businessRegistrationUrl", "Upload your business registration document");
-          }
-          if (!hasText(values.ownerIdDocumentType)) {
-            addError("ownerIdDocumentType", "Select the owner or manager ID type");
-          }
-          if (!hasUploadValue(values.ownerIdDocumentUrl)) {
-            addError("ownerIdDocumentUrl", "Upload the owner or manager ID document");
-          }
-          if (!values.workerDeclarationAgreed) {
-            addError("workerDeclarationAgreed", "You must confirm worker identity verification");
-          }
         }
         break;
       }

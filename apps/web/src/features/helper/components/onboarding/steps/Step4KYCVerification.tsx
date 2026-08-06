@@ -73,23 +73,6 @@ export function Step4KYCVerification<T extends FieldValues>({
           <ShieldCheck className="mr-2 inline h-6 w-6 text-primary" />
           Identity verification
         </h1>
-        <p className="mt-2 text-muted-foreground">
-          Upload official ID and documents so we can verify your identity. This helps customers trust your profile.
-        </p>
-      </div>
-
-      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-        <div className="flex gap-3">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-          <div>
-            <p className="text-sm font-medium text-foreground">
-              Verified profiles appear higher in search and receive better matching.
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              We encrypt your documents and only authorized reviewers access them for verification.
-            </p>
-          </div>
-        </div>
       </div>
 
       {isIndividual ? (
@@ -154,15 +137,8 @@ export function Step4KYCVerification<T extends FieldValues>({
             accept="image/*,application/pdf"
             maxSize={5}
             category="kyc"
-            hint="Clear photos showing all visible text and security features"
           />
 
-          <div className="rounded-lg border border-accent/30 bg-accent/10 p-4">
-            <p className="text-sm text-foreground">
-              <AlertCircle className="mr-2 inline h-4 w-4 text-accent" />
-              <strong>Optional:</strong> Upload a selfie holding your ID for instant verification
-            </p>
-          </div>
 
           <FileUploadField
             control={control}
@@ -173,7 +149,6 @@ export function Step4KYCVerification<T extends FieldValues>({
             accept="image/*,application/pdf"
             maxSize={5}
             category="kyc"
-            hint="Recent document with your name and address"
           />
 
           <div className="mt-4">
@@ -204,7 +179,6 @@ export function Step4KYCVerification<T extends FieldValues>({
             maxSize={5}
             category="kyc"
             required
-            hint="Company registration certificate, LLC, or partnership deed"
           />
 
           <Controller
@@ -233,7 +207,6 @@ export function Step4KYCVerification<T extends FieldValues>({
               accept="image/*,application/pdf"
               maxSize={5}
               category="kyc"
-              hint="GST registration certificate or acknowledgment"
             />
           )}
 
@@ -281,7 +254,6 @@ export function Step4KYCVerification<T extends FieldValues>({
             maxSize={5}
             category="kyc"
             required
-            hint="Clear photos of the owner's government-issued ID"
           />
 
           <div className="mt-4">
@@ -319,9 +291,6 @@ export function Step4KYCVerification<T extends FieldValues>({
                   <p className="text-sm font-medium text-foreground">
                     I certify that all workers on my team have verified their identity
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    We will verify this during onboarding completion
-                  </p>
                 </div>
               </label>
             )}
@@ -334,11 +303,6 @@ export function Step4KYCVerification<T extends FieldValues>({
         </>
       )}
 
-      <div className="rounded-lg border border-border bg-muted/40 p-4">
-        <p className="text-xs text-muted-foreground">
-          <strong>Timeline:</strong> Verification typically completes within 24-48 hours. You will receive updates via email.
-        </p>
-      </div>
     </div>
   );
 }

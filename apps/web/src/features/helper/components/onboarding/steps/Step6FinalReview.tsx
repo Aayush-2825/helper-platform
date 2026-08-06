@@ -42,7 +42,6 @@ export function Step6FinalReview<T extends FieldValues>({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Review & submit</h1>
-        <p className="mt-2 text-gray-600">Confirm everything looks correct — you can edit any step before submitting.</p>
       </div>
 
       {/* Summary Cards */}
@@ -149,20 +148,6 @@ export function Step6FinalReview<T extends FieldValues>({
           </div>
         </div>
 
-        {/* Verification Status */}
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <div className="flex gap-3">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-            <div>
-              <p className="text-sm font-medium text-amber-900">
-                Pending Verification
-              </p>
-              <p className="text-xs text-amber-700 mt-1">
-                Your profile will be reviewed within 24-48 hours. You will receive email updates on the status.
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Terms & Agreements */}
@@ -184,16 +169,6 @@ export function Step6FinalReview<T extends FieldValues>({
               <div>
                 <p className="text-sm font-medium text-gray-900">
                   I agree to Terms of Service and Privacy Policy
-                </p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  Read our{" "}
-                  <Link href="/terms" className="text-blue-600 hover:underline">
-                    terms
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="/privacy" className="text-blue-600 hover:underline">
-                    privacy policy
-                  </Link>
                 </p>
               </div>
             </label>
@@ -221,9 +196,6 @@ export function Step6FinalReview<T extends FieldValues>({
                 <p className="text-sm font-medium text-gray-900">
                   I accept the commission structure (10-25% varies by service)
                 </p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  Different services have different commission rates. You will see exact details in your dashboard.
-                </p>
               </div>
             </label>
           )}
@@ -233,13 +205,6 @@ export function Step6FinalReview<T extends FieldValues>({
         )}
       </div>
 
-      {/* Final CTA */}
-      <div className="rounded-lg bg-green-50 border border-green-200 p-4">
-        <p className="text-sm text-green-900">
-          <Check className="inline h-4 w-4 mr-1" />
-          <strong>Ready to submit?</strong> Submit your application for verification. Once approved, you can start receiving bookings.
-        </p>
-      </div>
     </div>
   );
 }

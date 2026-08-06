@@ -74,13 +74,8 @@ export function Step0RoleSelection<T extends FieldValues>({
 
             <h2 className="text-lg font-semibold text-gray-900">Individual Helper</h2>
             <p className="mt-2 text-sm text-gray-600">
-              Work solo and accept jobs directly from customers. Ideal for independent contractors and freelancers.
+              Work solo and accept jobs directly from customers.
             </p>
-
-            <div className="mt-4 flex items-center text-sm font-medium text-blue-600">
-              <span>Get Started</span>
-              <span className="ml-2">&rarr;</span>
-            </div>
           </label>
 
           <label
@@ -110,13 +105,8 @@ export function Step0RoleSelection<T extends FieldValues>({
 
             <h2 className="text-lg font-semibold text-gray-900">Agency / Organization</h2>
             <p className="mt-2 text-sm text-gray-600">
-              Register your business to manage a team, assign jobs, and run operations at scale.
+              Register your business to manage a team and assign jobs.
             </p>
-
-            <div className="mt-4 flex items-center text-sm font-medium text-blue-600">
-              <span>Get Started</span>
-              <span className="ml-2">&rarr;</span>
-            </div>
           </label>
         </RadioGroup>
 
@@ -126,12 +116,6 @@ export function Step0RoleSelection<T extends FieldValues>({
           </p>
         ) : null}
       </fieldset>
-
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-        <p className="text-sm text-blue-900">
-          <strong>Note:</strong> You can change your account type later in Settings — we’ll migrate your profile where possible.
-        </p>
-      </div>
     </div>
   );
 }

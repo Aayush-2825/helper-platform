@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { Resend } from "resend";
 import { db } from "@/db";
 import { notificationEvent, user } from "@/db/schema";
@@ -18,6 +18,10 @@ export type HelperNotificationEvent =
   | "doc_expiring_soon"
   | "doc_expired";
 
+export type AdminNotificationEvent =
+  | "new_docs_pending"
+  | "doc_reviewed";
+
 export interface NotificationPayload {
   helperUserId: string;
   event: HelperNotificationEvent;
@@ -31,6 +35,18 @@ export interface NotificationPayload {
     submissionIdempotencyKey?: string;
     dpdpConsentAt?: string;
     dpdpConsentVersion?: string;
+  };
+}
+
+export interface AdminNotificationPayload {
+  event: AdminNotificationEvent;
+  meta: {
+    helperProfileId?: string;
+    helperName?: string;
+    helperEmail?: string;
+    docTypes?: string[];
+    documentId?: string;
+    decision?: string;
   };
 }
 
@@ -120,6 +136,26 @@ function getTemplate(payload: NotificationPayload): NotificationTemplate {
   }
 }
 
+function getAdminTemplate(payload: AdminNotificationPayload): NotificationTemplate {
+  const helperName = payload.meta.helperName ?? "Helper";
+  const docTypes = payload.meta.docTypes?.join(", ") ?? "documents";
+
+  switch (payload.event) {
+    case "new_docs_pending":
+      return {
+        subject: `New verification documents submitted by ${helperName}`,
+        message: `${helperName} has submitted ${docTypes} for verification. Review in admin portal.`,
+        templateKey: "admin.new_docs_pending",
+      };
+    case "doc_reviewed":
+      return {
+        subject: `Document reviewed: ${payload.meta.decision ?? "completed"}`,
+        message: `Document review completed for ${helperName}. Decision: ${payload.meta.decision ?? "see details"}.`,
+        templateKey: "admin.doc_reviewed",
+      };
+  }
+}
+
 function getResendClient() {
   const apiKey = process.env.EMAIL_PROVIDER_API_KEY || process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL || process.env.FROM_EMAIL;
@@ -178,4 +214,59 @@ export async function enqueueHelperNotification(payload: NotificationPayload) {
       ...payload.meta,
     },
   });
+}
+
+export async function enqueueAdminNotification(payload: AdminNotificationPayload) {
+  const template = getAdminTemplate(payload);
+
+  const adminUsers = await db.query.user.findMany({
+    where: inArray(user.role, ["admin"]),
+    columns: {
+      id: true,
+      email: true,
+      name: true,
+    },
+  });
+
+  const adminUserIds = adminUsers.map((u: { id: string }) => u.id);
+
+  for (const adminUser of adminUsers) {
+    await db.insert(notificationEvent).values({
+      id: crypto.randomUUID(),
+      userId: adminUser.id,
+      channel: "admin_audit",
+      templateKey: template.templateKey,
+      status: "queued",
+      payload: {
+        message: template.message,
+        event: payload.event,
+        ...payload.meta,
+      },
+    });
+  }
+
+  if (adminUserIds.length > 0) {
+    await sendGenericPushToUsers(adminUserIds, {
+      title: "Admin verification update",
+      body: template.message,
+      url: "/admin/verifications",
+      data: {
+        event: payload.event,
+        ...payload.meta,
+      },
+    });
+  }
+
+  const emailClient = getResendClient();
+  if (emailClient && adminUsers.length > 0) {
+    const adminEmails = adminUsers.map((u: { email: string | null }) => u.email).filter((e: string | null): e is string => !!e);
+    if (adminEmails.length > 0) {
+      await emailClient.resend.emails.send({
+        from: emailClient.from,
+        to: adminEmails,
+        subject: template.subject,
+        html: `<p>Admin notification:</p><p>${template.message}</p>`,
+      });
+    }
+  }
 }

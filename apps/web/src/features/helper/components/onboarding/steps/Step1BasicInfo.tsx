@@ -25,11 +25,6 @@ export function Step1BasicInfo<T extends FieldValues>({
         <h1 className="text-2xl font-bold text-gray-900">
           {isIndividual ? "Your profile details" : "Business details"}
         </h1>
-        <p className="mt-2 text-gray-600">
-          {isIndividual
-            ? "Provide your name, contact, and a profile photo so customers can recognize you."
-            : "Provide business and contact details so customers can reach your team."}
-        </p>
       </div>
 
       <div className="space-y-4">
@@ -61,7 +56,6 @@ export function Step1BasicInfo<T extends FieldValues>({
                 maxLength={10}
                 error={error?.message}
                 icon={<Phone className="h-4 w-4" />}
-                helperText="10-digit Indian mobile number."
                 required
               />
             )}
@@ -70,14 +64,14 @@ export function Step1BasicInfo<T extends FieldValues>({
           <Controller
             control={control}
             name={"email" as FieldPath<T>}
-            render={({ field }) => (
+            render={({ field, fieldState: { error } }) => (
               <FormField
                 {...field}
                 label="Email (optional)"
                 type="email"
                 placeholder="hello@example.com"
                 icon={<Mail className="h-4 w-4" />}
-                helperText="Used for account recovery and important notifications"
+                error={error?.message}
               />
             )}
           />
@@ -104,7 +98,6 @@ export function Step1BasicInfo<T extends FieldValues>({
             accept="image/*"
             maxSize={3}
             category="image"
-            hint="Upload a clear, recent headshot. Use a plain background and face-forward photo."
           />
         </>
       ) : (
@@ -149,7 +142,6 @@ export function Step1BasicInfo<T extends FieldValues>({
                 maxLength={10}
                 error={error?.message}
                 icon={<Phone className="h-4 w-4" />}
-                helperText="10-digit Indian mobile number."
                 required
               />
             )}
@@ -207,7 +199,6 @@ export function Step1BasicInfo<T extends FieldValues>({
             accept="image/*"
             maxSize={3}
             category="image"
-            hint="Upload your company logo (optional but recommended). Min 512x512px for best quality."
           />
         </>
       )}

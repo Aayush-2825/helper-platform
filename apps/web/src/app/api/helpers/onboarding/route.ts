@@ -13,7 +13,7 @@ import {
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 import { getHelperLandingPath } from "@/lib/helper/routing";
-import { enqueueHelperNotification } from "@/lib/notifications/helper-events";
+import { enqueueHelperNotification, enqueueAdminNotification } from "@/lib/notifications/helper-events";
 
 const PHONE_REGEX = /^[0-9]{10}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -816,6 +816,16 @@ export async function POST(request: NextRequest) {
         submissionIdempotencyKey: idempotencyKey,
         dpdpConsentAt: data.dpdpConsentAt,
         dpdpConsentVersion: data.dpdpConsentVersion,
+      },
+    });
+
+    await enqueueAdminNotification({
+      event: "new_docs_pending",
+      meta: {
+        helperProfileId: createdProfile.id,
+        helperName: data.helperType === "agency" ? data.businessName || session.user.name : data.fullName || session.user.name,
+        helperEmail: data.helperType === "agency" ? data.email : undefined,
+        docTypes: kycUploads.map((doc) => doc.documentType),
       },
     });
 

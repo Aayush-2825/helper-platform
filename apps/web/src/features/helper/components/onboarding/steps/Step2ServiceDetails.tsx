@@ -44,28 +44,21 @@ export function Step2ServiceDetails<T extends FieldValues>({
         <h1 className="text-2xl font-bold text-gray-900">
           What services do you offer?
         </h1>
-        <p className="mt-2 text-gray-600">
-          Describe the services you provide, your experience, and the languages you speak so customers can find you.
-        </p>
       </div>
 
-      {/* Primary Category - always required */}
       <ServiceSelector
         control={control}
         name={"primaryCategory" as FieldPath<T>}
         label="Primary Service Category"
         multi={false}
-        hint="Select the main service you provide. You can add more later."
       />
 
-      {/* For Agency: Multiple service types */}
       {!isIndividual && (
         <ServiceSelector
           control={control}
           name={"workerTypesOffered" as FieldPath<T>}
           label="Worker Types You Offer"
           multi={true}
-          hint="Select all the service types your team can provide."
         />
       )}
 
@@ -188,7 +181,6 @@ export function Step2ServiceDetails<T extends FieldValues>({
                 </>
               }
               error={error?.message}
-              helperText="How far are you willing to travel to serve customers?"
               required
               onChange={(e: ChangeEvent<HTMLInputElement>) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
             />
@@ -213,7 +205,6 @@ export function Step2ServiceDetails<T extends FieldValues>({
                 value={field.value ?? ""}
                 label="Number of Workers"
                 error={error?.message}
-                helperText="How many workers does your agency have?"
                 onChange={(e: ChangeEvent<HTMLInputElement>) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
               />
             )}
@@ -235,9 +226,6 @@ export function Step2ServiceDetails<T extends FieldValues>({
                 <div>
                   <p className="text-sm font-medium text-gray-900">
                     Allow internal job assignment
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Assign jobs to your workers directly without them accepting
                   </p>
                 </div>
               </label>
