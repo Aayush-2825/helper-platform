@@ -37,7 +37,7 @@ const DEFAULT_VALIDATORS: Record<string, FileValidationOptions> = {
 
 export function validateFile(
   file: File,
-  category: keyof typeof DEFAULT_VALIDATORS
+  category: keyof typeof DEFAULT_VALIDATORS,
 ): { valid: boolean; error?: string } {
   const rules = DEFAULT_VALIDATORS[category];
 
@@ -87,7 +87,8 @@ export async function generateFilePreview(file: File): Promise<{
       type: "image",
       data: await new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onload = (e: ProgressEvent<FileReader>) => resolve(e.target?.result as string);
+        reader.onload = (e: ProgressEvent<FileReader>) =>
+          resolve(e.target?.result as string);
         reader.readAsDataURL(file);
       }),
     };
@@ -124,64 +125,62 @@ export async function uploadToCloudinary(
     tags?: string[];
   }
 ): Promise<{ url: string; publicId: string }> {
-  // 1. Get signature from our API
+  const uploadParams = {
+    folder,
+    public_id: options?.publicId,
+    tags: options?.tags?.join(","),
+  };
+
+  // Get signed upload parameters
   const signResponse = await fetch("/api/cloudinary/sign", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      folder,
-      public_id: options?.publicId,
-    }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(uploadParams),
   });
 
   if (!signResponse.ok) {
     throw new Error("Failed to get upload signature");
   }
 
-  const { signature, timestamp, cloud_name, api_key } = await signResponse.json();
+  const { signature, timestamp, cloud_name, api_key } =
+    await signResponse.json();
 
-  // 2. Upload directly to Cloudinary
   const formData = new FormData();
+
   formData.append("file", file);
   formData.append("signature", signature);
   formData.append("timestamp", timestamp.toString());
   formData.append("api_key", api_key);
-  formData.append("folder", folder);
-  
-  if (options?.publicId) {
-    formData.append("public_id", options.publicId);
-  }
 
-  if (options?.tags) {
-    formData.append("tags", options.tags.join(","));
-  }
-
-  try {
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloud_name}/auto/upload`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Cloudinary error:", errorData);
-      throw new Error("Upload failed");
+  // Upload the exact same params that were signed
+  Object.entries(uploadParams).forEach(([key, value]) => {
+    if (value) {
+      formData.append(key, value);
     }
+  });
 
-    const data = await response.json();
-    return {
-      url: data.secure_url,
-      publicId: data.public_id,
-    };
-  } catch (error) {
-    console.error("Cloudinary upload error:", error);
-    throw new Error("Failed to upload file");
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${cloud_name}/auto/upload`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error(data);
+    throw new Error(data.error?.message || "Cloudinary upload failed");
   }
-}
 
+  return {
+    url: data.secure_url,
+    publicId: data.public_id,
+  };
+}
 
 /**
  * Generic upload function that routes through Cloudinary.
@@ -283,7 +282,7 @@ export async function compressImage(
     maxWidth?: number;
     maxHeight?: number;
     quality?: number;
-  }
+  },
 ): Promise<File> {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
@@ -319,7 +318,7 @@ export async function compressImage(
           }
         },
         "image/jpeg",
-        options?.quality || 0.8
+        options?.quality || 0.8,
       );
     };
 

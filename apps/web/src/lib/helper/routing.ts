@@ -2,7 +2,21 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { helperProfile } from "@/db/schema";
 
-export async function getHelperLandingPath(userId: string): Promise<string> {
+/**
+ * Centralized Helper Routes
+ */
+export const HELPER_ROUTES = {
+  ONBOARDING: "/helper/onboarding",
+  VERIFICATION: "/helper/verification",
+  DASHBOARD: "/helper",
+} as const;
+
+export type HelperRoute = (typeof HELPER_ROUTES)[keyof typeof HELPER_ROUTES];
+
+/**
+ * Resolves the initial landing route for a helper based on their profile status.
+ */
+export async function getHelperLandingPath(userId: string): Promise<HelperRoute> {
   const profile = await db.query.helperProfile.findFirst({
     where: eq(helperProfile.userId, userId),
     columns: {
@@ -13,17 +27,21 @@ export async function getHelperLandingPath(userId: string): Promise<string> {
     },
   });
 
+  // State 1: No profile exists -> Complete onboarding form
   if (!profile) {
-    return "/helper/onboarding";
+    return HELPER_ROUTES.ONBOARDING;
   }
 
-  if (
+  // State 2: Fully onboarded, verified, and active -> Go to Main Dashboard
+  const isFullyVerified =
+    profile.isActive &&
     profile.verificationStatus === "approved" &&
-    profile.videoKycStatus === "passed" &&
-    profile.isActive
-  ) {
-    return "/helper";
+    profile.videoKycStatus === "passed";
+
+  if (isFullyVerified) {
+    return HELPER_ROUTES.DASHBOARD;
   }
 
-  return "/helper/verification";
+  // State 3: Pending verification / inactive / under review -> Verification status screen
+  return HELPER_ROUTES.VERIFICATION;
 }

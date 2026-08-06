@@ -1,7 +1,7 @@
 import { v2 as cloudinary } from "cloudinary";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth/server";
-import { handleApiError, ApiError } from "@/lib/api-error";
+import { ApiError, handleApiError } from "@/lib/api-error";
 import { NextResponse } from "next/server";
 
 cloudinary.config({
@@ -12,20 +12,33 @@ cloudinary.config({
 
 export async function POST(request: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
     if (!session?.user) {
       throw ApiError.unauthorized();
     }
 
-    const { folder, public_id } = await request.json();
+    const { folder, public_id, tags } = await request.json();
 
-    const timestamp = Math.round(new Date().getTime() / 1000);
+    const timestamp = Math.round(Date.now() / 1000);
+
+    const paramsToSign: Record<string, string | number> = {
+      timestamp,
+      folder: folder ?? "helper-platform",
+    };
+
+    if (public_id) {
+      paramsToSign.public_id = public_id;
+    }
+
+    if (tags) {
+      paramsToSign.tags = tags;
+    }
+
     const signature = cloudinary.utils.api_sign_request(
-      {
-        timestamp,
-        folder: folder ?? "helper-platform",
-        public_id,
-      },
+      paramsToSign,
       process.env.CLOUDINARY_API_SECRET!
     );
 
