@@ -32,19 +32,19 @@ export function CalendarStatus() {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("calendar") === "connected") {
+        toast.success("Google Calendar connected successfully!");
+      } else if (params.get("calendar_error")) {
+        toast.error(`Calendar connection error: ${params.get("calendar_error")}`);
+      }
+    }
     void fetchStatus();
   }, []);
 
-  const handleConnect = async () => {
-    try {
-      await authClient.signIn.social({
-        provider: "google",
-        callbackURL: window.location.href,
-      });
-    } catch (error) {
-      toast.error("Failed to start Google connection");
-      console.error(error);
-    }
+  const handleConnect = () => {
+    window.location.href = "/api/admin/calendar/connect";
   };
 
   if (loading) {
@@ -71,7 +71,9 @@ export function CalendarStatus() {
           <p className="text-sm font-semibold">Google Calendar</p>
           <p className="text-xs text-muted-foreground">
             {isFullyConnected 
-              ? `Connected to ${status?.email}`
+              ? status?.hasServiceAccount
+                ? `Connected via Service Account (${status.email})`
+                : `Connected to ${status?.email}`
               : "Not connected or missing permissions"}
           </p>
         </div>

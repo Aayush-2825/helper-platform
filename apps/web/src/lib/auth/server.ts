@@ -44,15 +44,7 @@ export const auth = betterAuth({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       redirectURL: `${process.env.BETTER_AUTH_URL || "http://localhost:3000"}/api/auth/callback/google`,
-      scope: [
-        "openid",
-        "profile",
-        "email",
-        "https://www.googleapis.com/auth/calendar.events",
-        "https://www.googleapis.com/auth/calendar",
-      ],
-      accessType: "offline",
-      prompt: "select_account consent",
+      scope: ["openid", "profile", "email"],
     },
   },
 

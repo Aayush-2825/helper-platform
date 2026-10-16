@@ -49,7 +49,9 @@ export async function GET(request: NextRequest) {
         hasCalendarScope,
         hasRefreshToken,
         hasServiceAccount,
-        email: session.user.email,
+        email: hasServiceAccount
+          ? (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "Service Account")
+          : session.user.email,
         configured,
       },
       { headers: NO_STORE_HEADERS }
