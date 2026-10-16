@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { helperProfile, paymentTransaction, payout } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
+import { isAuthorizedHelper } from "@/lib/helper/auth";
 import { apiError, apiSuccess, getRequestId, logApiError } from "@/lib/http/responses";
 
 const createPayoutSchema = z.object({
@@ -81,12 +82,21 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
 
-    if (!session?.user || session.user.role !== "helper") {
+    if (!session?.user) {
       return apiError({
         requestId,
         message: "Unauthorized",
         code: "AUTH_UNAUTHORIZED",
         status: 401,
+      });
+    }
+
+    if (!(await isAuthorizedHelper(session.user.id, session.user.role))) {
+      return apiError({
+        requestId,
+        message: "Forbidden",
+        code: "AUTH_FORBIDDEN",
+        status: 403,
       });
     }
 
@@ -136,12 +146,21 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
 
-    if (!session?.user || session.user.role !== "helper") {
+    if (!session?.user) {
       return apiError({
         requestId,
         message: "Unauthorized",
         code: "AUTH_UNAUTHORIZED",
         status: 401,
+      });
+    }
+
+    if (!(await isAuthorizedHelper(session.user.id, session.user.role))) {
+      return apiError({
+        requestId,
+        message: "Forbidden",
+        code: "AUTH_FORBIDDEN",
+        status: 403,
       });
     }
 

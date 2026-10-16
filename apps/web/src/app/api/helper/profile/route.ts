@@ -16,6 +16,8 @@ function isPrerenderHangError(error: unknown): boolean {
   );
 }
 
+import { isAuthorizedHelper } from "@/lib/helper/auth";
+
 export async function GET() {
   try {
     await connection();
@@ -24,7 +26,7 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
-    if (session.user.role !== "helper") {
+    if (!(await isAuthorizedHelper(session.user.id, session.user.role))) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403, headers: NO_STORE_HEADERS });
     }
 

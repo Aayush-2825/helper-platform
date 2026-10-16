@@ -12,6 +12,8 @@ import {
   evaluateHelperActivationGate,
 } from "@/lib/helper/activation-gate";
 
+import { isAuthorizedHelper } from "@/lib/helper/auth";
+
 const schema = z.object({
   availabilityStatus: z.enum(["online", "offline", "busy"]),
 });
@@ -23,7 +25,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
-    if (session.user.role !== "helper") {
+    if (!(await isAuthorizedHelper(session.user.id, session.user.role))) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403, headers: NO_STORE_HEADERS });
     }
 

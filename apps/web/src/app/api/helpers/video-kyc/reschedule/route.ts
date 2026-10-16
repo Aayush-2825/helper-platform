@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
+import { isAuthorizedHelper } from "@/lib/helper/auth";
 import { getVideoKycAvailableSlots, rescheduleVideoKycByHelper } from "@/lib/kyc/video-kyc";
 
 const schema = z.object({
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
-    if (session.user.role !== "helper") {
+    if (!(await isAuthorizedHelper(session.user.id, session.user.role))) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403, headers: NO_STORE_HEADERS });
     }
 

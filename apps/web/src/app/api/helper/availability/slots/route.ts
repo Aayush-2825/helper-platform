@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { helperAvailabilitySlot, helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
+import { isAuthorizedHelper } from "@/lib/helper/auth";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
 const slotSchema = z
@@ -52,7 +53,7 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
-    if (session.user.role !== "helper") {
+    if (!(await isAuthorizedHelper(session.user.id, session.user.role))) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403, headers: NO_STORE_HEADERS });
     }
 
@@ -91,7 +92,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
-    if (session.user.role !== "helper") {
+    if (!(await isAuthorizedHelper(session.user.id, session.user.role))) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403, headers: NO_STORE_HEADERS });
     }
 
