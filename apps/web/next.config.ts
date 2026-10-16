@@ -22,13 +22,14 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
       {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: "/**",
       },
       {
-        protocol: 'https',
-        hostname: 'dozo.work',
-      }
+        protocol: "https",
+        hostname: "dozo.work",
+      },
     ],
   },
 };

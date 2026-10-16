@@ -9,11 +9,13 @@ const securityHeaders = {
     "default-src 'self'; " +
     "script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://checkout.razorpay.com https://static.cloudflareinsights.com https://*.cloudflareinsights.com https://va.vercel-scripts.com; " +
     "style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' blob: data: https://res.cloudinary.com https://*.cartocdn.com https://*.openfreemap.org https://tiles.openfreemap.org https://lh3.googleusercontent.com; " +
+    "img-src 'self' blob: data: https://res.cloudinary.com https://*.cloudinary.com https://*.cartocdn.com https://*.openfreemap.org https://tiles.openfreemap.org https://lh3.googleusercontent.com https://images.unsplash.com https://i.pravatar.cc https://randomuser.me; " +
     "font-src 'self' data:; " +
-    "connect-src 'self' https://api.razorpay.com https://basemaps.cartocdn.com https://*.cartocdn.com https://nominatim.openstreetmap.org https://router.project-osrm.org https://*.openfreemap.org https://tiles.openfreemap.org https://cloudflareinsights.com https://*.cloudflareinsights.com https://vitals.vercel-insights.com https://*.onrender.com wss: ws:; " +
+    "connect-src 'self' https://api.cloudinary.com https://*.cloudinary.com https://api.razorpay.com https://basemaps.cartocdn.com https://*.cartocdn.com https://nominatim.openstreetmap.org https://router.project-osrm.org https://*.openfreemap.org https://tiles.openfreemap.org https://cloudflareinsights.com https://*.cloudflareinsights.com https://static.cloudflareinsights.com https://vitals.vercel-insights.com https://*.onrender.com wss: ws:; " +
     "worker-src 'self' blob: https://*.cartocdn.com https://*.openfreemap.org https://tiles.openfreemap.org; " +
-    "child-src 'self' blob:; ",
+    "child-src 'self' blob: https://checkout.razorpay.com https://api.razorpay.com; " +
+    "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com; " +
+    "media-src 'self' blob: data: https://res.cloudinary.com https://*.cloudinary.com; ",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
   "X-Frame-Options": "DENY",
   "X-Content-Type-Options": "nosniff",
