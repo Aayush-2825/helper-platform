@@ -263,6 +263,11 @@ export default function HelperVerificationClientPage() {
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <p>{failedDoc?.rejection_reason ?? "Your application was rejected after document review."}</p>
             <div className="flex flex-wrap gap-3">
+              <Link href="/helper/onboarding">
+                <Button>
+                  Re-apply as Helper
+                </Button>
+              </Link>
               <Link href="/contact">
                 <Button variant="outline">
                   Contact support

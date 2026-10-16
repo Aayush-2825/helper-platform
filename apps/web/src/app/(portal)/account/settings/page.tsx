@@ -234,11 +234,16 @@ export default function AccountSettings() {
     ? "Loading helper flow..."
     : helperStatus?.canStartService
     ? "Start service"
+    : helperStatus?.verificationStatus === "rejected"
+    ? "Re-apply as helper"
     : helperStatus?.hasProfile
     ? "Continue helper flow"
     : "Become a helper";
 
-  const helperActionHref = helperStatus?.landingPath ?? "/helper/onboarding";
+  const helperActionHref =
+    helperStatus?.verificationStatus === "rejected"
+      ? "/helper/onboarding"
+      : helperStatus?.landingPath ?? "/helper/onboarding";
 
   return (
     <div className="min-h-screen p-4 py-6 sm:p-6 lg:p-8">

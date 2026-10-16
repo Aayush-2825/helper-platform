@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { db } from "@/db";
-import { helperOnboardingDraft } from "@/db/schema";
+import { helperOnboardingDraft, helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { getHelperLandingPath } from "@/lib/helper/routing";
 import { HelperOnboardingClientPage } from "../helper-onboarding-client";
@@ -22,7 +22,8 @@ const DRAFT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Helper Onboarding Page
- * Redirects already-onboarded helpers away from onboarding form.
+ * Redirects already-onboarded helpers away from onboarding form,
+ * but allows rejected helpers to re-apply.
  */
 export default async function HelperOnboardingPage() {
   await connection();
@@ -35,8 +36,19 @@ export default async function HelperOnboardingPage() {
     redirect("/auth/signin?next=%2Fhelper%2Fonboarding");
   }
 
+  const profile = await db.query.helperProfile.findFirst({
+    where: eq(helperProfile.userId, session.user.id),
+    columns: {
+      verificationStatus: true,
+    },
+  });
+
+  const canReapply =
+    profile?.verificationStatus === "rejected" ||
+    profile?.verificationStatus === "resubmission_required";
+
   const landingPath = await getHelperLandingPath(session.user.id);
-  if (landingPath !== "/helper/onboarding") {
+  if (landingPath !== "/helper/onboarding" && !canReapply) {
     redirect(landingPath);
   }
 

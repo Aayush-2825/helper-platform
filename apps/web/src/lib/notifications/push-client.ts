@@ -5,29 +5,45 @@ export function base64UrlToUint8Array(base64String: string) {
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
-export async function registerWebPushSubscription(vapidPublicKey: string) {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+export async function registerWebPushSubscription(vapidPublicKey: string, userInitiated = false) {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || typeof Notification === "undefined") {
     return null;
   }
 
-  const permission = await Notification.requestPermission();
+  let permission = Notification.permission;
   if (permission !== "granted") {
+    if (!userInitiated) {
+      // Modern browsers disallow Notification.requestPermission() outside a user gesture
+      return null;
+    }
+    try {
+      permission = await Notification.requestPermission();
+    } catch {
+      return null;
+    }
+    if (permission !== "granted") {
+      return null;
+    }
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.register("/sw.js");
+
+    const existing = await registration.pushManager.getSubscription();
+    if (existing) {
+      return existing;
+    }
+
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: base64UrlToUint8Array(vapidPublicKey),
+    });
+
+    return subscription;
+  } catch (err) {
+    console.warn("[Push] Failed to register subscription:", err);
     return null;
   }
-
-  const registration = await navigator.serviceWorker.register("/sw.js");
-
-  const existing = await registration.pushManager.getSubscription();
-  if (existing) {
-    return existing;
-  }
-
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: base64UrlToUint8Array(vapidPublicKey),
-  });
-
-  return subscription;
 }
 
 export async function syncWebPushSubscription(vapidPublicKey: string) {

@@ -592,7 +592,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (existingProfile?.lastResubmittedAt) {
+    if (existingProfile?.lastResubmittedAt && existingProfile.verificationStatus !== "rejected") {
       const hoursSince =
         (Date.now() - new Date(existingProfile.lastResubmittedAt).getTime()) / 36e5;
       if (hoursSince < 24) {
