@@ -171,11 +171,13 @@ export default function HelperVerificationClientPage() {
             <div className="flex flex-wrap gap-3">
               <Button
                 onClick={async () => {
-                  localStorage.removeItem("helper_onboarding_draft");
-                  await fetch("/api/helpers/onboarding/draft", { method: "DELETE", credentials: "include" }).catch(
-                    () => null,
-                  );
-                  router.push("/helper/onboarding");
+                  try {
+                    localStorage.removeItem("helper_onboarding_draft");
+                    await fetch("/api/helpers/onboarding/draft", { method: "DELETE", credentials: "include" });
+                  } catch {
+                    // ignore
+                  }
+                  window.location.assign("/helper/onboarding");
                 }}
               >
                 Apply as a different helper service
@@ -263,11 +265,19 @@ export default function HelperVerificationClientPage() {
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <p>{failedDoc?.rejection_reason ?? "Your application was rejected after document review."}</p>
             <div className="flex flex-wrap gap-3">
-              <Link href="/helper/onboarding">
-                <Button>
-                  Re-apply as Helper
-                </Button>
-              </Link>
+              <Button
+                onClick={async () => {
+                  try {
+                    localStorage.removeItem("helper_onboarding_draft");
+                    await fetch("/api/helpers/onboarding/draft", { method: "DELETE", credentials: "include" });
+                  } catch {
+                    // ignore
+                  }
+                  window.location.assign("/helper/onboarding");
+                }}
+              >
+                Re-apply as Helper
+              </Button>
               <Link href="/contact">
                 <Button variant="outline">
                   Contact support

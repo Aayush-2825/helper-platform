@@ -22,7 +22,7 @@ const rolePortals = [
     href: "/customer",
     icon: Clock,
     color: "bg-blue-500",
-    requiredRoles: ["user", "customer", "admin"],
+    requiredRoles: ["user", "customer", "helper", "admin"],
   },
   {
     role: "helper" as const,

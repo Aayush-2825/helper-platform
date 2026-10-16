@@ -95,6 +95,7 @@ interface HelperOnboardingWizardProps {
   onCancel?: () => void;
   initialStep?: number;
   initialPayload?: Partial<CompleteOnboarding>;
+  isReapplication?: boolean;
 }
 
 /**
@@ -107,6 +108,7 @@ export function HelperOnboardingWizard({
   onCancel,
   initialStep = 0,
   initialPayload,
+  isReapplication = false,
 }: HelperOnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -115,6 +117,7 @@ export function HelperOnboardingWizard({
   const form = useOnboardingForm<CompleteOnboarding>({
     schema: completeOnboardingSchema,
     mode: "onChange",
+    skipStorageLoad: isReapplication,
     defaultValues: {
       currentStep: initialStep,
       completedSteps: [],

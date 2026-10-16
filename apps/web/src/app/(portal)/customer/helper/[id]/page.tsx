@@ -2,16 +2,19 @@
 
 "use client";
 
+import { use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Star, ShieldCheck, Clock, CheckCircle2, BriefcaseBusiness } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
-export default function HelperProfilePage({ params }: { params: { id: string } }) {
+export default function HelperProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+
   // Simulated helper data based on the DOZO specification
   const helper = {
-    id: params.id,
+    id,
     name: "Ravi Kumar",
     photoUrl: "https://i.pravatar.cc/300?u=ravi",
     category: "Electrician",

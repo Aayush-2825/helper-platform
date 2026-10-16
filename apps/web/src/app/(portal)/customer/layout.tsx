@@ -29,8 +29,8 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
     <RoleSectionLayout
       title="Customer Portal"
       description="Discover, book, track, and review helpers in one flow."
-      requiredRoles={["user", "customer", "admin"]}
-      accessDeniedRedirect="/customer"
+      requiredRoles={["user", "customer", "helper", "admin"]}
+      accessDeniedRedirect="/dashboard"
       navLinks={customerLinks}
     >
       {children}

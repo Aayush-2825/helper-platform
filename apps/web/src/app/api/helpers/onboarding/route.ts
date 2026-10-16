@@ -9,6 +9,7 @@ import {
   notificationEvent,
   organization,
   user,
+  videoKycSession,
 } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
@@ -124,8 +125,13 @@ async function getHelperStatus(userId: string) {
 
 function canResubmitOnboarding(
   verificationStatus: "pending" | "approved" | "rejected" | "resubmission_required" | null,
+  videoKycStatus?: "not_required" | "pending_schedule" | "scheduled" | "passed" | "failed" | null,
 ) {
-  return verificationStatus === "rejected" || verificationStatus === "resubmission_required";
+  return (
+    verificationStatus === "rejected" ||
+    verificationStatus === "resubmission_required" ||
+    videoKycStatus === "failed"
+  );
 }
 
 function getEntry(source: FormData | Record<string, unknown>, key: string): unknown {
@@ -572,13 +578,20 @@ export async function POST(request: NextRequest) {
             id: true,
             organizationId: true,
             verificationStatus: true,
+            videoKycStatus: true,
             blockResubmission: true,
             lastResubmittedAt: true,
           },
         })
       : null;
 
-    if (existingStatus.hasProfile && !canResubmitOnboarding(existingStatus.verificationStatus)) {
+    if (
+      existingStatus.hasProfile &&
+      !canResubmitOnboarding(
+        existingProfile?.verificationStatus ?? existingStatus.verificationStatus,
+        existingProfile?.videoKycStatus,
+      )
+    ) {
       return NextResponse.json(existingStatus, {
         status: 200,
         headers: NO_STORE_HEADERS,
@@ -592,7 +605,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (existingProfile?.lastResubmittedAt && existingProfile.verificationStatus !== "rejected") {
+    const isRejectedOrFailed =
+      existingProfile?.verificationStatus === "rejected" ||
+      existingProfile?.videoKycStatus === "failed";
+
+    if (existingProfile?.lastResubmittedAt && !isRejectedOrFailed) {
       const hoursSince =
         (Date.now() - new Date(existingProfile.lastResubmittedAt).getTime()) / 36e5;
       if (hoursSince < 24) {
@@ -723,6 +740,19 @@ export async function POST(request: NextRequest) {
           and(
             eq(helperKycDocument.helperProfileId, existingProfile.id),
             isNull(helperKycDocument.supersededAt),
+          ),
+        );
+
+      await db
+        .update(videoKycSession)
+        .set({
+          status: "cancelled",
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(videoKycSession.helperProfileId, existingProfile.id),
+            eq(videoKycSession.status, "scheduled"),
           ),
         );
     }

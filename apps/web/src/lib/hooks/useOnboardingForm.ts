@@ -10,6 +10,7 @@ export interface UseOnboardingFormOptions<T extends FieldValues> extends Omit<Us
   storageKey?: string;
   autoSave?: boolean;
   debounceMs?: number;
+  skipStorageLoad?: boolean;
 }
 
 /**
@@ -22,6 +23,7 @@ export function useOnboardingForm<T extends FieldValues>({
   storageKey = ONBOARDING_STORAGE_KEY,
   autoSave = true,
   debounceMs = 500,
+  skipStorageLoad = false,
   ...rhfOptions
 }: UseOnboardingFormOptions<T>): UseFormReturn<T> & {
   saveToStorage: (data: T) => void;
@@ -42,6 +44,15 @@ export function useOnboardingForm<T extends FieldValues>({
 
   // Load stored data on mount
   useEffect(() => {
+    if (skipStorageLoad) {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
@@ -53,7 +64,7 @@ export function useOnboardingForm<T extends FieldValues>({
       console.warn("Failed to load onboarding draft:", error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [skipStorageLoad, storageKey]);
 
   // Auto-save on form changes
   useEffect(() => {

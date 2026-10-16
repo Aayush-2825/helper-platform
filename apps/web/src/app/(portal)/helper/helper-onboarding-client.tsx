@@ -96,7 +96,13 @@ function getStringProp(obj: unknown, key: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
-export function HelperOnboardingClientPage({ initialDraft }: { initialDraft: DraftState | null }) {
+export function HelperOnboardingClientPage({
+  initialDraft,
+  isReapplication = false,
+}: {
+  initialDraft: DraftState | null;
+  isReapplication?: boolean;
+}) {
   const router = useRouter();
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const idempotencyKeyRef = useRef(`onboarding-${crypto.randomUUID()}`);
@@ -157,6 +163,7 @@ export function HelperOnboardingClientPage({ initialDraft }: { initialDraft: Dra
       <HelperOnboardingWizard
         initialStep={initialDraft?.step_index ?? 0}
         initialPayload={initialDraft?.payload ?? undefined}
+        isReapplication={isReapplication}
         onSuccess={handleSubmit}
         onCancel={() => {
           router.push("/account/settings");

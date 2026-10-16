@@ -40,16 +40,28 @@ export default async function HelperOnboardingPage() {
     where: eq(helperProfile.userId, session.user.id),
     columns: {
       verificationStatus: true,
+      videoKycStatus: true,
     },
   });
 
-  const canReapply =
+  const isRejectedOrFailed =
     profile?.verificationStatus === "rejected" ||
+    profile?.videoKycStatus === "failed";
+
+  const canReapply =
+    isRejectedOrFailed ||
     profile?.verificationStatus === "resubmission_required";
 
   const landingPath = await getHelperLandingPath(session.user.id);
   if (landingPath !== "/helper/onboarding" && !canReapply) {
     redirect(landingPath);
+  }
+
+  // If the candidate was rejected or video kyc failed, give them a clean slate to re-apply
+  if (isRejectedOrFailed) {
+    await db.delete(helperOnboardingDraft).where(eq(helperOnboardingDraft.userId, session.user.id));
+
+    return <HelperOnboardingClientPage initialDraft={null} isReapplication={true} />;
   }
 
   const draft = await db.query.helperOnboardingDraft.findFirst({
