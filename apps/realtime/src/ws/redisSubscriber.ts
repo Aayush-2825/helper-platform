@@ -1,19 +1,32 @@
 import { dispatcher } from "./dispatcher.js";
 import { logger } from "../services/logger.js";
+import { isValidRedisUrl } from "../utils/redis.js";
 
 let redisSub: any = null;
 
 export async function startRedisSubscriber() {
   const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) {
-    logger.info("[RedisSubscriber] REDIS_URL not set — subscriber disabled");
+  if (!isValidRedisUrl(redisUrl)) {
+    logger.info("[RedisSubscriber] REDIS_URL not configured with valid redis:// connection string — running in standalone mode");
     return;
   }
 
   try {
     const { default: IORedis } = await import("ioredis");
     const IORedisCtor: any = IORedis;
-    redisSub = new IORedisCtor(redisUrl);
+    redisSub = new IORedisCtor(redisUrl, {
+      maxRetriesPerRequest: 3,
+      retryStrategy(times: number) {
+        if (times > 5) return null; // Stop endless reconnection loops
+        return Math.min(times * 200, 2000);
+      },
+    });
+
+    if (typeof redisSub.on === "function") {
+      redisSub.on("error", (err: any) => {
+        logger.error("[RedisSubscriber] Redis error", { error: err?.message });
+      });
+    }
 
     await redisSub.subscribe("realtime:outbound");
     logger.info("[RedisSubscriber] Subscribed to realtime:outbound");

@@ -2,12 +2,13 @@ import { dispatcher } from "./dispatcher.js";
 import { persistOutboundEvent } from "../services/event-persistence.service.js";
 import { logger } from "../services/logger.js";
 import { getNodesForUsers } from "./redisRegistry.js";
+import { isValidRedisUrl } from "../utils/redis.js";
 
 let publisherClient: any = null;
 
 async function getPublisherClient(): Promise<any> {
   const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) return null;
+  if (!isValidRedisUrl(redisUrl)) return null;
   if (publisherClient) return publisherClient;
 
   try {
@@ -16,6 +17,7 @@ async function getPublisherClient(): Promise<any> {
     publisherClient = new IORedisCtor(redisUrl, {
       maxRetriesPerRequest: 3,
       retryStrategy(times: number) {
+        if (times > 5) return null;
         return Math.min(times * 100, 3000);
       },
     });

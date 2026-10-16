@@ -1,4 +1,6 @@
 // Environment validation
+import { isValidRedisUrl } from "../utils/redis.js";
+
 function parseAllowedOrigins(value?: string): string[] {
   if (!value || value.trim().length === 0) {
     return ["http://localhost:3000", "https://helper-platform-web.vercel.app"];
@@ -11,10 +13,8 @@ function parseAllowedOrigins(value?: string): string[] {
 }
 
 function validateEnv() {
-  const requiredEnvs = [
-    "DATABASE_URL",
-    "REDIS_URL",
-  ];
+  const isTest = process.env.NODE_ENV === "test";
+  const requiredEnvs = isTest ? [] : ["DATABASE_URL"];
 
   const missing = requiredEnvs.filter((env) => !process.env[env]);
 
@@ -25,11 +25,14 @@ function validateEnv() {
     );
   }
 
+  const rawRedisUrl = process.env.REDIS_URL?.trim();
+  const validRedisUrl = isValidRedisUrl(rawRedisUrl) ? rawRedisUrl : undefined;
+
   return {
     PORT: Number(process.env.PORT) || 3001,
     NODE_ENV: process.env.NODE_ENV || "development",
-    DATABASE_URL: process.env.DATABASE_URL,
-    REDIS_URL: process.env.REDIS_URL,
+    DATABASE_URL: process.env.DATABASE_URL || (isTest ? "postgresql://test:test@localhost:5432/test" : undefined),
+    REDIS_URL: validRedisUrl,
     AUTH_SECRET: process.env.AUTH_SECRET || "",
     REALTIME_WS_AUTH_SECRET: process.env.REALTIME_WS_AUTH_SECRET || "",
     CORS_ALLOWED_ORIGINS: parseAllowedOrigins(process.env.CORS_ORIGIN),
@@ -38,4 +41,3 @@ function validateEnv() {
 }
 
 export const env = validateEnv();
-

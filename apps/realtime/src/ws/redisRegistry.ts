@@ -3,20 +3,32 @@
  * Uses dynamic import of ioredis so it's optional in local dev.
  */
 import { logger } from "../services/logger.js";
+import { isValidRedisUrl } from "../utils/redis.js";
 
 let client: any = null;
 
 async function getClient() {
   if (client) return client;
   const redisUrl = process.env.REDIS_URL;
-  if (!redisUrl) return null;
+  if (!isValidRedisUrl(redisUrl)) return null;
   try {
     const { default: IORedis } = await import("ioredis");
     const IORedisCtor: any = IORedis;
-    client = new IORedisCtor(redisUrl);
+    client = new IORedisCtor(redisUrl, {
+      maxRetriesPerRequest: 3,
+      retryStrategy(times: number) {
+        if (times > 5) return null;
+        return Math.min(times * 200, 2000);
+      },
+    });
+    if (typeof client.on === "function") {
+      client.on("error", (err: any) => {
+        logger.error("[RedisRegistry] Redis error", { error: err?.message });
+      });
+    }
     return client;
   } catch (err: any) {
-    logger.error("[RedisRegistry] Failed to create redis client", { error: err.message });
+    logger.error("[RedisRegistry] Failed to create redis client", { error: err?.message });
     return null;
   }
 }
