@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
         "User-Agent": "DOZO-Platform/1.0 (contact@dozo.work)",
         "Accept-Language": "en",
       },
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
 
     if (!res.ok) {

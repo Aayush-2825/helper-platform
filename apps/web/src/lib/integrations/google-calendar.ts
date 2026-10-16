@@ -297,32 +297,80 @@ export async function createGoogleMeetEvent(params: {
   attendees: Array<{ email: string }>;
   userId?: string;
 }) {
-  const accessToken = await getGoogleCalendarAccessToken(params.userId);
-  await ensureCalendarAccessible(params.calendarId, params.userId);
+  const hasServiceAccount = !!(
+    (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) ||
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+  );
 
-  const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events?conferenceDataVersion=1&sendUpdates=all`,
+  let targetCalendarId = params.calendarId;
+  if (hasServiceAccount && (!targetCalendarId || targetCalendarId === "primary")) {
+    targetCalendarId = process.env.GOOGLE_KYC_CALENDAR_ID || targetCalendarId;
+  }
+
+  const accessToken = await getGoogleCalendarAccessToken(params.userId);
+  await ensureCalendarAccessible(targetCalendarId, params.userId);
+
+  const attendeeList = params.attendees.map((a) => a.email).filter(Boolean).join(", ");
+  const descriptionWithAttendees = attendeeList
+    ? `${params.description}\n\nAttendees: ${attendeeList}`
+    : params.description;
+
+  // Service accounts without Domain-Wide Delegation cannot invite attendees directly
+  const shouldIncludeAttendees = !hasServiceAccount && params.attendees.length > 0;
+  const sendUpdates = shouldIncludeAttendees ? "all" : "none";
+
+  const requestBody: Record<string, unknown> = {
+    summary: params.summary,
+    description: descriptionWithAttendees,
+    start: { dateTime: params.start.toISOString() },
+    end: { dateTime: params.end.toISOString() },
+    conferenceData: {
+      createRequest: {
+        requestId: crypto.randomUUID(),
+        conferenceSolutionKey: { type: "hangoutsMeet" },
+      },
+    },
+  };
+
+  if (shouldIncludeAttendees) {
+    requestBody.attendees = params.attendees;
+  }
+
+  let response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendarId)}/events?conferenceDataVersion=1&sendUpdates=${sendUpdates}`,
     {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        summary: params.summary,
-        description: params.description,
-        start: { dateTime: params.start.toISOString() },
-        end: { dateTime: params.end.toISOString() },
-        attendees: params.attendees,
-        conferenceData: {
-          createRequest: {
-            requestId: crypto.randomUUID(),
-            conferenceSolutionKey: { type: "hangoutsMeet" },
-          },
-        },
-      }),
+      body: JSON.stringify(requestBody),
     },
   );
+
+  // If failed due to service account attendees restriction, retry without attendees
+  if (!response.ok) {
+    const errorText = await response.text();
+    if (
+      errorText.includes("forbiddenForServiceAccounts") ||
+      errorText.includes("Domain-Wide Delegation")
+    ) {
+      delete requestBody.attendees;
+      response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendarId)}/events?conferenceDataVersion=1&sendUpdates=none`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        },
+      );
+    } else {
+      throw new Error(errorText);
+    }
+  }
 
   if (!response.ok) {
     const details = await readGoogleApiError(response);
@@ -350,7 +398,7 @@ export async function createGoogleMeetEvent(params: {
       await new Promise<void>((resolve) => setTimeout(resolve, 750));
       latestPayload = await fetchEvent({
         accessToken,
-        calendarId: params.calendarId,
+        calendarId: targetCalendarId,
         eventId: currentEventId,
       });
       calendarEventId = latestPayload.id;
@@ -363,9 +411,9 @@ export async function createGoogleMeetEvent(params: {
     const fallbackMeetLink = buildFallbackMeetingLink(calendarEventId);
     await attachFallbackMeetingLinkToEvent({
       accessToken,
-      calendarId: params.calendarId,
+      calendarId: targetCalendarId,
       eventId: calendarEventId,
-      description: params.description,
+      description: descriptionWithAttendees,
       fallbackMeetLink,
     });
     meetLink = fallbackMeetLink;
@@ -391,9 +439,20 @@ export async function updateGoogleEventTime(params: {
   end: Date;
   userId?: string;
 }) {
+  const hasServiceAccount = !!(
+    (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) ||
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+  );
+  const sendUpdates = hasServiceAccount ? "none" : "all";
+
+  let targetCalendarId = params.calendarId;
+  if (hasServiceAccount && (!targetCalendarId || targetCalendarId === "primary")) {
+    targetCalendarId = process.env.GOOGLE_KYC_CALENDAR_ID || targetCalendarId;
+  }
+
   const accessToken = await getGoogleCalendarAccessToken(params.userId);
   const payload = await googleFetchJson<{ start?: { dateTime?: string } }>(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events/${encodeURIComponent(params.calendarEventId)}?sendUpdates=all`,
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendarId)}/events/${encodeURIComponent(params.calendarEventId)}?sendUpdates=${sendUpdates}`,
     {
       accessToken,
       method: "PATCH",
@@ -409,9 +468,20 @@ export async function updateGoogleEventTime(params: {
 }
 
 export async function deleteGoogleEvent(params: { calendarId: string; calendarEventId: string; userId?: string }) {
+  const hasServiceAccount = !!(
+    (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) ||
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+  );
+  const sendUpdates = hasServiceAccount ? "none" : "all";
+
+  let targetCalendarId = params.calendarId;
+  if (hasServiceAccount && (!targetCalendarId || targetCalendarId === "primary")) {
+    targetCalendarId = process.env.GOOGLE_KYC_CALENDAR_ID || targetCalendarId;
+  }
+
   const accessToken = await getGoogleCalendarAccessToken(params.userId);
   const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(params.calendarId)}/events/${encodeURIComponent(params.calendarEventId)}?sendUpdates=all`,
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendarId)}/events/${encodeURIComponent(params.calendarEventId)}?sendUpdates=${sendUpdates}`,
     {
       method: "DELETE",
       headers: { Authorization: `Bearer ${accessToken}` },

@@ -258,7 +258,13 @@ export async function scheduleVideoKYC(params: {
   const start = params.scheduledAt;
   const end = addMinutes(start, durationMinutes);
 
-  const calendarId = params.adminUserId ? "primary" : getAdminCalendarId(params.adminEmail);
+  const hasServiceAccount = !!(
+    (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) ||
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+  );
+  const calendarId = hasServiceAccount
+    ? (process.env.GOOGLE_KYC_CALENDAR_ID || "primary")
+    : (params.adminUserId ? "primary" : getAdminCalendarId(params.adminEmail));
   const event = await createGoogleMeetEvent({
     calendarId,
     summary: `KYC Verification - ${profile.user.name ?? "Helper"}`,

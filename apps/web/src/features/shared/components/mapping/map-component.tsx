@@ -437,10 +437,10 @@ export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcatego
               await tryIpFallback();
               setIsLocating(false);
             },
-            { enableHighAccuracy: false, timeout: 6000, maximumAge: 120000 },
+            { enableHighAccuracy: false, timeout: 6000, maximumAge: 0 },
           );
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
       );
     } else {
       await tryIpFallback();
@@ -655,6 +655,9 @@ export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcatego
           ref={mapRef}
           center={[mapCenter.lng, mapCenter.lat]}
           zoom={14}
+          onMapClick={async (coords) => {
+            await applyCoordinates(coords.lat, coords.lng);
+          }}
           styles={{
             light: "https://tiles.openfreemap.org/styles/liberty",
             dark: "https://tiles.openfreemap.org/styles/liberty",
