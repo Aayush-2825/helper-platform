@@ -21,8 +21,8 @@ import { X, Minus, Plus, Locate, Maximize, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const defaultStyles = {
-  dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-  light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+  dark: "https://tiles.openfreemap.org/styles/dark",
+  light: "https://tiles.openfreemap.org/styles/liberty",
 };
 
 type Theme = "light" | "dark";
@@ -233,9 +233,24 @@ const Map = forwardRef<MapRef, MapProps>(function Map(
       attributionControl: {
         compact: true,
       },
+      maxTileCacheSize: (props as any).maxTileCacheSize ?? 50,
+      preserveDrawingBuffer: (props as any).preserveDrawingBuffer ?? false,
+      antialias: (props as any).antialias ?? true,
+      transformRequest: (url: string, resourceType?: any) => {
+        if (props.transformRequest) {
+          return props.transformRequest(url, resourceType);
+        }
+        if (resourceType === "Tile") {
+          return {
+            url,
+            headers: { "Cache-Control": "max-age=86400" },
+          };
+        }
+        return { url };
+      },
       ...props,
       ...viewport,
-    });
+    } as any);
 
     const styleDataHandler = () => {
       clearStyleTimeout();
@@ -1523,6 +1538,645 @@ function MapClusterLayer<
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// RoutePolyline - Turn-by-turn route with animated dashed line
+// ---------------------------------------------------------------------------
+
+type RoutePolylineProps = {
+  id?: string;
+  coordinates: [number, number][];
+  color?: string;
+  width?: number;
+  opacity?: number;
+  dashArray?: [number, number];
+  animated?: boolean;
+};
+
+function RoutePolyline({
+  id: customId,
+  coordinates,
+  color = "#f97316",
+  width = 3,
+  opacity = 0.9,
+  dashArray = [2, 2],
+  animated = true,
+}: RoutePolylineProps) {
+  const { map, isLoaded } = useMap();
+  const id = useId();
+  const baseId = customId || id;
+  const sourceId = `route-polyline-source-${baseId}`;
+  const layerId = `route-polyline-layer-${baseId}`;
+
+  const stylePropsRef = useRef({ color, width, opacity, dashArray });
+
+  // Add source and layer on mount and handle updates
+  useEffect(() => {
+    if (!isLoaded || !map) return;
+
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: coordinates.length >= 2 ? coordinates : [[0, 0], [0, 0]],
+          },
+        },
+      });
+
+      map.addLayer({
+        id: layerId,
+        type: "line",
+        source: sourceId,
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: {
+          "line-color": color,
+          "line-width": width,
+          "line-opacity": opacity,
+          ...(dashArray && { "line-dasharray": dashArray }),
+        },
+      });
+    }
+
+    return () => {
+      try {
+        if (map.getLayer(layerId)) map.removeLayer(layerId);
+        if (map.getSource(sourceId)) map.removeSource(sourceId);
+      } catch {
+        // ignore
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, map, sourceId]);
+
+  // Update line coordinates when coordinates change
+  useEffect(() => {
+    if (!isLoaded || !map || coordinates.length < 2) return;
+
+    const source = map.getSource(sourceId) as MapLibreGL.GeoJSONSource;
+    if (source) {
+      source.setData({
+        type: "Feature",
+        properties: {},
+        geometry: { type: "LineString", coordinates },
+      });
+    }
+  }, [isLoaded, map, coordinates, sourceId]);
+
+  // Update styles when paint props change
+  useEffect(() => {
+    if (!isLoaded || !map || !map.getLayer(layerId)) return;
+
+    const prev = stylePropsRef.current;
+    if (prev.color !== color) map.setPaintProperty(layerId, "line-color", color);
+    if (prev.width !== width) map.setPaintProperty(layerId, "line-width", width);
+    if (prev.opacity !== opacity) map.setPaintProperty(layerId, "line-opacity", opacity);
+    if (prev.dashArray !== dashArray && dashArray && !animated) {
+      map.setPaintProperty(layerId, "line-dasharray", dashArray);
+    }
+    stylePropsRef.current = { color, width, opacity, dashArray };
+  }, [isLoaded, map, layerId, color, width, opacity, dashArray, animated]);
+
+  // Animated dashed line effect
+  useEffect(() => {
+    if (!isLoaded || !map || !animated) return;
+
+    let animId: number;
+    let step = 0;
+    let lastTime = 0;
+
+    const animateDash = (timestamp: number) => {
+      if (timestamp - lastTime > 60) {
+        lastTime = timestamp;
+        step = (step + 0.25) % 4;
+        if (map.getLayer(layerId)) {
+          const p = step;
+          let currentDash: [number, number, number, number] | [number, number];
+          if (p <= 2) {
+            currentDash = [Math.max(0.1, 2 - p), 2, p, 0];
+          } else {
+            currentDash = [0, 4 - p, 2, Math.max(0.1, p - 2)];
+          }
+          try {
+            map.setPaintProperty(layerId, "line-dasharray", currentDash);
+          } catch {
+            // ignore
+          }
+        }
+      }
+      animId = requestAnimationFrame(animateDash);
+    };
+
+    animId = requestAnimationFrame(animateDash);
+    return () => {
+      cancelAnimationFrame(animId);
+      if (map && map.getLayer(layerId)) {
+        try {
+          map.setPaintProperty(layerId, "line-dasharray", dashArray);
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, [isLoaded, map, layerId, animated, dashArray]);
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Geofence / ServiceRadius - Great-circle polygon generation & visualization
+// ---------------------------------------------------------------------------
+
+function createGeoJSONCircle(
+  center: [number, number],
+  radiusKm: number,
+  points = 64,
+): GeoJSON.Feature<GeoJSON.Polygon> {
+  const [lng, lat] = center;
+  const coords: [number, number][] = [];
+  const distanceRadians = radiusKm / 6371; // Earth radius in km
+  const centerLatRadians = (lat * Math.PI) / 180;
+  const centerLngRadians = (lng * Math.PI) / 180;
+
+  for (let i = 0; i < points; i++) {
+    const bearing = (i * 360) / points;
+    const bearingRadians = (bearing * Math.PI) / 180;
+
+    const pointLatRadians = Math.asin(
+      Math.sin(centerLatRadians) * Math.cos(distanceRadians) +
+        Math.cos(centerLatRadians) * Math.sin(distanceRadians) * Math.cos(bearingRadians),
+    );
+
+    const pointLngRadians =
+      centerLngRadians +
+      Math.atan2(
+        Math.sin(bearingRadians) * Math.sin(distanceRadians) * Math.cos(centerLatRadians),
+        Math.cos(distanceRadians) - Math.sin(centerLatRadians) * Math.sin(pointLatRadians),
+      );
+
+    const pointLat = (pointLatRadians * 180) / Math.PI;
+    const pointLng = (pointLngRadians * 180) / Math.PI;
+    coords.push([pointLng, pointLat]);
+  }
+  // Close the polygon ring
+  coords.push(coords[0]);
+
+  return {
+    type: "Feature",
+    properties: {},
+    geometry: {
+      type: "Polygon",
+      coordinates: [coords],
+    },
+  };
+}
+
+type ServiceRadiusProps = {
+  id?: string;
+  center: [number, number]; // [lng, lat]
+  radiusKm: number;
+  color?: string;
+  fillOpacity?: number;
+  strokeWidth?: number;
+};
+
+function ServiceRadius({
+  id: customId,
+  center,
+  radiusKm,
+  color = "#f97316",
+  fillOpacity = 0.15,
+  strokeWidth = 2,
+}: ServiceRadiusProps) {
+  const { map, isLoaded } = useMap();
+  const id = useId();
+  const baseId = customId || id;
+  const sourceId = `service-radius-source-${baseId}`;
+  const fillLayerId = `service-radius-fill-${baseId}`;
+  const lineLayerId = `service-radius-line-${baseId}`;
+
+  const circleData = useMemo(
+    () => createGeoJSONCircle(center, radiusKm),
+    [center[0], center[1], radiusKm],
+  );
+
+  // Add source and layers
+  useEffect(() => {
+    if (!isLoaded || !map) return;
+
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: "geojson",
+        data: circleData,
+      });
+
+      // Fill polygon
+      map.addLayer({
+        id: fillLayerId,
+        type: "fill",
+        source: sourceId,
+        paint: {
+          "fill-color": color,
+          "fill-opacity": fillOpacity,
+        },
+      });
+
+      // Outline ring
+      map.addLayer({
+        id: lineLayerId,
+        type: "line",
+        source: sourceId,
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": color,
+          "line-width": strokeWidth,
+          "line-opacity": 0.8,
+        },
+      });
+    }
+
+    return () => {
+      try {
+        if (map.getLayer(fillLayerId)) map.removeLayer(fillLayerId);
+        if (map.getLayer(lineLayerId)) map.removeLayer(lineLayerId);
+        if (map.getSource(sourceId)) map.removeSource(sourceId);
+      } catch {
+        // ignore
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, map, sourceId]);
+
+  // Update geometry when center or radius changes
+  useEffect(() => {
+    if (!isLoaded || !map) return;
+    const source = map.getSource(sourceId) as MapLibreGL.GeoJSONSource;
+    if (source) {
+      source.setData(circleData);
+    }
+  }, [isLoaded, map, circleData, sourceId]);
+
+  // Update paint styles
+  useEffect(() => {
+    if (!isLoaded || !map) return;
+    if (map.getLayer(fillLayerId)) {
+      map.setPaintProperty(fillLayerId, "fill-color", color);
+      map.setPaintProperty(fillLayerId, "fill-opacity", fillOpacity);
+    }
+    if (map.getLayer(lineLayerId)) {
+      map.setPaintProperty(lineLayerId, "line-color", color);
+      map.setPaintProperty(lineLayerId, "line-width", strokeWidth);
+    }
+  }, [isLoaded, map, fillLayerId, lineLayerId, color, fillOpacity, strokeWidth]);
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// HelperCluster - High-performance GeoJSON clustering for nearby helpers
+// ---------------------------------------------------------------------------
+
+type HelperClusterItem = {
+  id: string;
+  lat: number | null;
+  lng: number | null;
+  name: string;
+  rating?: number | string | null;
+  service?: string;
+  category?: string;
+  availability?: string;
+  completedJobs?: number;
+  [key: string]: unknown;
+};
+
+type HelperClusterProps = {
+  id?: string;
+  helpers: HelperClusterItem[];
+  clusterRadius?: number;
+  clusterMaxZoom?: number;
+  onHelperClick?: (helper: HelperClusterItem) => void;
+  onClusterClick?: (clusterId: number, coordinates: [number, number], pointCount: number) => void;
+};
+
+function HelperCluster({
+  id: customId,
+  helpers,
+  clusterRadius = 50,
+  clusterMaxZoom = 14,
+  onHelperClick,
+  onClusterClick,
+}: HelperClusterProps) {
+  const { map, isLoaded } = useMap();
+  const id = useId();
+  const baseId = customId || id;
+  const sourceId = `helper-cluster-source-${baseId}`;
+  const clusterLayerId = `helper-clusters-${baseId}`;
+  const clusterCountLayerId = `helper-cluster-count-${baseId}`;
+  const unclusteredLayerId = `helper-unclustered-${baseId}`;
+  const unclusteredLabelLayerId = `helper-unclustered-label-${baseId}`;
+  const popupRef = useRef<MapLibreGL.Popup | null>(null);
+
+  const geojsonData = useMemo<GeoJSON.FeatureCollection<GeoJSON.Point>>(() => {
+    const valid = helpers.filter(
+      (h) =>
+        h.lat != null &&
+        h.lng != null &&
+        !Number.isNaN(Number(h.lat)) &&
+        !Number.isNaN(Number(h.lng)),
+    );
+
+    return {
+      type: "FeatureCollection",
+      features: valid.map((h) => ({
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [Number(h.lng), Number(h.lat)],
+        },
+        properties: {
+          id: h.id,
+          name: h.name || "Helper",
+          rating: Number(h.rating) || 0,
+          service: h.service || h.category || "General",
+          availability: h.availability || "online",
+          completedJobs: h.completedJobs || 0,
+          rawJson: JSON.stringify(h),
+        },
+      })),
+    };
+  }, [helpers]);
+
+  // Setup cluster source and layers
+  useEffect(() => {
+    if (!isLoaded || !map) return;
+
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: "geojson",
+        data: geojsonData,
+        cluster: true,
+        clusterMaxZoom,
+        clusterRadius,
+      });
+
+      // Cluster circles: orange filled circles
+      map.addLayer({
+        id: clusterLayerId,
+        type: "circle",
+        source: sourceId,
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": [
+            "step",
+            ["get", "point_count"],
+            "#f97316", // orange
+            10,
+            "#ea580c", // deeper orange
+            25,
+            "#c2410c",
+          ],
+          "circle-radius": [
+            "step",
+            ["get", "point_count"],
+            18,
+            10,
+            24,
+            25,
+            30,
+          ],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+          "circle-opacity": 0.95,
+        },
+      });
+
+      // Cluster count text symbol layer
+      map.addLayer({
+        id: clusterCountLayerId,
+        type: "symbol",
+        source: sourceId,
+        filter: ["has", "point_count"],
+        layout: {
+          "text-field": "{point_count_abbreviated}",
+          "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+          "text-size": 12,
+        },
+        paint: {
+          "text-color": "#ffffff",
+        },
+      });
+
+      // Individual unclustered markers (pin-like circle)
+      map.addLayer({
+        id: unclusteredLayerId,
+        type: "circle",
+        source: sourceId,
+        filter: ["!", ["has", "point_count"]],
+        paint: {
+          "circle-color": [
+            "match",
+            ["get", "availability"],
+            "online",
+            "#22c55e",
+            "busy",
+            "#eab308",
+            "#9ca3af",
+          ],
+          "circle-radius": 8,
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
+
+      // Individual unclustered helper name label
+      map.addLayer({
+        id: unclusteredLabelLayerId,
+        type: "symbol",
+        source: sourceId,
+        filter: ["!", ["has", "point_count"]],
+        layout: {
+          "text-field": ["get", "name"],
+          "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+          "text-size": 10,
+          "text-offset": [0, 1.4],
+          "text-anchor": "top",
+        },
+        paint: {
+          "text-color": "#0f172a",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 1.5,
+        },
+      });
+    }
+
+    return () => {
+      try {
+        if (popupRef.current) {
+          popupRef.current.remove();
+          popupRef.current = null;
+        }
+        if (map.getLayer(unclusteredLabelLayerId)) map.removeLayer(unclusteredLabelLayerId);
+        if (map.getLayer(unclusteredLayerId)) map.removeLayer(unclusteredLayerId);
+        if (map.getLayer(clusterCountLayerId)) map.removeLayer(clusterCountLayerId);
+        if (map.getLayer(clusterLayerId)) map.removeLayer(clusterLayerId);
+        if (map.getSource(sourceId)) map.removeSource(sourceId);
+      } catch {
+        // ignore
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, map, sourceId]);
+
+  // Update source data when helpers array changes
+  useEffect(() => {
+    if (!isLoaded || !map) return;
+    const source = map.getSource(sourceId) as MapLibreGL.GeoJSONSource;
+    if (source) {
+      source.setData(geojsonData);
+    }
+  }, [isLoaded, map, geojsonData, sourceId]);
+
+  // Handle interaction events
+  useEffect(() => {
+    if (!isLoaded || !map) return;
+
+    // Cluster click: zoom in to expand
+    const handleClusterClick = async (e: MapLibreGL.MapMouseEvent) => {
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: [clusterLayerId],
+      });
+      if (!features.length) return;
+
+      const feature = features[0];
+      const clusterId = feature.properties?.cluster_id as number;
+      const count = feature.properties?.point_count as number;
+      const coordinates = (feature.geometry as GeoJSON.Point).coordinates as [
+        number,
+        number,
+      ];
+
+      if (onClusterClick) {
+        onClusterClick(clusterId, coordinates, count);
+      } else {
+        const source = map.getSource(sourceId) as MapLibreGL.GeoJSONSource;
+        const zoom = await source.getClusterExpansionZoom(clusterId);
+        map.easeTo({
+          center: coordinates,
+          zoom: Math.max(zoom, map.getZoom() + 2),
+          duration: 500,
+        });
+      }
+    };
+
+    // Unclustered point click
+    const handlePointClick = (e: MapLibreGL.MapMouseEvent) => {
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: [unclusteredLayerId],
+      });
+      if (!features.length) return;
+
+      const feature = features[0];
+      const raw = feature.properties?.rawJson
+        ? (JSON.parse(feature.properties.rawJson) as HelperClusterItem)
+        : (feature.properties as HelperClusterItem);
+
+      onHelperClick?.(raw);
+    };
+
+    // Unclustered point hover tooltip popup
+    const handleMouseEnterPoint = (e: MapLibreGL.MapMouseEvent) => {
+      map.getCanvas().style.cursor = "pointer";
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: [unclusteredLayerId],
+      });
+      if (!features.length) return;
+
+      const feature = features[0];
+      const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [
+        number,
+        number,
+      ];
+      const name = feature.properties?.name ?? "Helper";
+      const service = (feature.properties?.service ?? "").replace(/_/g, " ");
+      const rating = Number(feature.properties?.rating) || 0;
+      const availability = feature.properties?.availability ?? "online";
+      const availBg =
+        availability === "online"
+          ? "#dcfce7; color:#15803d"
+          : availability === "busy"
+            ? "#fef9c3; color:#a16207"
+            : "#f1f5f9; color:#64748b";
+
+      const html = `
+        <div style="font-family: inherit; font-size: 11px; line-height: 1.4; padding: 2px;">
+          <p style="font-weight: 700; color: #0f172a; margin: 0 0 2px 0;">${name}</p>
+          <p style="font-size: 9px; text-transform: uppercase; color: #64748b; margin: 0 0 4px 0;">${service}</p>
+          ${
+            rating > 0
+              ? `<div style="display:flex; align-items:center; gap:3px; margin-bottom:4px; font-weight:600; color:#d97706;">★ ${rating.toFixed(1)}</div>`
+              : ""
+          }
+          <span style="display:inline-block; font-size:9px; font-weight:600; padding:1px 6px; border-radius:9999px; background:${availBg};">${availability}</span>
+        </div>
+      `;
+
+      popupRef.current?.remove();
+      popupRef.current = new MapLibreGL.Popup({
+        closeButton: false,
+        offset: 12,
+        className: "helper-cluster-tooltip",
+      })
+        .setLngLat(coords)
+        .setHTML(html)
+        .addTo(map);
+    };
+
+    const handleMouseLeavePoint = () => {
+      map.getCanvas().style.cursor = "";
+      popupRef.current?.remove();
+      popupRef.current = null;
+    };
+
+    const handleMouseEnterCluster = () => {
+      map.getCanvas().style.cursor = "pointer";
+    };
+    const handleMouseLeaveCluster = () => {
+      map.getCanvas().style.cursor = "";
+    };
+
+    map.on("click", clusterLayerId, handleClusterClick);
+    map.on("click", unclusteredLayerId, handlePointClick);
+    map.on("mouseenter", clusterLayerId, handleMouseEnterCluster);
+    map.on("mouseleave", clusterLayerId, handleMouseLeaveCluster);
+    map.on("mouseenter", unclusteredLayerId, handleMouseEnterPoint);
+    map.on("mouseleave", unclusteredLayerId, handleMouseLeavePoint);
+
+    return () => {
+      map.off("click", clusterLayerId, handleClusterClick);
+      map.off("click", unclusteredLayerId, handlePointClick);
+      map.off("mouseenter", clusterLayerId, handleMouseEnterCluster);
+      map.off("mouseleave", clusterLayerId, handleMouseLeaveCluster);
+      map.off("mouseenter", unclusteredLayerId, handleMouseEnterPoint);
+      map.off("mouseleave", unclusteredLayerId, handleMouseLeavePoint);
+    };
+  }, [
+    isLoaded,
+    map,
+    clusterLayerId,
+    unclusteredLayerId,
+    sourceId,
+    onClusterClick,
+    onHelperClick,
+  ]);
+
+  return null;
+}
+
 export {
   Map,
   useMap,
@@ -1535,6 +2189,18 @@ export {
   MapControls,
   MapRoute,
   MapClusterLayer,
+  RoutePolyline,
+  ServiceRadius,
+  HelperCluster,
+  createGeoJSONCircle,
 };
 
-export type { MapRef, MapViewport };
+export type {
+  MapRef,
+  MapViewport,
+  RoutePolylineProps,
+  ServiceRadiusProps,
+  HelperClusterItem,
+  HelperClusterProps,
+};
+

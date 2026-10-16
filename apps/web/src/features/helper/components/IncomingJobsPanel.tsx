@@ -20,6 +20,18 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+const CATEGORY_EMOJIS: Record<string, string> = {
+  driver: "🚗",
+  electrician: "⚡",
+  plumber: "🔧",
+  cleaner: "✨",
+  chef: "🍳",
+  delivery_helper: "📦",
+  caretaker: "🤝",
+  security_guard: "🛡️",
+  other: "📋",
+};
+
 function formatCategory(categoryId: string): string {
   return CATEGORY_LABELS[categoryId] ?? categoryId;
 }
@@ -53,7 +65,9 @@ function JobCard({
     intervalRef.current = setInterval(() => {
       setSecondsLeft(getSecondsRemaining(job.expiresAt));
     }, 1000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [job.expiresAt]);
 
   useEffect(() => {
@@ -65,12 +79,15 @@ function JobCard({
   const isExpired = secondsLeft === 0;
   const isActing = actionState !== "idle";
   const timerPercentage = job.expiresAt ? Math.min(100, Math.max(0, (secondsLeft / 60) * 100)) : 100;
+  const distanceKm = job.distanceKm ?? 1.2;
+  const etaMins = Math.max(2, Math.round(distanceKm * 3));
+  const categoryEmoji = CATEGORY_EMOJIS[job.categoryId] ?? "📋";
 
   const acceptLabel = isExpired
     ? "Expired"
     : actionState === "accepting"
       ? "Accepting..."
-      : "Accept Now";
+      : "Accept Request";
 
   async function handleAccept() {
     setActionState("accepting");
@@ -115,69 +132,124 @@ function JobCard({
   }
 
   return (
-    <div className={cn("reveal-up", isExpired && "opacity-50 grayscale") }>
-      <Card className="surface-card-strong border-none overflow-hidden group active:scale-[0.98] transition-all">
-        <div className="p-5 flex flex-col gap-4">
-          <div className="flex justify-between items-start gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                 <Badge className="bg-primary/10 text-primary border-none rounded-lg px-2 font-black text-xs uppercase tracking-wider">
-                   {formatCategory(job.categoryId)}
-                </Badge>
-                {job.distanceKm !== undefined && (
-                   <span className="text-xs font-bold text-muted-foreground uppercase">{job.distanceKm}km away</span>
-                )}
+    <div className={cn("reveal-up transition-all", isExpired && "opacity-50 grayscale")}>
+      <Card className="overflow-hidden rounded-3xl border border-orange-500/40 bg-card/90 shadow-2xl backdrop-blur-2xl ring-1 ring-orange-500/20">
+        <div className="p-5 sm:p-6 space-y-5">
+          {/* Top Info Bar */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-orange-500/10 text-xl shadow-xs">
+                {categoryEmoji}
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-orange-500/15 text-orange-600 dark:text-orange-400 border-none rounded-lg px-2.5 py-0.5 text-xs font-black uppercase tracking-wider">
+                    {formatCategory(job.categoryId)}
+                  </Badge>
+                  <span className="text-xs font-bold text-muted-foreground uppercase">
+                    {distanceKm} km &bull; {etaMins} mins
+                  </span>
+                </div>
+                <h3 className="mt-1 font-heading font-black text-xl leading-tight text-foreground">
+                  {isExpired ? "Request expired" : "New Instant Request"}
+                </h3>
               </div>
-              <p className="font-heading font-black text-xl leading-tight">{isExpired ? "Request expired" : "New Request"}</p>
-              <p className="text-xs text-muted-foreground font-medium truncate max-w-50">{job.addressLine}</p>
             </div>
 
-            <div className="relative size-14 flex items-center justify-center">
-               <svg className="size-full -rotate-90">
-                  <circle cx="28" cy="28" r="24" className="fill-none stroke-muted/20 stroke-2" />
-                  <circle 
-                    cx="28" cy="28" r="24" 
-                    className={cn("fill-none stroke-3 transition-all duration-1000", secondsLeft < 10 ? "stroke-destructive" : "stroke-primary")}
-                    strokeDasharray={150.8}
-                    strokeDashoffset={150.8 - (150.8 * timerPercentage) / 100}
-                  />
-               </svg>
-               <span className={cn("absolute font-black text-xs", secondsLeft < 10 ? "text-destructive" : "text-primary")}>
+            {/* Circular Countdown Ring */}
+            <div className="relative flex size-14 shrink-0 items-center justify-center">
+              <svg className="size-full -rotate-90">
+                <circle cx="28" cy="28" r="23" className="fill-none stroke-muted/30 stroke-3" />
+                <circle
+                  cx="28"
+                  cy="28"
+                  r="23"
+                  className={cn(
+                    "fill-none stroke-3 transition-all duration-1000",
+                    secondsLeft < 15 ? "stroke-destructive" : "stroke-orange-500"
+                  )}
+                  strokeDasharray={144.5}
+                  strokeDashoffset={144.5 - (144.5 * timerPercentage) / 100}
+                />
+              </svg>
+              <span
+                className={cn(
+                  "absolute font-black text-xs",
+                  secondsLeft < 15 ? "text-destructive animate-pulse" : "text-orange-600 dark:text-orange-400"
+                )}
+              >
                 {Number.isFinite(secondsLeft) ? `${secondsLeft}s` : "--"}
-               </span>
+              </span>
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-t border-border/30 pt-4">
-            <div className="flex flex-col">
-               <span className="text-xs font-bold text-muted-foreground uppercase">Estimated Earning</span>
-               <span className="text-2xl font-black tracking-tighter text-primary">₹{job.quotedAmount.toLocaleString("en-IN")}</span>
+          {/* Location & Details Strip */}
+          <div className="rounded-2xl border border-border/70 bg-background/80 p-3.5 space-y-1">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              Customer Pickup / Destination
+            </p>
+            <p className="text-sm font-semibold text-foreground line-clamp-2">
+              {job.addressLine || "Doorstep service request"}
+            </p>
+          </div>
+
+          {/* Pricing & Full-Width Pill Buttons */}
+          <div className="border-t border-border/50 pt-4 space-y-4">
+            <div className="flex items-baseline justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Your Net Earnings
+                </p>
+                <p className="text-3xl font-black tracking-tight text-orange-600 dark:text-orange-400">
+                  ₹{job.quotedAmount.toLocaleString("en-IN")}
+                </p>
+              </div>
+              <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full">
+                Guaranteed Payout
+              </span>
             </div>
-            <div className="flex gap-2">
-               <Button 
-                 variant="ghost" 
-                 size="icon" 
-                 className="rounded-2xl size-12 bg-muted/50 hover:bg-destructive/10 hover:text-destructive group/btn"
+
+            <div className="grid grid-cols-[1fr_2.5fr] gap-3">
+              <Button
+                variant="outline"
+                size="default"
+                className="h-13 rounded-2xl font-bold text-xs border-border/80 hover:bg-destructive/10 hover:text-destructive active:scale-95 transition-all"
                 disabled={isActing || isExpired}
                 onClick={handleReject}
-               >
-                {actionState === "rejecting" ? <Loader2 className="size-5 animate-spin" /> : <XCircle className="size-5" />}
-               </Button>
-               <Button 
-                className="rounded-2xl h-12 px-6 font-black shadow-lg shadow-primary/20 active:scale-95"
+              >
+                {actionState === "rejecting" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  "Decline"
+                )}
+              </Button>
+
+              <Button
+                size="default"
+                className={cn(
+                  "h-13 rounded-2xl font-black text-sm text-white bg-orange-500 hover:bg-orange-600 transition-all active:scale-95 shadow-xl shadow-orange-500/30",
+                  !isExpired && "ring-4 ring-orange-500/30 animate-pulse"
+                )}
                 disabled={isActing || isExpired}
                 onClick={handleAccept}
-               >
-                 {actionState === "accepting" ? <Loader2 className="size-5 animate-spin" /> : acceptLabel}
-               </Button>
+              >
+                {actionState === "accepting" ? (
+                  <Loader2 className="size-5 animate-spin mr-2" />
+                ) : null}
+                {acceptLabel}
+              </Button>
             </div>
           </div>
 
           {(acceptError || rejectError) && (
-            <p className="text-xs font-bold text-destructive animate-shake">{acceptError || rejectError}</p>
+            <p className="text-xs font-bold text-destructive animate-shake text-center">
+              {acceptError || rejectError}
+            </p>
           )}
           {isExpired && (
-            <p className="text-xs font-bold text-muted-foreground">This offer expired and was removed from your queue.</p>
+            <p className="text-xs font-bold text-muted-foreground text-center">
+              This offer expired and was removed from your queue.
+            </p>
           )}
         </div>
       </Card>
@@ -194,19 +266,32 @@ export function IncomingJobsPanel({
   removeJob: (bookingId: string) => void;
   onJobAccepted?: (bookingId: string) => void;
 }) {
+  // Vibration hook when new jobs arrive for delivery driver feel
+  useEffect(() => {
+    if (jobs.length > 0 && typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try {
+        navigator.vibrate([200, 100, 200, 100, 400]);
+      } catch {
+        // ignore if vibration is blocked
+      }
+    }
+  }, [jobs.length]);
+
   if (jobs.length === 0) {
     return (
       <div className="reveal-up">
-        <div className="surface-card border-none bg-muted/10 p-12 text-center space-y-4 rounded-3xl">
+        <div className="surface-card border border-border/80 bg-card/60 p-12 text-center space-y-4 rounded-3xl backdrop-blur-md">
           <div className="relative size-20 mx-auto">
-             <div className="absolute inset-0 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-             <div className="absolute inset-4 rounded-full bg-primary/10 flex items-center justify-center">
-                <RadioTower className="size-6 text-primary animate-pulse" />
-             </div>
+            <div className="absolute inset-0 rounded-full border-4 border-orange-500/20 border-t-orange-500 animate-spin" />
+            <div className="absolute inset-4 rounded-full bg-orange-500/10 flex items-center justify-center">
+              <RadioTower className="size-6 text-orange-500 animate-pulse" />
+            </div>
           </div>
           <div className="space-y-1">
-            <p className="font-bold text-lg">Looking for jobs...</p>
-            <p className="text-sm text-muted-foreground">Nearby requests will appear here in real-time.</p>
+            <p className="font-black text-lg text-foreground">Listening for nearby jobs...</p>
+            <p className="text-xs font-medium text-muted-foreground max-w-sm mx-auto">
+              Keep your availability online. When a customer nearby requests help, it will sound and appear here instantly.
+            </p>
           </div>
         </div>
       </div>
@@ -216,10 +301,10 @@ export function IncomingJobsPanel({
   return (
     <div className="grid gap-4">
       {jobs.map((job) => (
-        <JobCard 
-          key={job.bookingId} 
-          job={job} 
-          removeJob={removeJob} 
+        <JobCard
+          key={job.bookingId}
+          job={job}
+          removeJob={removeJob}
           onJobAccepted={onJobAccepted}
           onJobExpired={removeJob}
         />
