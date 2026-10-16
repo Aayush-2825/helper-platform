@@ -545,6 +545,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
               bookingId={bookingId}
               customerLocation={customerLocation}
               helperId={role === "helper" ? userId : (booking.helperId ?? undefined)}
+              status={booking.status}
             />
           </CardContent>
         </Card>

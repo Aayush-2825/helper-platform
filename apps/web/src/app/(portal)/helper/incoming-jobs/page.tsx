@@ -2,7 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { IncomingJobsPanel } from "@features/helper/components/IncomingJobsPanel";
-import { IncomingJobsMap } from "@features/helper/components/incoming-jobs-map";
+import dynamic from "next/dynamic";
+
+const IncomingJobsMap = dynamic(
+  () => import("@features/helper/components/incoming-jobs-map").then((mod) => mod.IncomingJobsMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-112.5 w-full rounded-2xl bg-muted/40 animate-pulse flex items-center justify-center text-sm text-muted-foreground">
+        Loading radar map...
+      </div>
+    ),
+  },
+);
 import { useIncomingJobs } from "./useIncomingJobs";
 import { useWebSocket } from "@features/shared/hooks/useWebsocket";
 import { useSession } from "@/lib/auth/session";

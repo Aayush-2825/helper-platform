@@ -234,8 +234,11 @@ const Map = forwardRef<MapRef, MapProps>(function Map(
         compact: true,
       },
       maxTileCacheSize: (props as any).maxTileCacheSize ?? 50,
-      preserveDrawingBuffer: (props as any).preserveDrawingBuffer ?? false,
-      antialias: (props as any).antialias ?? true,
+      canvasContextAttributes: {
+        antialias: true,
+        preserveDrawingBuffer: false,
+        ...(props as any).canvasContextAttributes,
+      },
       transformRequest: (url: string, resourceType?: any) => {
         if (props.transformRequest) {
           return props.transformRequest(url, resourceType);

@@ -6,11 +6,12 @@ import {
   MapMarker,
   MarkerContent,
   MarkerPopup,
-  MarkerTooltip,
+  HelperCluster,
+  ServiceRadius,
 } from "./map";
 import { Card } from "@repo/ui/components/ui/card";
-import { useCallback, useEffect, useRef, useState, memo } from "react";
-import { MapPin, Search, Star, X, Users } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MapPin, Search, X, Users } from "lucide-react";
 import { BookingForm, type LiveHelper } from "@features/booking/components/BookingForm";
 import { BookingStatus } from "@features/booking/components/BookingStatus";
 import { useRealtimeEvents } from "@features/booking/hooks/use-realtime-events";
@@ -282,64 +283,7 @@ function ServiceLocationMarker({
   );
 }
 
-function HelperMarkerItem({ helper }: { helper: NearbyHelper }) {
-  return (
-    <MapMarker key={helper.id} longitude={helper.lng!} latitude={helper.lat!}>
-      <MarkerContent>
-        <div className="relative flex flex-col items-center">
-          <div
-            className={`size-4 rounded-full border-2 border-white shadow-lg cursor-pointer hover:scale-125 transition-transform ${
-              helper.availability === "online"
-                ? "bg-green-500"
-                : helper.availability === "busy"
-                  ? "bg-yellow-500"
-                  : "bg-gray-400"
-            }`}
-          />
-          <span className="mt-0.5 whitespace-nowrap text-[10px] font-semibold text-foreground drop-shadow-sm bg-background/80 rounded px-1">
-            {helper.name !== "Helper" ? helper.name.split(" ")[0] : "Helper"}
-          </span>
-        </div>
-      </MarkerContent>
-      <MarkerTooltip>
-        <div className="space-y-1">
-          <p className="font-medium">{helper.name}</p>
-          <p className="text-[10px] uppercase tracking-wide opacity-70">
-            {helper.category.replace(/_/g, " ")}
-          </p>
-          {Number(helper.rating) > 0 && (
-            <div className="flex items-center gap-1">
-              <Star className="size-3 fill-amber-400 text-amber-400" />
-              <span>{Number(helper.rating).toFixed(1)}</span>
-              <span className="opacity-70">({helper.completedJobs} jobs)</span>
-            </div>
-          )}
-          <span
-            className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-              helper.availability === "online"
-                ? "bg-green-500/20 text-green-300"
-                : helper.availability === "busy"
-                  ? "bg-yellow-500/20 text-yellow-300"
-                  : "bg-gray-500/20 text-gray-400"
-            }`}
-          >
-            {helper.availability.charAt(0).toUpperCase() + helper.availability.slice(1)}
-          </span>
-        </div>
-      </MarkerTooltip>
-    </MapMarker>
-  );
-}
 
-const HelperMarkersLayer = memo(function HelperMarkersLayer({ helpers }: { helpers: NearbyHelper[] }) {
-  return (
-    <>
-      {helpers.map((helper) => (
-        <HelperMarkerItem key={helper.id} helper={helper} />
-      ))}
-    </>
-  );
-});
 
 
 // ---------------------------------------------------------------------------
@@ -368,6 +312,7 @@ export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcatego
   const [prefillAddress, setPrefillAddress] = useState({ addressLine: "", area: "", city: "", state: "", postalCode: "" });
   const [currentBookingId, setCurrentBookingId] = useState<string | null>(null);
   const [fetchCity, setFetchCity] = useState<string>("New Delhi");
+  const [selectedHelper, setSelectedHelper] = useState<NearbyHelper | null>(null);
 
   const selectedCategory = initialCategoryId ?? "";
   const currentSlug = serviceSlug ?? searchParams.get("service") ?? "all";
@@ -656,6 +601,7 @@ export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcatego
           center={[mapCenter.lng, mapCenter.lat]}
           zoom={14}
           onMapClick={async (coords) => {
+            setSelectedHelper(null);
             await applyCoordinates(coords.lat, coords.lng);
           }}
           styles={{
@@ -689,7 +635,17 @@ export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcatego
               });
             }}
           />
-          <HelperMarkersLayer helpers={helpersWithCoords} />
+          {selectedHelper?.lng != null && selectedHelper?.lat != null && (
+            <ServiceRadius
+              center={[selectedHelper.lng, selectedHelper.lat]}
+              radiusKm={5}
+              color="#f97316"
+            />
+          )}
+          <HelperCluster
+            helpers={helpersWithCoords}
+            onHelperClick={(helper) => setSelectedHelper(helper as unknown as NearbyHelper)}
+          />
         </MapComponent>
       </Card>
 

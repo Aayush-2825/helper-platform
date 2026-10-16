@@ -34,15 +34,92 @@ const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 }; // New Delhi
  */
 export function IncomingJobsMap({ jobs, workerLocation }: IncomingJobsMapProps) {
   const mapRef = useRef<MapLibreGL.Map | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<WorkerLocation | null>(workerLocation ?? null);
+  const lastSentServerTimeRef = useRef<number>(0);
+  const lastPositionRef = useRef<WorkerLocation | null>(null);
+  const isFirstFixRef = useRef<boolean>(true);
   const [routes, setRoutes] = useState<Record<string, {
       coordinates: [number, number][],
       duration: number,
       distance: number
   }>>({});
 
+  // Synchronize initial or external worker location changes
+  useEffect(() => {
+    if (workerLocation) {
+      setCurrentLocation(workerLocation);
+    }
+  }, [workerLocation]);
+
+  // Track helper location every 5s with watchPosition and animate marker / camera
+  useEffect(() => {
+    if (typeof window === "undefined" || !("geolocation" in navigator)) return;
+
+    let watchId: number;
+
+    const sendServerUpdate = async (lat: number, lng: number) => {
+      try {
+        await fetch("/api/helper/availability", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            availabilityStatus: "online",
+            latitude: lat,
+            longitude: lng,
+          }),
+        });
+      } catch (err) {
+        console.warn("[IncomingJobsMap] Availability GPS update failed:", err);
+      }
+    };
+
+    const handlePosition = (pos: GeolocationPosition) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const now = Date.now();
+
+      setCurrentLocation({ lat, lng });
+
+      if (mapRef.current) {
+        if (isFirstFixRef.current) {
+          isFirstFixRef.current = false;
+          mapRef.current.easeTo({ center: [lng, lat], zoom: 14, duration: 1000 });
+        } else {
+          const prev = lastPositionRef.current;
+          if (!prev || Math.abs(prev.lat - lat) > 0.0001 || Math.abs(prev.lng - lng) > 0.0001) {
+            mapRef.current.easeTo({ center: [lng, lat], duration: 1000 });
+          }
+        }
+      }
+      lastPositionRef.current = { lat, lng };
+
+      // Throttle updates to 5 seconds
+      if (now - lastSentServerTimeRef.current >= 5000) {
+        lastSentServerTimeRef.current = now;
+        void sendServerUpdate(lat, lng);
+      }
+    };
+
+    const handleError = (error: GeolocationPositionError) => {
+      console.warn("[IncomingJobsMap] Geolocation watch error:", error.message);
+    };
+
+    watchId = navigator.geolocation.watchPosition(handlePosition, handleError, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 4000,
+    });
+
+    return () => {
+      if (watchId !== undefined) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, []);
+
   // Fetch routes for all nearby jobs
   useEffect(() => {
-    const activeWorkerLocation = workerLocation;
+    const activeWorkerLocation = currentLocation;
     if (!activeWorkerLocation || jobs.length === 0) return;
 
     let cancelled = false;
@@ -88,11 +165,11 @@ export function IncomingJobsMap({ jobs, workerLocation }: IncomingJobsMapProps) 
       cancelled = true;
       abortController.abort();
     };
-  }, [jobs, workerLocation]);
+  }, [jobs, currentLocation]);
 
   // Determine the map center: prefer worker location, else first job, else default
   const center =
-    workerLocation ??
+    currentLocation ??
     (jobs.length > 0 && jobs[0].latitude != null && jobs[0].longitude != null
       ? { lat: jobs[0].latitude, lng: jobs[0].longitude }
       : DEFAULT_CENTER);
@@ -102,7 +179,7 @@ export function IncomingJobsMap({ jobs, workerLocation }: IncomingJobsMapProps) 
     (j) => j.latitude != null && j.longitude != null,
   );
 
-  if (jobsWithCoords.length === 0 && !workerLocation) {
+  if (jobsWithCoords.length === 0 && !currentLocation) {
     return (
       <Card className="h-75 p-0 overflow-hidden flex items-center justify-center bg-muted/30">
         <p className="text-sm text-muted-foreground px-4 text-center">
@@ -150,10 +227,10 @@ export function IncomingJobsMap({ jobs, workerLocation }: IncomingJobsMapProps) 
           ))}
 
           {/* Helper's own live location */}
-          {workerLocation && (
+          {currentLocation && (
             <MapMarker
-              longitude={workerLocation.lng}
-              latitude={workerLocation.lat}
+              longitude={currentLocation.lng}
+              latitude={currentLocation.lat}
             >
               <MarkerContent>
                 <div className="relative group cursor-pointer">

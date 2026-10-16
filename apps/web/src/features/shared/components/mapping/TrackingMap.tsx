@@ -8,6 +8,7 @@ import {
   MarkerContent,
   MarkerPopup,
   MapRoute,
+  RoutePolyline,
 } from "@features/shared/components/mapping/map";
 import { 
   MapPin, 
@@ -31,6 +32,7 @@ export interface TrackingMapProps {
   helperId?: string;
   initialHelperLocation?: { lat: number; lng: number } | null;
   className?: string;
+  status?: string;
 }
 
 type RealtimeLocationUpdate = {
@@ -103,9 +105,11 @@ export function TrackingMap({
   helperId,
   initialHelperLocation,
   className = "",
+  status,
 }: TrackingMapProps) {
   const { session } = useSession();
   const userId = session?.user?.id;
+  const isRouteActive = !status || status === "accepted" || status === "in_progress";
 
   const [helperLocation, setHelperLocation] = useState<{ lat: number; lng: number } | null>(
     initialHelperLocation ?? null
@@ -448,25 +452,15 @@ export function TrackingMap({
         <MapControls position="bottom-right" showZoom showLocate />
 
         {/* 🛣️ Road Navigation Route (Turn-by-turn polyline) */}
-        {routeCoordinates.length >= 2 && (
-          <>
-            {/* Soft Route Halo / Casing */}
-            <MapRoute
-              id={`route-glow-${bookingId}`}
-              coordinates={routeCoordinates}
-              color="#60a5fa"
-              width={7}
-              opacity={0.35}
-            />
-            {/* Primary Route Line */}
-            <MapRoute
-              id={`route-main-${bookingId}`}
-              coordinates={routeCoordinates}
-              color="#2563eb"
-              width={4}
-              opacity={0.9}
-            />
-          </>
+        {isRouteActive && helperLocation && routeCoordinates.length >= 2 && (
+          <RoutePolyline
+            id={`route-poly-${bookingId}`}
+            coordinates={routeCoordinates}
+            color="#f97316"
+            width={3}
+            dashArray={[2, 2]}
+            animated
+          />
         )}
 
         {/* 🎯 Customer Destination Marker */}
@@ -636,7 +630,7 @@ export function TrackingMap({
                       <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 flex items-center justify-end gap-1 leading-tight">
                         <Clock className="size-2.5" /> ETA
                       </span>
-                      <span className="text-xs font-black text-blue-600 dark:text-blue-400">
+                      <span className="text-xs font-black text-orange-600 dark:text-orange-400">
                         {isRouteLoading ? "..." : formatDuration(durationSeconds)}
                       </span>
                     </div>

@@ -2,7 +2,19 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { MyMap } from "@features/shared/components/mapping/map-component";
+import dynamic from "next/dynamic";
+
+const MyMap = dynamic(
+  () => import("@features/shared/components/mapping/map-component").then((mod) => mod.MyMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-105 w-full rounded-2xl bg-muted/40 animate-pulse flex items-center justify-center text-sm text-muted-foreground">
+        Loading interactive map...
+      </div>
+    ),
+  },
+);
 import { useSession } from "@/lib/auth/session";
 import { SERVICE_TO_BOOKING_CATEGORY } from "@/config/services";
 
