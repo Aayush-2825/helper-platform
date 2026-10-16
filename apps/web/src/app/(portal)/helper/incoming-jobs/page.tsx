@@ -136,29 +136,48 @@ export default function HelperPage() {
       });
     };
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setWorkerLocation({ lat, lng });
-        
-        // Send initial presence
-        sendPresence(lat, lng);
+    const tryFallbackIp = async () => {
+      try {
+        const ipRes = await fetch("/api/location/ip");
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          if (typeof ipData?.latitude === "number" && typeof ipData?.longitude === "number") {
+            setWorkerLocation({ lat: ipData.latitude, lng: ipData.longitude });
+            sendPresence(ipData.latitude, ipData.longitude);
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+      sendPresence();
+    };
 
-        // Start heartbeat every 30 seconds
-        heartbeatInterval = setInterval(() => {
-          navigator.geolocation.getCurrentPosition(
-            (p) => sendPresence(p.coords.latitude, p.coords.longitude),
-            () => sendPresence(), // fallback if GPS fails during heartbeat
-          );
-        }, 30000);
-      },
-      () => {
-        // Geolocation denied — still send presence as "online" without coords
-        sendPresence();
-        heartbeatInterval = setInterval(() => sendPresence(), 30000);
-      },
-    );
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setWorkerLocation({ lat, lng });
+          sendPresence(lat, lng);
+        },
+        () => {
+          void tryFallbackIp();
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      );
+
+      heartbeatInterval = setInterval(() => {
+        navigator.geolocation.getCurrentPosition(
+          (p) => sendPresence(p.coords.latitude, p.coords.longitude),
+          () => sendPresence(),
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+        );
+      }, 30000);
+    } else {
+      void tryFallbackIp();
+      heartbeatInterval = setInterval(() => sendPresence(), 30000);
+    }
 
     return () => {
       if (heartbeatInterval) clearInterval(heartbeatInterval);
@@ -279,7 +298,7 @@ export default function HelperPage() {
             scheduleNext();
           }
         },
-        { enableHighAccuracy: true },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 },
       );
     };
 

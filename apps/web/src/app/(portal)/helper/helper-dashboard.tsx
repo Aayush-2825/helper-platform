@@ -61,12 +61,46 @@ export default function HelperDashboard() {
     const newStatus = isOnline ? "offline" : "online";
     const userId = session?.user.id;
     try {
-      // Optimistic update for low-tech user feedback speed
       setIsOnline(!isOnline);
+
+      let coords: { latitude?: number; longitude?: number } = {};
+      if (newStatus === "online" && typeof navigator !== "undefined" && navigator.geolocation) {
+        coords = await new Promise<{ latitude?: number; longitude?: number }>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+            () => {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+                async () => {
+                  try {
+                    const ipRes = await fetch("/api/location/ip");
+                    if (ipRes.ok) {
+                      const ipData = await ipRes.json();
+                      if (typeof ipData?.latitude === "number" && typeof ipData?.longitude === "number") {
+                        return resolve({ latitude: ipData.latitude, longitude: ipData.longitude });
+                      }
+                    }
+                  } catch {
+                    // ignore
+                  }
+                  resolve({});
+                },
+                { enableHighAccuracy: false, timeout: 5000, maximumAge: 120000 },
+              );
+            },
+            { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 },
+          );
+        });
+      }
+
       const response = await fetch("/api/helper/availability", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ availabilityStatus: newStatus }),
+        body: JSON.stringify({
+          availabilityStatus: newStatus,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        }),
       });
 
       if (!response.ok) {
@@ -75,24 +109,12 @@ export default function HelperDashboard() {
       }
 
       if (userId) {
-        if (newStatus === "online" && navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              publishHelperPresence({
-                helperUserId: userId,
-                status: "online",
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-              });
-            },
-            () => {
-              publishHelperPresence({ helperUserId: userId, status: "online" });
-            },
-            { timeout: 5000 },
-          );
-        } else {
-          publishHelperPresence({ helperUserId: userId, status: newStatus });
-        }
+        publishHelperPresence({
+          helperUserId: userId,
+          status: newStatus,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        });
       }
     } catch {
       setIsOnline(isOnline);

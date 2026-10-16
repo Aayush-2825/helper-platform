@@ -220,11 +220,45 @@ export default function HelperAvailabilityPage() {
     setError(null);
     setSuccessMsg(null);
     try {
+      let coords: { latitude?: number; longitude?: number } = {};
+      if (newStatus === "online" && typeof navigator !== "undefined" && navigator.geolocation) {
+        coords = await new Promise<{ latitude?: number; longitude?: number }>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+            () => {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+                async () => {
+                  try {
+                    const ipRes = await fetch("/api/location/ip");
+                    if (ipRes.ok) {
+                      const ipData = await ipRes.json();
+                      if (typeof ipData?.latitude === "number" && typeof ipData?.longitude === "number") {
+                        return resolve({ latitude: ipData.latitude, longitude: ipData.longitude });
+                      }
+                    }
+                  } catch {
+                    // ignore
+                  }
+                  resolve({});
+                },
+                { enableHighAccuracy: false, timeout: 5000, maximumAge: 120000 },
+              );
+            },
+            { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 },
+          );
+        });
+      }
+
       const res = await fetch("/api/helper/availability", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ availabilityStatus: newStatus }),
+        body: JSON.stringify({
+          availabilityStatus: newStatus,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { message?: string };
@@ -233,29 +267,13 @@ export default function HelperAvailabilityPage() {
       }
       setStatus(newStatus);
       setSuccessMsg(`Status updated to ${statusConfig[newStatus].label}`);
-      // Broadcast presence update via WS — include current GPS coords so the
-      // realtime server can persist them for matching and map display
       if (session?.user.id) {
-        const userId = session.user.id;
-        if (newStatus === "online" && navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              publishHelperPresence({
-                helperUserId: userId,
-                status: newStatus,
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-              });
-            },
-            () => {
-              // No GPS — still broadcast status without coords
-              publishHelperPresence({ helperUserId: userId, status: newStatus });
-            },
-            { timeout: 5000 },
-          );
-        } else {
-          publishHelperPresence({ helperUserId: userId, status: newStatus });
-        }
+        publishHelperPresence({
+          helperUserId: session.user.id,
+          status: newStatus,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        });
       }
     } catch {
       setError("Network error. Please try again.");

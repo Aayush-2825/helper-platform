@@ -53,10 +53,18 @@ type NominatimResult = {
 
 
 // ---------------------------------------------------------------------------
-// Location search bar (Nominatim, no API key)
+// Location search bar
 // ---------------------------------------------------------------------------
 
-function LocationSearchBar({ onSelect }: { onSelect: (loc: GeocodedLocation) => void }) {
+function LocationSearchBar({
+  onSelect,
+  onDetectLocation,
+  isDetecting,
+}: {
+  onSelect: (loc: GeocodedLocation) => void;
+  onDetectLocation?: () => void;
+  isDetecting?: boolean;
+}) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -68,7 +76,7 @@ function LocationSearchBar({ onSelect }: { onSelect: (loc: GeocodedLocation) => 
       abortRef.current.abort();
     }
 
-    if (q.trim().length < 3) {
+    if (q.trim().length < 2) {
       setResults([]);
       setSearching(false);
       return;
@@ -78,14 +86,14 @@ function LocationSearchBar({ onSelect }: { onSelect: (loc: GeocodedLocation) => 
     abortRef.current = controller;
     setSearching(true);
 
-    fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=in`,
-      { headers: { "Accept-Language": "en" }, signal: controller.signal },
-    )
+    fetch(`/api/location/search?q=${encodeURIComponent(q.trim())}`, {
+      headers: { "Accept-Language": "en" },
+      signal: controller.signal,
+    })
       .then((r) => r.json() as Promise<NominatimResult[]>)
       .then((nextResults) => {
         if (!controller.signal.aborted) {
-          setResults(nextResults);
+          setResults(Array.isArray(nextResults) ? nextResults : []);
         }
       })
       .catch((error) => {
@@ -114,7 +122,7 @@ function LocationSearchBar({ onSelect }: { onSelect: (loc: GeocodedLocation) => 
     const val = e.target.value;
     setQuery(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => search(val), 400);
+    debounceRef.current = setTimeout(() => search(val), 350);
   }
 
   function handleSelect(r: NominatimResult) {
@@ -132,31 +140,51 @@ function LocationSearchBar({ onSelect }: { onSelect: (loc: GeocodedLocation) => 
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-background shadow-sm">
-        <Search className="size-4 text-muted-foreground shrink-0" />
-        <input
-          type="text"
-          value={query}
-          onChange={handleChange}
-          placeholder="Search location (e.g. Connaught Place, Delhi)..."
-          className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
-        />
-        {searching && (
-          <span className="size-4 rounded-full border-2 border-primary border-t-transparent animate-spin shrink-0" />
-        )}
-        {query && !searching && (
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 flex items-center gap-2 border rounded-lg px-3 py-2 bg-background shadow-sm">
+          <Search className="size-4 text-muted-foreground shrink-0" />
+          <input
+            type="text"
+            value={query}
+            onChange={handleChange}
+            placeholder="Search location (e.g. Connaught Place, Delhi)..."
+            className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+          />
+          {searching && (
+            <span className="size-4 rounded-full border-2 border-primary border-t-transparent animate-spin shrink-0" />
+          )}
+          {query && !searching && (
+            <button
+              type="button"
+              aria-label="Clear location search"
+              onClick={() => { setQuery(""); setResults([]); }}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+
+        {onDetectLocation && (
           <button
             type="button"
-            aria-label="Clear location search"
-            onClick={() => { setQuery(""); setResults([]); }}
-            className="text-muted-foreground hover:text-foreground"
+            onClick={onDetectLocation}
+            disabled={isDetecting}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border bg-background hover:bg-accent text-foreground shadow-sm transition-colors shrink-0 disabled:opacity-50 h-10"
+            title="Use current location"
           >
-            <X className="size-4" />
+            {isDetecting ? (
+              <span className="size-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            ) : (
+              <MapPin className="size-3.5 text-primary" />
+            )}
+            <span className="hidden sm:inline">{isDetecting ? "Locating..." : "Use My Location"}</span>
           </button>
         )}
       </div>
+
       {results.length > 0 && (
-        <ul className="absolute z-50 mt-1 w-full rounded-lg border bg-popover shadow-lg overflow-hidden">
+        <ul className="absolute z-50 mt-1 w-full rounded-lg border bg-popover shadow-lg overflow-hidden max-h-60 overflow-y-auto">
           {results.map((r, i) => (
             <li key={i}>
               <button
@@ -181,22 +209,21 @@ function LocationSearchBar({ onSelect }: { onSelect: (loc: GeocodedLocation) => 
 
 async function reverseGeocode(lat: number, lng: number): Promise<{ addressLine: string; area: string; city: string; state: string; postalCode: string }> {
   try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
-      { headers: { "Accept-Language": "en" } },
-    );
-    const data = await res.json() as NominatimResult;
-    const addr = data?.address ?? {};
-    const road = addr.road ?? addr.suburb ?? "";
-    const area = addr.suburb ?? addr.neighbourhood ?? "";
-    const city = addr.city ?? addr.town ?? addr.village ?? addr.state_district ?? addr.county ?? "";
-    const state = addr.state ?? "";
-    const postalCode = (addr.postcode ?? "").replace(/[^0-9]/g, "").slice(0, 6);
-    const short = data.display_name.split(",").slice(0, 3).join(",");
-    return { addressLine: road || short, area, city, state, postalCode };
-  } catch {
-    return { addressLine: "", area: "", city: "", state: "", postalCode: "" };
+    const res = await fetch(`/api/location/reverse?lat=${lat}&lng=${lng}`);
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        addressLine: data.addressLine ?? "",
+        area: data.area ?? "",
+        city: data.city ?? "",
+        state: data.state ?? "",
+        postalCode: data.postalCode ?? "",
+      };
+    }
+  } catch (err) {
+    console.error("Reverse geocoding error:", err);
   }
+  return { addressLine: "", area: "", city: "", state: "", postalCode: "" };
 }
 
 function HelpersInAreaBadge({
@@ -351,59 +378,80 @@ export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcatego
   const helperRemovalsRef = useRef<Set<string>>(new Set());
   const batchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // On mount, attempt to get user position with safety timeout so map never hangs
-  useEffect(() => {
-    let isCancelled = false;
+  const applyCoordinates = useCallback(async (lat: number, lng: number) => {
+    setLocation({ lat, lng });
+    setMapCenter({ lat, lng });
+    setDraggableMarker({ lat, lng });
+    mapRef.current?.flyTo({ center: [lng, lat], zoom: 14, duration: 1200 });
 
-    const safetyTimer = setTimeout(() => {
-      if (!isCancelled) {
-        setIsLocating(false);
-        setFetchCity((prev) => prev || "New Delhi");
+    try {
+      const geocoded = await reverseGeocode(lat, lng);
+      if (geocoded.city) setFetchCity(geocoded.city);
+      setPrefillAddress((prev) => ({
+        addressLine: geocoded.addressLine || prev.addressLine,
+        area: geocoded.area || prev.area,
+        city: geocoded.city || prev.city,
+        state: geocoded.state || prev.state,
+        postalCode: geocoded.postalCode || prev.postalCode,
+      }));
+    } catch (err) {
+      console.error("Reverse geocoding error:", err);
+    }
+  }, []);
+
+  const detectUserLocation = useCallback(async () => {
+    setIsLocating(true);
+
+    const tryIpFallback = async () => {
+      try {
+        const ipRes = await fetch("/api/location/ip");
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          if (typeof ipData?.latitude === "number" && typeof ipData?.longitude === "number") {
+            await applyCoordinates(ipData.latitude, ipData.longitude);
+            if (ipData.city) setFetchCity(ipData.city);
+            return true;
+          }
+        }
+      } catch (err) {
+        console.warn("IP location fallback failed:", err);
       }
-    }, 3500);
+      return false;
+    };
 
-    if (typeof navigator !== "undefined" && navigator.geolocation) {
-      setIsLocating(true);
+    if (typeof navigator !== "undefined" && "geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          if (isCancelled) return;
-          clearTimeout(safetyTimer);
           setIsLocating(false);
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setLocation({ lat, lng });
-          setMapCenter({ lat, lng });
-          setDraggableMarker({ lat, lng });
-          try {
-            const { addressLine, area, city, state, postalCode } = await reverseGeocode(lat, lng);
-            if (!isCancelled) {
-              setFetchCity(city);
-              setPrefillAddress({ addressLine, area, city, state, postalCode });
-              mapRef.current?.flyTo({ center: [lng, lat], zoom: 14, duration: 1000 });
-            }
-          } catch {
-            // Keep New Delhi fallback
-          }
+          await applyCoordinates(pos.coords.latitude, pos.coords.longitude);
         },
         () => {
-          if (isCancelled) return;
-          clearTimeout(safetyTimer);
-          setIsLocating(false);
-          setFetchCity((prev) => prev || "New Delhi");
+          // Retry with low accuracy if high-accuracy timed out or failed
+          navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+              setIsLocating(false);
+              await applyCoordinates(pos.coords.latitude, pos.coords.longitude);
+            },
+            async () => {
+              // Both GPS attempts failed/denied, fall back to IP location
+              await tryIpFallback();
+              setIsLocating(false);
+            },
+            { enableHighAccuracy: false, timeout: 6000, maximumAge: 120000 },
+          );
         },
-        { timeout: 3500, enableHighAccuracy: false, maximumAge: 300000 },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
       );
     } else {
-      clearTimeout(safetyTimer);
+      await tryIpFallback();
       setIsLocating(false);
-      setFetchCity("New Delhi");
     }
+  }, [applyCoordinates]);
 
-    return () => {
-      isCancelled = true;
-      clearTimeout(safetyTimer);
-    };
-  }, []);
+  // On mount, attempt to get user position with fallback to IP
+  useEffect(() => {
+    void detectUserLocation();
+  }, [detectUserLocation]);
 
   // Listen to both helper_presence (online/offline + coords) and location_update (in-job GPS)
   const { eventMessages } = useRealtimeEvents({
@@ -577,7 +625,11 @@ export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcatego
       {/* 2. Top Bar: Search + Category Dropdown */}
       <div className="flex flex-col sm:flex-row gap-3 z-10 relative">
         <div className="flex-1">
-          <LocationSearchBar onSelect={handleLocationSelect} />
+          <LocationSearchBar
+            onSelect={handleLocationSelect}
+            onDetectLocation={detectUserLocation}
+            isDetecting={isLocating}
+          />
         </div>
 
         <div className="w-full sm:w-60">
@@ -608,7 +660,15 @@ export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcatego
             dark: "https://tiles.openfreemap.org/styles/liberty",
           }}
         >
-          <MapControls position="bottom-right" showZoom showCompass showLocate />
+          <MapControls
+            position="bottom-right"
+            showZoom
+            showCompass
+            showLocate
+            onLocate={async (coords) => {
+              await applyCoordinates(coords.latitude, coords.longitude);
+            }}
+          />
           <ServiceLocationMarker
             lat={draggableMarker.lat}
             lng={draggableMarker.lng}

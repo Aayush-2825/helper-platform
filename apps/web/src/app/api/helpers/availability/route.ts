@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
-import { helperProfile } from "@/db/schema";
+import { helperPresence, helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import {
   activationGateForbiddenResponse,
@@ -15,6 +15,8 @@ import { isAuthorizedHelper } from "@/lib/helper/auth";
 
 const schema = z.object({
   availabilityStatus: z.enum(["online", "offline", "busy"]),
+  latitude: z.number().optional().nullable(),
+  longitude: z.number().optional().nullable(),
 });
 
 export async function PATCH(request: NextRequest) {
@@ -73,6 +75,32 @@ export async function PATCH(request: NextRequest) {
         { message: "Helper profile not found." },
         { status: 404, headers: NO_STORE_HEADERS },
       );
+    }
+
+    // Upsert into helperPresence so location and presence are recorded in database
+    try {
+      const { availabilityStatus, latitude, longitude } = parsed.data;
+      await db
+        .insert(helperPresence)
+        .values({
+          id: `presence-${session.user.id}`,
+          helperUserId: session.user.id,
+          status: availabilityStatus,
+          latitude: latitude != null ? String(latitude) : null,
+          longitude: longitude != null ? String(longitude) : null,
+          lastHeartbeat: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: helperPresence.helperUserId,
+          set: {
+            status: availabilityStatus,
+            ...(latitude != null ? { latitude: String(latitude) } : {}),
+            ...(longitude != null ? { longitude: String(longitude) } : {}),
+            lastHeartbeat: new Date(),
+          },
+        });
+    } catch (presenceErr) {
+      console.warn("Could not upsert helperPresence:", presenceErr);
     }
 
     return NextResponse.json(

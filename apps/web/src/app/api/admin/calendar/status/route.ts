@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { connection, NextRequest } from "next/server";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { account } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
@@ -23,19 +26,34 @@ export async function GET(request: NextRequest) {
 
     // Check for service account configuration (preferred method)
     const hasServiceAccount = !!(
-      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
-      process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+      (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) ||
+      process.env.GOOGLE_SERVICE_ACCOUNT_JSON
     );
 
-    // Fallback: check if admin has Google OAuth linked (for backward compatibility)
-    const hasGoogleOAuth = !!session.user.email?.endsWith("@gmail.com");
+    // Check if current admin user has a Google OAuth account linked
+    const adminGoogleAccount = await db.query.account.findFirst({
+      where: and(eq(account.userId, session.user.id), eq(account.providerId, "google")),
+    });
 
-    return NextResponse.json({
-      hasServiceAccount,
-      hasGoogleOAuth,
-      email: session.user.email,
-      configured: hasServiceAccount || hasGoogleOAuth,
-    }, { headers: NO_STORE_HEADERS });
+    const isConnected = !!adminGoogleAccount || hasServiceAccount;
+    const hasRefreshToken = !!adminGoogleAccount?.refreshToken || hasServiceAccount;
+    const hasCalendarScope =
+      hasServiceAccount ||
+      (adminGoogleAccount?.scope ? adminGoogleAccount.scope.includes("calendar") : true);
+
+    const configured = hasServiceAccount || (isConnected && (hasRefreshToken || Boolean(adminGoogleAccount?.accessToken)));
+
+    return NextResponse.json(
+      {
+        isConnected,
+        hasCalendarScope,
+        hasRefreshToken,
+        hasServiceAccount,
+        email: session.user.email,
+        configured,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     if (!isPrerenderHangError(error)) {
       console.error("Calendar status error:", error);

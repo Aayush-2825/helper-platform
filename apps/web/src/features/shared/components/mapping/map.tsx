@@ -794,7 +794,26 @@ function MapControls({
 
   const handleLocate = useCallback(() => {
     setWaitingForLocation(true);
-    if ("geolocation" in navigator) {
+
+    const tryFallbackIp = async () => {
+      try {
+        const ipRes = await fetch("/api/location/ip");
+        if (ipRes.ok) {
+          const data = await ipRes.json();
+          if (data?.latitude && data?.longitude) {
+            const coords = { longitude: data.longitude, latitude: data.latitude };
+            map?.flyTo({ center: [coords.longitude, coords.latitude], zoom: 14, duration: 1500 });
+            onLocate?.(coords);
+          }
+        }
+      } catch (err) {
+        console.error("IP fallback error:", err);
+      } finally {
+        setWaitingForLocation(false);
+      }
+    };
+
+    if (typeof navigator !== "undefined" && "geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const coords = {
@@ -809,11 +828,32 @@ function MapControls({
           onLocate?.(coords);
           setWaitingForLocation(false);
         },
-        (error) => {
-          console.error("Error getting location:", error);
-          setWaitingForLocation(false);
+        () => {
+          // If high-accuracy fails or times out, try low-accuracy, then IP
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const coords = {
+                longitude: pos.coords.longitude,
+                latitude: pos.coords.latitude,
+              };
+              map?.flyTo({
+                center: [coords.longitude, coords.latitude],
+                zoom: 14,
+                duration: 1500,
+              });
+              onLocate?.(coords);
+              setWaitingForLocation(false);
+            },
+            () => {
+              void tryFallbackIp();
+            },
+            { enableHighAccuracy: false, timeout: 6000, maximumAge: 120000 },
+          );
         },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
       );
+    } else {
+      void tryFallbackIp();
     }
   }, [map, onLocate]);
 

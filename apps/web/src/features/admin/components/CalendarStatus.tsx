@@ -11,6 +11,8 @@ export function CalendarStatus() {
     isConnected: boolean;
     hasCalendarScope: boolean;
     hasRefreshToken: boolean;
+    hasServiceAccount?: boolean;
+    configured?: boolean;
     email: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,7 +56,10 @@ export function CalendarStatus() {
     );
   }
 
-  const isFullyConnected = status?.isConnected && status?.hasCalendarScope && status?.hasRefreshToken;
+  const isFullyConnected =
+    Boolean(status?.configured) ||
+    Boolean(status?.hasServiceAccount) ||
+    Boolean(status?.isConnected && status?.hasCalendarScope && status?.hasRefreshToken);
 
   return (
     <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border/50 bg-card/40 p-4">
