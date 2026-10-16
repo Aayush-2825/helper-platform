@@ -318,19 +318,23 @@ export async function createGoogleMeetEvent(params: {
   // Service accounts without Domain-Wide Delegation cannot invite attendees directly
   const shouldIncludeAttendees = !hasServiceAccount && params.attendees.length > 0;
   const sendUpdates = shouldIncludeAttendees ? "all" : "none";
-
   const requestBody: Record<string, unknown> = {
     summary: params.summary,
     description: descriptionWithAttendees,
     start: { dateTime: params.start.toISOString() },
     end: { dateTime: params.end.toISOString() },
-    conferenceData: {
+  };
+
+  // Only request Google Meet conferencing if not a service account
+  // (Service accounts without a paid Google Workspace license cannot generate hangoutsMeet conferences)
+  if (!hasServiceAccount) {
+    requestBody.conferenceData = {
       createRequest: {
         requestId: crypto.randomUUID(),
         conferenceSolutionKey: { type: "hangoutsMeet" },
       },
-    },
-  };
+    };
+  }
 
   if (shouldIncludeAttendees) {
     requestBody.attendees = params.attendees;
@@ -348,14 +352,30 @@ export async function createGoogleMeetEvent(params: {
     },
   );
 
-  // If failed due to service account attendees restriction, retry without attendees
+  // If failed due to service account restrictions (attendees or conference type), retry cleanly
   if (!response.ok) {
     const errorText = await response.text();
+    let retryNeeded = false;
+
     if (
       errorText.includes("forbiddenForServiceAccounts") ||
-      errorText.includes("Domain-Wide Delegation")
+      errorText.includes("Domain-Wide Delegation") ||
+      errorText.includes("attendees")
     ) {
       delete requestBody.attendees;
+      retryNeeded = true;
+    }
+
+    if (
+      errorText.includes("Invalid conference type") ||
+      errorText.includes("conferenceSolutionKey") ||
+      errorText.includes("conference")
+    ) {
+      delete requestBody.conferenceData;
+      retryNeeded = true;
+    }
+
+    if (retryNeeded) {
       response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCalendarId)}/events?conferenceDataVersion=1&sendUpdates=none`,
         {
