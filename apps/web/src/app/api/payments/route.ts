@@ -139,169 +139,129 @@ export async function POST(request: NextRequest) {
       request.headers.get("x-idempotency-key")?.trim() ||
       `booking-payment:${bookingId}:${session.user.id}:${method}`;
 
-    const paymentResult = await db.transaction(async (tx: typeof db) => {
-      await tx.execute(sql`
-        select 1
-        from ${booking}
-        where ${booking.id} = ${bookingId}
-          and ${booking.customerId} = ${session.user.id}
-        for update
-      `);
-
-      const bookingRecord = await tx.query.booking.findFirst({
-        where: and(eq(booking.id, bookingId), eq(booking.customerId, session.user.id)),
-      });
-
-      if (!bookingRecord) {
-        return { kind: "not_found" as const };
-      }
-
-      if (bookingRecord.status !== "completed") {
-        return { kind: "not_ready" as const };
-      }
-
-      const amount = bookingRecord.finalAmount ?? bookingRecord.quotedAmount;
-      if (!amount || amount <= 0) {
-        return { kind: "invalid_amount" as const };
-      }
-
-      const existingCaptured = await tx.query.paymentTransaction.findFirst({
-        where: and(
-          eq(paymentTransaction.bookingId, bookingId),
-          eq(paymentTransaction.customerId, session.user.id),
-          eq(paymentTransaction.status, "captured"),
-        ),
-        columns: { id: true },
-      });
-
-      if (existingCaptured) {
-        return { kind: "already_paid" as const };
-      }
-
-      const existingOpenOrder = await tx.query.paymentTransaction.findFirst({
-        where: and(
-          eq(paymentTransaction.bookingId, bookingId),
-          eq(paymentTransaction.customerId, session.user.id),
-          inArray(paymentTransaction.status, ["created", "authorized"]),
-        ),
-        orderBy: [desc(paymentTransaction.createdAt)],
-      });
-
-      if (existingOpenOrder?.providerOrderId) {
-        return {
-          kind: "existing_order" as const,
-          payment: existingOpenOrder,
-        };
-      }
-
-      const platformFee = computePlatformFee(amount, bookingRecord.commissionRate);
-      const helperEarning = Math.max(amount - platformFee, 0);
-      const razorpay = getRazorpayClient();
-
-      const order = await razorpay.orders.create({
-        amount: toRazorpayAmount(amount),
-        currency: bookingRecord.currency || "INR",
-        receipt: `booking_${bookingId.slice(0, 18)}_${idempotencyKey.slice(0, 24)}`,
-        notes: {
-          bookingId,
-          customerId: session.user.id,
-          idempotencyKey,
-        },
-      });
-
-      const [createdPayment] = await tx
-        .insert(paymentTransaction)
-        .values({
-          id: crypto.randomUUID(),
-          bookingId,
-          customerId: session.user.id,
-          helperProfileId: bookingRecord.helperProfileId,
-          method,
-          status: "created",
-          provider: "razorpay",
-          providerOrderId: order.id,
-          amount,
-          platformFee,
-          helperEarning,
-          currency: bookingRecord.currency || "INR",
-          metadata: {
-            source: "api/payments",
-            idempotencyKey,
-            razorpayOrderStatus: order.status,
-          },
-        })
-        .returning();
-
-      return {
-        kind: "created" as const,
-        payment: createdPayment,
-        razorpay: {
-          orderId: order.id,
-          amount: order.amount,
-          currency: order.currency,
-        },
-      };
+    const bookingRecord = await db.query.booking.findFirst({
+      where: and(eq(booking.id, bookingId), eq(booking.customerId, session.user.id)),
     });
 
-    if (paymentResult.kind === "not_found") {
+    if (!bookingRecord) {
       return NextResponse.json(
         { message: "Booking not found." },
         { status: 404, headers: NO_STORE_HEADERS },
       );
     }
 
-    if (paymentResult.kind === "not_ready") {
+    if (bookingRecord.status !== "completed") {
       return NextResponse.json(
         { message: "Payment is available only after booking completion." },
         { status: 409, headers: NO_STORE_HEADERS },
       );
     }
 
-    if (paymentResult.kind === "invalid_amount") {
+    const amount = bookingRecord.finalAmount ?? bookingRecord.quotedAmount;
+    if (!amount || amount <= 0) {
       return NextResponse.json(
         { message: "Invalid booking amount for payment." },
         { status: 422, headers: NO_STORE_HEADERS },
       );
     }
 
-    if (paymentResult.kind === "already_paid") {
+    const existingCaptured = await db.query.paymentTransaction.findFirst({
+      where: and(
+        eq(paymentTransaction.bookingId, bookingId),
+        eq(paymentTransaction.customerId, session.user.id),
+        eq(paymentTransaction.status, "captured"),
+      ),
+      columns: { id: true },
+    });
+
+    if (existingCaptured) {
       return NextResponse.json(
         { message: "Booking is already paid." },
         { status: 409, headers: NO_STORE_HEADERS },
       );
     }
 
+    const existingOpenOrder = await db.query.paymentTransaction.findFirst({
+      where: and(
+        eq(paymentTransaction.bookingId, bookingId),
+        eq(paymentTransaction.customerId, session.user.id),
+        inArray(paymentTransaction.status, ["created", "authorized"]),
+      ),
+      orderBy: [desc(paymentTransaction.createdAt)],
+    });
+
     const { keyId } = getRazorpaySecrets();
 
-    if (paymentResult.kind === "existing_order") {
+    if (existingOpenOrder?.providerOrderId) {
       return NextResponse.json(
         {
           message: "Existing payment order found.",
-          payment: paymentResult.payment,
+          payment: existingOpenOrder,
           razorpay: {
             keyId,
-            orderId: paymentResult.payment.providerOrderId,
-            amount: toRazorpayAmount(paymentResult.payment.amount),
-            currency: paymentResult.payment.currency,
+            orderId: existingOpenOrder.providerOrderId,
+            amount: toRazorpayAmount(existingOpenOrder.amount),
+            currency: existingOpenOrder.currency,
           },
         },
         { status: 200, headers: NO_STORE_HEADERS },
       );
     }
 
+    const platformFee = computePlatformFee(amount, bookingRecord.commissionRate);
+    const helperEarning = Math.max(amount - platformFee, 0);
+    const razorpay = getRazorpayClient();
+
+    // Call external payment gateway outside the database transaction
+    const order = await razorpay.orders.create({
+      amount: toRazorpayAmount(amount),
+      currency: bookingRecord.currency || "INR",
+      receipt: `booking_${bookingId.slice(0, 18)}_${idempotencyKey.slice(0, 24)}`,
+      notes: {
+        bookingId,
+        customerId: session.user.id,
+        idempotencyKey,
+      },
+    });
+
+    const [createdPayment] = await db
+      .insert(paymentTransaction)
+      .values({
+        id: crypto.randomUUID(),
+        bookingId,
+        customerId: session.user.id,
+        helperProfileId: bookingRecord.helperProfileId,
+        method,
+        status: "created",
+        provider: "razorpay",
+        providerOrderId: order.id,
+        amount,
+        platformFee,
+        helperEarning,
+        currency: bookingRecord.currency || "INR",
+        metadata: {
+          source: "api/payments",
+          idempotencyKey,
+          razorpayOrderStatus: order.status,
+        },
+      })
+      .returning();
+
     return NextResponse.json(
       {
         message: "Payment order created successfully.",
-        payment: paymentResult.payment,
+        payment: createdPayment,
         razorpay: {
           keyId,
-          orderId: paymentResult.razorpay.orderId,
-          amount: paymentResult.razorpay.amount,
-          currency: paymentResult.razorpay.currency,
+          orderId: order.id,
+          amount: order.amount,
+          currency: order.currency,
         },
       },
       { status: 201, headers: NO_STORE_HEADERS },
     );
+
+
   } catch (error) {
     console.error("Create payment error:", error);
     return NextResponse.json(

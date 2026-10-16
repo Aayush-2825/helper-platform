@@ -585,10 +585,18 @@ export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcatego
           <ServiceLocationMarker
             lat={draggableMarker.lat}
             lng={draggableMarker.lng}
-            onDragEnd={(coords) => {
+            onDragEnd={async (coords) => {
               setMapCenter({ lat: coords.lat, lng: coords.lng });
               setDraggableMarker({ lat: coords.lat, lng: coords.lng });
-              setPrefillAddress((prev) => ({ ...prev, addressLine: "", area: "", city: prev.city, state: prev.state, postalCode: prev.postalCode }));
+              const geocoded = await reverseGeocode(coords.lat, coords.lng);
+              if (geocoded.city) setFetchCity(geocoded.city);
+              setPrefillAddress({
+                addressLine: geocoded.addressLine,
+                area: geocoded.area,
+                city: geocoded.city || prefillAddress.city,
+                state: geocoded.state || prefillAddress.state,
+                postalCode: geocoded.postalCode || prefillAddress.postalCode,
+              });
             }}
           />
           <HelperMarkersLayer helpers={helpersWithCoords} />

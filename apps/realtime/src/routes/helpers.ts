@@ -3,6 +3,7 @@ import { db } from "../db/index.js";
 import { eq, sql } from "drizzle-orm";
 import { helperPresence, helperProfile } from "../db/schema.js";
 import { randomUUID } from "crypto";
+import { env } from "../config/env.js";
 
 const router: Router = Router();
 
@@ -107,6 +108,16 @@ router.get("/nearby", async (req, res) => {
 
 router.post("/helper-presence", async (req, res) => {
   try {
+    const configuredSecret = env.REALTIME_BROADCAST_SECRET?.trim();
+    if (!configuredSecret) {
+      return res.status(500).json({ error: "Broadcast secret not configured on server" });
+    }
+
+    const providedSecret = req.headers["x-realtime-secret"];
+    if (providedSecret !== configuredSecret) {
+      return res.status(401).json({ error: "Unauthorized helper presence request" });
+    }
+
     const { helperUserId, status, latitude, longitude, availableSlots } =
       req.body;
 

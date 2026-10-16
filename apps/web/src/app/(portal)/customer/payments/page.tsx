@@ -96,7 +96,7 @@ export default function CustomerPaymentsPage() {
     void fetchData();
   }, []);
 
-  const completed = bookings.filter((b) => b.status === "completed");
+  const completed = bookings.filter((b) => b.status === "completed" || b.status === "disputed");
 
   const capturedByBookingId = new Map(
     payments

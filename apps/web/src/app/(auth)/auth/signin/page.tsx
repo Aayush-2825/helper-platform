@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { getHomeRouteForRole } from "@/lib/auth/roles";
 import { SignInClientPage } from "@features/auth/components/signin-client-page";
+import { authMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = {
+  ...authMetadata,
+  title: "Sign In — DOZO",
+};
 
 interface SignInPageProps {
   searchParams?: Promise<{

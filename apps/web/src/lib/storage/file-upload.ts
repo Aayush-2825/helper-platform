@@ -144,7 +144,7 @@ export async function uploadToCloudinary(
     throw new Error("Failed to get upload signature");
   }
 
-  const { signature, timestamp, cloud_name, api_key } =
+  const { signature, timestamp, cloud_name, api_key, folder: signedFolder, type } =
     await signResponse.json();
 
   const formData = new FormData();
@@ -153,13 +153,20 @@ export async function uploadToCloudinary(
   formData.append("signature", signature);
   formData.append("timestamp", timestamp.toString());
   formData.append("api_key", api_key);
+  if (signedFolder) {
+    formData.append("folder", signedFolder);
+  }
+  if (type) {
+    formData.append("type", type);
+  }
 
-  // Upload the exact same params that were signed
-  Object.entries(uploadParams).forEach(([key, value]) => {
-    if (value) {
-      formData.append(key, value);
-    }
-  });
+  // Upload the remaining params that were signed
+  if (options?.publicId) {
+    formData.append("public_id", options.publicId);
+  }
+  if (options?.tags && options.tags.length > 0) {
+    formData.append("tags", options.tags.join(","));
+  }
 
   const response = await fetch(
     `https://api.cloudinary.com/v1_1/${cloud_name}/auto/upload`,

@@ -1,8 +1,16 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Search, Home, HelpCircle } from "lucide-react";
 import { Button } from "@repo/ui/components/ui/button";
+
+export const metadata: Metadata = {
+  title: "404 — Page Not Found | DOZO",
+  description: "The page you're looking for doesn't exist or may have moved. Let's get you back on track.",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function NotFound() {
   return (

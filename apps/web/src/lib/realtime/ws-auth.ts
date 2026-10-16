@@ -11,9 +11,12 @@ function toBase64Url(value: string): string {
 }
 
 export function getWsAuthSecret(): string {
-  const secret = process.env.REALTIME_WS_AUTH_SECRET || process.env.AUTH_SECRET;
+  const secret =
+    process.env.REALTIME_WS_AUTH_SECRET ||
+    process.env.AUTH_SECRET ||
+    process.env.BETTER_AUTH_SECRET;
   if (!secret || secret.trim().length === 0) {
-    throw new Error("Missing REALTIME_WS_AUTH_SECRET (or AUTH_SECRET) for websocket token signing.");
+    throw new Error("Missing REALTIME_WS_AUTH_SECRET (or BETTER_AUTH_SECRET) for websocket token signing.");
   }
 
   return secret.trim();

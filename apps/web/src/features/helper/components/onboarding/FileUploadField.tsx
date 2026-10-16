@@ -60,13 +60,7 @@ export function FileUploadField<
   }, [field.value, fileName]);
 
   // register with upload focus registry if available
-  const uploadFocus = (() => {
-    try {
-      return useUploadFocus();
-    } catch (e) {
-      return null;
-    }
-  })();
+  const uploadFocus = useUploadFocus();
 
   useEffect(() => {
     if (uploadId && uploadFocus) {

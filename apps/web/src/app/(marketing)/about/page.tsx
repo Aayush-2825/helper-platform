@@ -2,11 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Info } from "lucide-react";
 import { buttonVariants } from "@repo/ui/components/ui/button-variants";
+import { aboutMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "About — Coming Soon | DOZO",
-  description: "DOZO About page is coming soon.",
-};
+export const metadata: Metadata = aboutMetadata;
 
 export default function AboutPage() {
   return (

@@ -57,13 +57,7 @@ export function Step4KYCVerification<T extends FieldValues>({
     (form.setValue as any)("dpdpConsentVersion", version, { shouldDirty: true, shouldValidate: true });
   };
 
-  const uploadFocus = (() => {
-    try {
-      return useUploadFocus();
-    } catch (e) {
-      return null;
-    }
-  })();
+  const uploadFocus = useUploadFocus();
 
   return (
     <div className="space-y-6">

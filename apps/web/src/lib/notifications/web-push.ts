@@ -101,7 +101,7 @@ export async function sendBookingPushToHelpers(helperUserIds: string[], payload:
   });
 
   await Promise.allSettled(
-    subscriptions.map(async (subscription: any) => {
+    subscriptions.map(async (subscription: { endpoint: string; p256dh: string; auth: string; id: string }) => {
       const pushSubscription: WebPushSubscriptionPayload = {
         endpoint: subscription.endpoint,
         keys: {
@@ -166,7 +166,7 @@ export async function sendGenericPushToUsers(userIds: string[], payload: Generic
   });
 
   await Promise.allSettled(
-    subscriptions.map(async (subscription: any) => {
+    subscriptions.map(async (subscription: { endpoint: string; p256dh: string; auth: string; id: string }) => {
       const pushSubscription: WebPushSubscriptionPayload = {
         endpoint: subscription.endpoint,
         keys: {

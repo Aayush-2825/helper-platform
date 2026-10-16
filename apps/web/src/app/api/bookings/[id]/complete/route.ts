@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { booking, bookingStatusEvent, helperProfile } from "@/db/schema";
@@ -73,10 +73,37 @@ export async function POST(
       );
     }
 
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const recentFailedAttempts = await db.query.bookingStatusEvent.findMany({
+      where: and(
+        eq(bookingStatusEvent.bookingId, bookingId),
+        eq(bookingStatusEvent.note, "Failed complete OTP attempt"),
+        gte(bookingStatusEvent.createdAt, fifteenMinutesAgo),
+      ),
+    });
+
+    if (recentFailedAttempts.length >= 5) {
+      return NextResponse.json(
+        { message: "Too many failed OTP attempts. Please wait 15 minutes before trying again." },
+        { status: 429, headers: NO_STORE_HEADERS },
+      );
+    }
+
     // ✅ OTP Verification
     if (existingBooking.completeCode !== otp) {
+      await db.insert(bookingStatusEvent).values({
+        id: crypto.randomUUID(),
+        bookingId,
+        status: existingBooking.status,
+        actorUserId: session.user.id,
+        note: "Failed complete OTP attempt",
+      });
+
+      const remaining = Math.max(0, 4 - recentFailedAttempts.length);
       return NextResponse.json(
-        { message: "Invalid OTP. Please ask the customer for the correct Completion Code." },
+        {
+          message: `Invalid OTP. Please ask the customer for the correct Completion Code. (${remaining} attempts remaining)`,
+        },
         { status: 400, headers: NO_STORE_HEADERS },
       );
     }

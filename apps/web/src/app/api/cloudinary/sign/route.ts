@@ -24,9 +24,15 @@ export async function POST(request: Request) {
 
     const timestamp = Math.round(Date.now() / 1000);
 
+    const requestedFolder = typeof folder === "string" ? folder.replace(/[^a-zA-Z0-9_\-\/]/g, "").replace(/\.\./g, "") : "helper-platform";
+    // Sanitize folder to ensure user cannot write arbitrary roots or overwrite system assets
+    const sanitizedFolder = requestedFolder.startsWith("kyc")
+      ? `kyc/${session.user.id}`
+      : `uploads/${session.user.id}/${requestedFolder.replace(/^\/+/, "")}`;
+
     const paramsToSign: Record<string, string | number> = {
       timestamp,
-      folder: folder ?? "helper-platform",
+      folder: sanitizedFolder,
     };
 
     if (public_id) {
@@ -37,6 +43,11 @@ export async function POST(request: Request) {
       paramsToSign.tags = tags;
     }
 
+    // For KYC documents, enforce authenticated access mode
+    if (sanitizedFolder.startsWith("kyc")) {
+      paramsToSign.type = "authenticated";
+    }
+
     const signature = cloudinary.utils.api_sign_request(
       paramsToSign,
       process.env.CLOUDINARY_API_SECRET!
@@ -45,6 +56,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       signature,
       timestamp,
+      folder: sanitizedFolder,
+      type: paramsToSign.type,
       cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
     });

@@ -177,13 +177,23 @@ export async function PATCH(request: NextRequest) {
         const computed = computeProfileStatus(profileDocs.map((profileDoc: any) => profileDoc.status));
         nextProfileStatus = computed.verificationStatus;
 
+        const currentProfile = await tx.query.helperProfile.findFirst({
+          where: eq(helperProfile.id, document.helperProfileId),
+          columns: { videoKycStatus: true },
+        });
+
+        const nextVideoKycStatus =
+          currentProfile?.videoKycStatus === "passed"
+            ? "passed"
+            : "pending_schedule";
+
         const [updatedProfile] = await tx
           .update(helperProfile)
           .set({
             verificationStatus: nextProfileStatus,
-            isActive: computed.isActive,
+            isActive: computed.isActive && nextVideoKycStatus === "passed",
             blockResubmission: computed.blockResubmission,
-            videoKycStatus: "pending_schedule",
+            videoKycStatus: nextVideoKycStatus,
             updatedAt: now,
           })
           .where(eq(helperProfile.id, document.helperProfileId))

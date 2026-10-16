@@ -42,12 +42,11 @@ export class WsDispatcher {
       userSockets.delete(socket);
       if (userSockets.size === 0) {
         this.clients.delete(userId);
+        const nodeId = process.env.NODE_ID || `${process.pid}`;
+        removeNodeForUser(userId, nodeId).catch(() => {});
       }
     }
     logger.debug(`[Dispatcher] Unregistered client for user=${userId}. Remaining=${userSockets?.size ?? 0}`);
-    // remove mapping
-    const nodeId = process.env.NODE_ID || `${process.pid}`;
-    removeNodeForUser(userId, nodeId).catch(() => {});
   }
 
   /**

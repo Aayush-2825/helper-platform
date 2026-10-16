@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
@@ -7,6 +8,15 @@ import { helperOnboardingDraft } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { getHelperLandingPath } from "@/lib/helper/routing";
 import { HelperOnboardingClientPage } from "../helper-onboarding-client";
+import { becomeHelperMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = {
+  ...becomeHelperMetadata,
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 const DRAFT_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 

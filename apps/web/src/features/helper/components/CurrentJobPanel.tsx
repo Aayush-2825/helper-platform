@@ -19,11 +19,13 @@ type ActiveBooking = {
   city?: string | null;
   state?: string | null;
   customer?: {
+    name?: string | null;
     user?: {
       name?: string | null;
     } | null;
     emailVerified?: boolean | null;
   } | null;
+  customerPhone?: string | null;
 };
 
 interface CurrentJobPanelProps {
@@ -157,18 +159,26 @@ export function CurrentJobPanel({ bookingId, onJobCompleted }: CurrentJobPanelPr
                </div>
                <div className="flex items-center gap-3 border-t border-border/30 pt-3 mt-3">
                   <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-                    {booking.customer?.user?.name?.[0] || "C"}
+                    {booking.customer?.name?.[0] || booking.customer?.user?.name?.[0] || "C"}
                   </div>
                   <div className="flex-1">
-                     <p className="font-bold text-sm leading-tight">{booking.customer?.user?.name || "Customer"}</p>
+                     <p className="font-bold text-sm leading-tight">{booking.customer?.name || booking.customer?.user?.name || "Customer"}</p>
                      <p className="text-xs font-bold text-muted-foreground uppercase">
                        {booking.customer?.emailVerified ? "Verified User" : "Customer"}
                      </p>
                   </div>
                   <div className="flex gap-2">
-                     <Button size="icon" variant="ghost" className="rounded-full size-10 bg-muted/50 hover:bg-primary hover:text-white transition-all shadow-lg active:scale-95">
+                    {booking.customerPhone ? (
+                      <a href={`tel:${booking.customerPhone}`} title={`Call ${booking.customer?.name || "Customer"}`}>
+                        <Button size="icon" variant="ghost" className="rounded-full size-10 bg-muted/50 hover:bg-primary hover:text-white transition-all shadow-lg active:scale-95">
+                          <Phone className="size-4" />
+                        </Button>
+                      </a>
+                    ) : (
+                      <Button size="icon" variant="ghost" disabled title="No phone provided" className="rounded-full size-10 bg-muted/50 opacity-40 shadow-lg cursor-not-allowed">
                         <Phone className="size-4" />
-                     </Button>
+                      </Button>
+                    )}
                   </div>
                </div>
             </div>

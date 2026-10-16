@@ -287,7 +287,7 @@ export async function POST(
     if (updatedRows.length === 0) {
       return NextResponse.json(
         { message: "Booking not found or no longer available for acceptance." },
-        { status: 400, headers: NO_STORE_HEADERS }
+        { status: 409, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -298,9 +298,12 @@ export async function POST(
       eventType: "accepted",
       data: {
         candidateId: candidate.id,
-        booking: updatedRows[0],
+        booking: {
+          ...updatedRows[0],
+          helperPhone: null,
+        },
         helperName: updatedRows[0].helperName ?? helperUser?.name ?? null,
-        helperPhone: updatedRows[0].helperPhone ?? helperUser?.phone ?? null,
+        helperPhone: null,
       },
     });
 

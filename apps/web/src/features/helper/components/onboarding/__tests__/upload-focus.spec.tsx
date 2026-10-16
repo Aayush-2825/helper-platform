@@ -18,9 +18,7 @@ function TestConsumer() {
 function jestLikeFn() {
   let called = 0
   const fn = () => { called += 1 }
-  // attach a way to inspect
-  // @ts-ignore
-  fn.__called = () => called
+  (fn as typeof fn & { __called: () => number }).__called = () => called
   return fn
 }
 

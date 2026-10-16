@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
+import { blogMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = blogMetadata;
+
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import { buttonVariants } from "@repo/ui/components/ui/button-variants";
-
-export const metadata: Metadata = {
-  title: "Blog — Coming Soon | DOZO",
-  description: "DOZO blog is coming soon with service stories, product updates, and customer guides.",
-};
 
 export default function BlogPage() {
   return (

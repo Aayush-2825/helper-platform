@@ -7,6 +7,11 @@ import { helperProfile } from "@/db/schema";
 import { auth } from "@/lib/auth/server";
 import { NO_STORE_HEADERS } from "@/lib/http/cache";
 
+import {
+  activationGateForbiddenResponse,
+  evaluateHelperActivationGate,
+} from "@/lib/helper/activation-gate";
+
 const schema = z.object({
   availabilityStatus: z.enum(["online", "offline", "busy"]),
 });
@@ -26,6 +31,22 @@ export async function PATCH(request: Request) {
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ message: "Invalid status value." }, { status: 400, headers: NO_STORE_HEADERS });
+    }
+
+    if (parsed.data.availabilityStatus === "online") {
+      const profile = await db.query.helperProfile.findFirst({
+        where: eq(helperProfile.userId, session.user.id),
+        columns: {
+          verificationStatus: true,
+          videoKycStatus: true,
+          isActive: true,
+        },
+      });
+
+      const gate = evaluateHelperActivationGate(profile ?? null);
+      if (!gate.ok) {
+        return activationGateForbiddenResponse(gate, NO_STORE_HEADERS);
+      }
     }
 
     const updated = await db

@@ -27,6 +27,12 @@ let cachedSession: SessionData | null | undefined;
 let cachedSessionError: Error | null = null;
 let inFlightSessionRequest: Promise<SessionData | null> | null = null;
 
+export function clearCachedSession() {
+  cachedSession = null;
+  cachedSessionError = null;
+  inFlightSessionRequest = null;
+}
+
 async function requestSession() {
   if (!inFlightSessionRequest) {
     inFlightSessionRequest = authClient
@@ -137,6 +143,7 @@ export function useSignOut() {
   const signOut = async () => {
     setLoading(true);
     setError(null);
+    clearCachedSession();
     try {
       await authClient.signOut();
     } catch (err) {

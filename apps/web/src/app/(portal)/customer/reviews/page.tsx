@@ -213,7 +213,7 @@ export default function CustomerReviewsPage() {
   }, []);
 
   const completed = [...bookings]
-    .filter((b) => b.status === "completed")
+    .filter((b) => b.status === "completed" || b.status === "disputed")
     .sort(
       (a, b) =>
         new Date(b.completedAt ?? b.requestedAt).getTime() -

@@ -55,6 +55,7 @@ export const paymentTransaction = pgTable(
     index("paymentTransaction_customerId_idx").on(table.customerId),
     index("paymentTransaction_helperProfileId_idx").on(table.helperProfileId),
     index("paymentTransaction_status_createdAt_idx").on(table.status, table.createdAt),
+    index("paymentTransaction_providerOrderId_idx").on(table.providerOrderId),
     uniqueIndex("paymentTransaction_providerPaymentId_uidx").on(
       table.providerPaymentId,
     ),

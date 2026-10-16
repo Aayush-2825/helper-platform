@@ -103,7 +103,7 @@ export default function HelperJobHistoryPage() {
     .sort(sortDesc);
 
   const pastJobs = bookings
-    .filter((b) => b.status === "completed" || b.status === "cancelled")
+    .filter((b) => b.status === "completed" || b.status === "cancelled" || b.status === "disputed" || b.status === "expired")
     .sort(sortDesc);
 
   const isEmpty = !loading && !fetchError && bookings.length === 0;

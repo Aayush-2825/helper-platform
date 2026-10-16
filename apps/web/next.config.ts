@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@repo/ui", "@repo/db", "@repo/types", "@repo/validators"],
   cacheComponents: true,
   images: {
-
     remotePatterns: [
       {
         protocol: "https",
@@ -25,6 +24,10 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'dozo.work',
       }
     ],
   },

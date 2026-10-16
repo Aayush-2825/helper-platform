@@ -1,4 +1,8 @@
+import type { Metadata } from "next";
 import { RoleSectionLayout } from "@features/shared/components/portal/role-section-layout";
+import { adminMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = adminMetadata;
 import {
   LayoutDashboard,
   Users,

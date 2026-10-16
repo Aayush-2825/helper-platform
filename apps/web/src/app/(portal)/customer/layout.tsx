@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import { RoleSectionLayout } from "@features/shared/components/portal/role-section-layout";
+import { dashboardMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = {
+  ...dashboardMetadata,
+  title: "Customer Dashboard — DOZO",
+};
 import {
   LayoutDashboard,
   Plus,

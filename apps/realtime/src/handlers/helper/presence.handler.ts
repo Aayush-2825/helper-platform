@@ -5,9 +5,14 @@ import { and, eq } from "drizzle-orm";
 
 type PresenceStatus = "online" | "offline" | "busy" | "away";
 
-export async function presenceHandler(_userId: string, data: unknown) {
+export async function presenceHandler(userId: string, data: unknown) {
   const payload = data as Record<string, unknown>;
-  const helperUserId = typeof payload.helperUserId === "string" ? payload.helperUserId : null;
+  const payloadHelperId = typeof payload.helperUserId === "string" ? payload.helperUserId : null;
+  if (payloadHelperId && payloadHelperId !== userId) {
+    console.warn(`[presenceHandler] Unauthorized presence update attempt: user ${userId} tried to act as ${payloadHelperId}`);
+    return;
+  }
+  const helperUserId = userId;
   const status = typeof payload.status === "string" && ["online", "offline", "busy", "away"].includes(payload.status)
     ? (payload.status as PresenceStatus)
     : null;
@@ -15,9 +20,30 @@ export async function presenceHandler(_userId: string, data: unknown) {
   const longitude = typeof payload.longitude === "number" ? payload.longitude : null;
   const availableSlots = typeof payload.availableSlots === "number" ? payload.availableSlots : null;
 
-  // Persist to DB so the matching service can find this helper via /api/helpers/nearby
+  // Verify helper activation gate before persisting presence or broadcasting
   if (helperUserId && status) {
     try {
+      const profile = await webDb.query.helperProfile.findFirst({
+        where: eq(helperProfile.userId, helperUserId),
+        columns: {
+          id: true,
+          verificationStatus: true,
+          videoKycStatus: true,
+          isActive: true,
+          primaryCategory: true,
+        },
+      });
+
+      if (!profile) {
+        console.warn(`[presenceHandler] Helper profile not found for user: ${helperUserId}`);
+        return;
+      }
+
+      if (profile.verificationStatus !== "approved" || !profile.isActive) {
+        console.warn(`[presenceHandler] Unapproved or inactive helper ${helperUserId} attempted presence update (verification: ${profile.verificationStatus}, active: ${profile.isActive})`);
+        return;
+      }
+
       await db
         .insert(helperPresence)
         .values({

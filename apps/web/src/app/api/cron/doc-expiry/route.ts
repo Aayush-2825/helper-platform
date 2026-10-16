@@ -4,9 +4,14 @@ import { runDocExpiryCron } from "@/lib/kyc/doc-expiry";
 
 async function handle(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
-  const expected = process.env.CRON_SECRET;
+  const expected = process.env.CRON_SECRET?.trim();
 
-  if (expected && authHeader !== `Bearer ${expected}`) {
+  if (!expected) {
+    console.error("CRON_SECRET is not configured on the server");
+    return NextResponse.json({ message: "Server configuration error" }, { status: 500, headers: NO_STORE_HEADERS });
+  }
+
+  if (authHeader !== `Bearer ${expected}`) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
   }
 

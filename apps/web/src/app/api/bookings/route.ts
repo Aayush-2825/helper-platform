@@ -33,7 +33,6 @@ const createBookingSchema = z.object({
   notes: z.string().optional(),
 
   quotedAmount: z.number().int().positive().max(1_000_000),
-  finalAmount: z.number().int().optional(),
   customerPhone: z
     .string()
     .regex(/^\+?[0-9]{10,15}$/)
@@ -149,7 +148,7 @@ export async function POST(request: NextRequest) {
         notes: emptyToNull(data.notes),
 
         quotedAmount: data.quotedAmount,
-        finalAmount: data.finalAmount ?? null,
+        finalAmount: null,
 
         currency: "INR",
         scheduledFor,

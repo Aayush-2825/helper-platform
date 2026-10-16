@@ -50,17 +50,34 @@ async function refreshGoogleAccessToken(refreshToken: string) {
 }
 
 async function getServiceAccountAccessToken(): Promise<string> {
-  const serviceAccountEmail = process.env.GOOGLE_CLIENT_ID;
-  const privateKey = process.env.GOOGLE_CLIENT_KEY;
+  let credentials: { client_email?: string; private_key?: string } | undefined;
 
-  if (!serviceAccountEmail || !privateKey) {
-    throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_KEY in environment.");
+  const rawJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (rawJson) {
+    try {
+      const normalized = normalizeJsonEnvValue(rawJson);
+      credentials = JSON.parse(normalized);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!credentials?.client_email || !credentials?.private_key) {
+    const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+    if (serviceAccountEmail && privateKey) {
+      credentials = { client_email: serviceAccountEmail, private_key: privateKey };
+    }
+  }
+
+  if (!credentials?.client_email || !credentials?.private_key) {
+    throw new Error("Missing GOOGLE_SERVICE_ACCOUNT_EMAIL / GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY or GOOGLE_SERVICE_ACCOUNT_JSON in environment.");
   }
 
   const auth = new GoogleAuth({
     credentials: {
-      client_email: serviceAccountEmail,
-      private_key: privateKey.replace(/\\n/g, "\n"),
+      client_email: credentials.client_email,
+      private_key: credentials.private_key.replace(/\\n/g, "\n"),
     },
     scopes: ["https://www.googleapis.com/auth/calendar"],
   });
@@ -75,8 +92,11 @@ async function getServiceAccountAccessToken(): Promise<string> {
 
 export async function getGoogleCalendarAccessToken(userId?: string) {
   // Prefer service account for calendar operations to avoid OAuth scope issues
-  const serviceAccountEmail = process.env.GOOGLE_CLIENT_ID;
-  if (serviceAccountEmail) {
+  const hasServiceAccount = !!(
+    (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) ||
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+  );
+  if (hasServiceAccount) {
     return getServiceAccountAccessToken();
   }
 

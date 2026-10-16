@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { contactMetadata } from "@/lib/seo/metadata";
+
 import Link from "next/link";
 
 export const metadata: Metadata = {

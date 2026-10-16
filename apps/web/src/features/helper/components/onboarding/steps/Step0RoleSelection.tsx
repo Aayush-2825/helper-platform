@@ -32,7 +32,7 @@ export function Step0RoleSelection<T extends FieldValues>({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
-        <p className="mt-2 text-gray-600">Select the account type that best describes how you'll deliver services.</p>
+        <p className="mt-2 text-gray-600">Select the account type that best describes how you&apos;ll deliver services.</p>
       </div>
 
       <fieldset>

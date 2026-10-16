@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronRight, LogOut } from "lucide-react";
 import { authClient } from "@/lib/auth/client";
-import { useSession } from "@/lib/auth/session";
+import { clearCachedSession, useSession } from "@/lib/auth/session";
 import { normalizeRole, type AppRole } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@repo/ui/components/ui/scroll-area";
@@ -154,6 +154,7 @@ export function DashboardLayout({
                   size="default"
                   className="w-full justify-start rounded-xl font-semibold text-destructive/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
                   onClick={async () => {
+                    clearCachedSession();
                     await authClient.signOut({
                       fetchOptions: {
                         onSuccess: () => {

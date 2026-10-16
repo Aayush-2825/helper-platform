@@ -21,7 +21,8 @@ import {
   CheckCircle2, 
   XCircle,
   Play,
-  AlertCircle
+  AlertCircle,
+  Download
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -47,7 +48,9 @@ type BookingDetailsRecord = {
   cancelledAt?: string | null;
   category?: { name?: string | null } | null;
   customer?: { name?: string | null } | null;
+  customerId?: string | null;
   helper?: { name?: string | null } | null;
+  helperId?: string | null;
   addressLine: string;
   area?: string | null;
   city: string;
@@ -384,6 +387,40 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
     }
   };
 
+  const handleRaiseDispute = async () => {
+    const reason = window.prompt("Reason code (e.g. overcharged, incomplete_service, unprofessional_conduct):");
+    if (!reason || !reason.trim()) return;
+    const description = window.prompt("Please describe the dispute in detail (minimum 10 characters):");
+    if (!description || description.trim().length < 10) {
+      alert("Dispute description must be at least 10 characters.");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/disputes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          bookingId,
+          reasonCode: reason.trim(),
+          description: description.trim(),
+          againstUserId: booking?.helperId ?? undefined,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to raise dispute");
+      }
+      alert("Dispute submitted successfully. Our operations team will investigate and follow up.");
+      await fetchBooking();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to raise dispute");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const bookingIsInProgress = booking?.status === "in_progress";
   const bookingStartedAt = booking?.startedAt;
 
@@ -500,14 +537,14 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
           <CardHeader className="p-4 border-b bg-muted/30">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <div className="size-2 rounded-full bg-green-500 animate-pulse" />
-              Live Locations (MVP)
+              Live Route & Helper Tracking
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4">
             <TrackingMap
               bookingId={bookingId}
               customerLocation={customerLocation}
-              helperId={role === "helper" ? userId : undefined}
+              helperId={role === "helper" ? userId : (booking.helperId ?? undefined)}
             />
           </CardContent>
         </Card>
@@ -609,6 +646,37 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
                     "Pay now"
                   )}
                 </Button>
+              )}
+
+              {payment?.status === "captured" && (
+                <a
+                  href={`/api/bookings/${bookingId}/receipt`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto gap-2 inline-flex items-center justify-center")}
+                >
+                  <Download className="size-4" /> Download Receipt
+                </a>
+              )}
+
+              {role === "customer" && (
+                <div className="flex flex-wrap items-center gap-2 pt-3 border-t">
+                  <Link
+                    href="/customer/reviews"
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5 text-xs")}
+                  >
+                    Rate & Review Helper
+                  </Link>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-destructive hover:bg-destructive/10"
+                    onClick={() => void handleRaiseDispute()}
+                  >
+                    Need Help? Raise Dispute
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -745,7 +813,7 @@ export function BookingDetails({ bookingId, role }: BookingDetailsProps) {
             </Button>
           )}
           
-          {(booking.status === "completed" || booking.status === "cancelled") && (
+          {(booking.status === "completed" || booking.status === "cancelled" || booking.status === "disputed" || booking.status === "expired") && (
               <Link 
                 href={role === "customer" ? "/customer/bookings" : "/helper/job-history"}
                 className={cn(buttonVariants({ variant: "secondary" }), "flex-1 h-12")}

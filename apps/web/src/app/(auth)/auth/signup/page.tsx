@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { auth } from "@/lib/auth/server";
 import { getHomeRouteForRole } from "@/lib/auth/roles";
 import { SignUpClientPage } from "@features/auth/components/signup-client-page";
+import { authMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = {
+  ...authMetadata,
+  title: "Sign Up — DOZO",
+};
 
 export default async function SignUpPage() {
   await connection();

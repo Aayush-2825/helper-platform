@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
+import { careersMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = careersMetadata;
+
 import Image from "next/image";
 import Link from "next/link";
 import { Briefcase } from "lucide-react";
 import { buttonVariants } from "@repo/ui/components/ui/button-variants";
-
-export const metadata: Metadata = {
-  title: "Careers — Coming Soon | DOZO",
-  description: "DOZO careers page is coming soon. Reach out to careers@dozo.in for opportunities.",
-};
 
 export default function CareersPage() {
   return (

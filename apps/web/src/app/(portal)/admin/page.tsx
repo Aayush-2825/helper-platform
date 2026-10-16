@@ -1,4 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { adminMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = adminMetadata;
 import {
   ArrowRight,
   BadgeCheck,

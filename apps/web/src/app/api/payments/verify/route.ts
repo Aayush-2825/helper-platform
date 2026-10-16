@@ -103,53 +103,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (!isValid) {
-      if (!canTransitionPaymentStatus(paymentRecord.status, "failed")) {
-        return NextResponse.json(
-          { message: "Payment verification failed." },
-          { status: 400, headers: NO_STORE_HEADERS },
-        );
-      }
-
-      const [failedPayment] = await db
-        .update(paymentTransaction)
-        .set({
-          status: "failed",
-          providerPaymentId: razorpayPaymentId,
-          failedAt: new Date(),
-          failureCode: "INVALID_SIGNATURE",
-          failureReason: "Payment signature verification failed.",
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(paymentTransaction.id, paymentRecord.id),
-            eq(paymentTransaction.updatedAt, paymentRecord.updatedAt),
-          ),
-        )
-        .returning();
-
-      if (!failedPayment) {
-        return NextResponse.json(
-          { message: "Payment verification failed." },
-          { status: 400, headers: NO_STORE_HEADERS },
-        );
-      }
-
-      await publishPaymentUpdate({
-        bookingId: failedPayment.bookingId,
-        paymentId: failedPayment.id,
-        status: failedPayment.status,
-        targetUserIds: targets,
-        amount: failedPayment.amount,
-        currency: failedPayment.currency,
-        providerOrderId: razorpayOrderId,
-        providerPaymentId: razorpayPaymentId,
-        failureCode: "INVALID_SIGNATURE",
-        failureReason: "Payment signature verification failed.",
-      });
-
       return NextResponse.json(
-        { message: "Payment verification failed." },
+        { message: "Payment verification failed. Invalid signature." },
         { status: 400, headers: NO_STORE_HEADERS },
       );
     }

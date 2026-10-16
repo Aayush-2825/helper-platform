@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
+import { pressMetadata } from "@/lib/seo/metadata";
+
+export const metadata: Metadata = pressMetadata;
+
 import Link from "next/link";
 import { Newspaper } from "lucide-react";
 import { buttonVariants } from "@repo/ui/components/ui/button-variants";
-
-export const metadata: Metadata = {
-  title: "Press — Coming Soon | DOZO",
-  description: "DOZO press resources and announcements are coming soon.",
-};
 
 export default function PressPage() {
   return (

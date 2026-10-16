@@ -40,7 +40,7 @@ type BookingUpdateEventData = {
 };
 
 const ACTIVE_STATUSES = new Set(["requested", "matched", "accepted", "in_progress"]);
-const PAST_STATUSES = new Set(["completed", "cancelled", "expired"]);
+const PAST_STATUSES = new Set(["completed", "cancelled", "expired", "disputed"]);
 
 export default function CustomerBookingsPage() {
   const { session, loading: sessionLoading } = useSession();

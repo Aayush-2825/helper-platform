@@ -1,0 +1,22 @@
+# DOZO Robots.txt
+# Allow search engines to crawl public pages
+
+User-agent: *
+Allow: /
+
+# Disallow private and authenticated areas
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /helper/dashboard
+Disallow: /customer/dashboard
+Disallow: /auth/
+Disallow: /api/
+Disallow: /account/
+
+# Disallow internal utility pages
+Disallow: /_next/
+Disallow: /privacy/
+Disallow: /terms/
+
+# Sitemap location
+Sitemap: https://dozo.work/sitemap.xml

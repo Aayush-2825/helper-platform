@@ -36,8 +36,13 @@ export function UploadFocusProvider({ children }: { children: React.ReactNode })
   );
 }
 
-export function useUploadFocus() {
+const noopFocusContext: UploadFocusContextType = {
+  register: () => {},
+  unregister: () => {},
+  focus: () => {},
+};
+
+export function useUploadFocus(): UploadFocusContextType {
   const ctx = useContext(UploadFocusContext);
-  if (!ctx) throw new Error("useUploadFocus must be used within UploadFocusProvider");
-  return ctx;
+  return ctx ?? noopFocusContext;
 }

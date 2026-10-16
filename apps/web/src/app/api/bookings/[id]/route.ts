@@ -41,9 +41,10 @@ export async function GET(
 
     const isCustomer = bookingResult.customerId === session.user.id;
     const isAssignedHelper = bookingResult.helperId === session.user.id;
+    const isAdmin = session.user.role === "admin";
 
-    // Check if the user is authorized to see this booking (customer or helper)
-    if (!isCustomer && !isAssignedHelper) {
+    // Check if the user is authorized to see this booking (customer, helper, or admin)
+    if (!isCustomer && !isAssignedHelper && !isAdmin) {
         // Find the helper profile for the current user to see if they are the assigned helper
         const profile = await db.query.helperProfile.findFirst({
             where: eq(helperProfile.userId, session.user.id),

@@ -180,14 +180,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (targetStatus === "captured" && bookingRecord.status !== "completed") {
-      return NextResponse.json(
-        { message: "Capture deferred until booking is completed." },
-        { status: 409, headers: NO_STORE_HEADERS },
-      );
-    }
-
     const now = new Date();
+    const isEarlyCapture = targetStatus === "captured" && bookingRecord.status !== "completed";
+
     const [updatedPayment] = await db
       .update(paymentTransaction)
       .set({
@@ -210,6 +205,7 @@ export async function POST(request: NextRequest) {
           webhookEventId: webhookEventId ?? previousWebhookEventId ?? null,
           webhookProcessedAt: now.toISOString(),
           providerStatus: paymentEntity.status ?? null,
+          ...(isEarlyCapture ? { earlyCaptureBeforeCompletion: true } : {}),
         },
         updatedAt: now,
       })
@@ -236,18 +232,22 @@ export async function POST(request: NextRequest) {
     const targetUserIds = [paymentRecord.customerId, bookingRecord?.helperId]
       .filter(Boolean) as string[];
 
-    await publishPaymentUpdate({
-      bookingId: paymentRecord.bookingId,
-      paymentId: paymentRecord.id,
-      status: updatedPayment.status,
-      targetUserIds,
-      amount: fromPaiseToRupees(paymentEntity.amount) ?? paymentRecord.amount,
-      currency: paymentEntity.currency ?? paymentRecord.currency,
-      providerOrderId: providerOrderId ?? paymentRecord.providerOrderId ?? undefined,
-      providerPaymentId: providerPaymentId ?? paymentRecord.providerPaymentId ?? undefined,
-      failureCode: paymentEntity.error_code,
-      failureReason: paymentEntity.error_description,
-    });
+    try {
+      await publishPaymentUpdate({
+        bookingId: paymentRecord.bookingId,
+        paymentId: paymentRecord.id,
+        status: updatedPayment.status,
+        targetUserIds,
+        amount: fromPaiseToRupees(paymentEntity.amount) ?? paymentRecord.amount,
+        currency: paymentEntity.currency ?? paymentRecord.currency,
+        providerOrderId: providerOrderId ?? paymentRecord.providerOrderId ?? undefined,
+        providerPaymentId: providerPaymentId ?? paymentRecord.providerPaymentId ?? undefined,
+        failureCode: paymentEntity.error_code,
+        failureReason: paymentEntity.error_description,
+      });
+    } catch (realtimeError) {
+      console.error("Failed to publish payment update to realtime service:", realtimeError);
+    }
 
     return NextResponse.json(
       { message: "Webhook processed successfully." },

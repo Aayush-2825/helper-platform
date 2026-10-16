@@ -230,10 +230,12 @@ export async function PATCH(request: NextRequest) {
       }
 
       if (isFinalState) {
+        const nextBookingStatus = parsed.data.resolutionType === "refund_full" ? "cancelled" : "completed";
         const [resolvedBooking] = await tx
           .update(booking)
           .set({
-            status: "completed",
+            status: nextBookingStatus,
+            ...(nextBookingStatus === "cancelled" ? { cancelledBy: "admin", cancellationReason: "Dispute resolved with full refund" } : {}),
             updatedAt: now,
           })
           .where(and(eq(booking.id, existing.bookingId), eq(booking.status, "disputed")))
@@ -243,9 +245,9 @@ export async function PATCH(request: NextRequest) {
           await tx.insert(bookingStatusEvent).values({
             id: crypto.randomUUID(),
             bookingId: existing.bookingId,
-            status: "completed",
+            status: nextBookingStatus,
             actorUserId: session.user.id,
-            note: "Dispute finalized",
+            note: nextBookingStatus === "cancelled" ? "Dispute finalized: cancelled with full refund" : "Dispute finalized: completed",
             metadata: {
               disputeId: updatedDispute.id,
               disputeStatus: parsed.data.status,
