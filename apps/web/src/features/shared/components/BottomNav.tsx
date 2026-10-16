@@ -39,8 +39,11 @@ export function BottomNav() {
   const navItems = isHelperContext ? helperNavItems : customerNavItems;
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-50 w-[92%] max-w-md -translate-x-1/2 lg:hidden">
-      <nav aria-label="Portal navigation" className="surface-card flex items-center justify-between rounded-2xl border border-border/70 px-3 py-2.5 shadow-xl backdrop-blur-xl">
+    <div className="fixed bottom-3 left-1/2 z-50 w-[94%] max-w-md -translate-x-1/2 lg:hidden animate-in fade-in slide-in-from-bottom-5 duration-500 ease-out">
+      <nav
+        aria-label="Portal navigation"
+        className="flex h-16 items-center justify-around rounded-2xl border border-border/80 bg-background/85 px-2 py-1 shadow-2xl shadow-primary/10 backdrop-blur-xl transition-all"
+      >
         {navItems.map((item) => {
           const isActive = isRouteActive(pathname, item.href);
           return (
@@ -49,15 +52,30 @@ export function BottomNav() {
               href={item.href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "relative flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 rounded-xl px-2 transition-all duration-300",
-                isActive ? "text-primary scale-110" : "text-muted-foreground hover:text-foreground"
+                "relative flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1 text-center select-none active:scale-95 transition-all duration-300",
+                isActive
+                  ? "text-primary font-bold"
+                  : "text-muted-foreground hover:text-foreground font-medium"
               )}
             >
-              <item.icon className={cn("size-5", isActive && "stroke-[2.5px]")} />
-              <span className="text-xs font-semibold">{item.label}</span>
+              {/* Active indicator: small filled pill above the active tab icon */}
               {isActive && (
-                <span className="absolute -bottom-1.5 size-1 rounded-full bg-primary animate-in fade-in zoom-in duration-300" />
+                <span className="absolute top-1.5 h-1 w-5 rounded-full bg-primary shadow-[0_0_8px_rgba(30,27,75,0.4)] dark:shadow-[0_0_8px_rgba(129,140,248,0.5)] animate-in fade-in zoom-in-75 duration-300" />
               )}
+              <div
+                className={cn(
+                  "relative mt-1 flex items-center justify-center transition-all duration-300",
+                  isActive && "drop-shadow-[0_2px_8px_rgba(249,115,22,0.35)]"
+                )}
+              >
+                <item.icon
+                  className={cn(
+                    "size-5 transition-transform duration-300",
+                    isActive ? "stroke-[2.5px] scale-105" : "stroke-[1.75px]"
+                  )}
+                />
+              </div>
+              <span className="text-[11px] leading-none tracking-tight">{item.label}</span>
             </Link>
           );
         })}
