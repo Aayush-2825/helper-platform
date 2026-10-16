@@ -48,9 +48,23 @@ export async function POST(
       });
     }
 
-    // Security: Only customer can cancel their own 'requested' or 'accepted' booking
-    if (existingBooking.customerId !== session.user.id) {
-       return apiError({
+    // Security: Customer, assigned helper, or admin can cancel
+    const isCustomer = existingBooking.customerId === session.user.id;
+    const isAdmin = (session.user as any)?.role === "admin";
+    let isAssignedHelper = existingBooking.helperId === session.user.id;
+    if (!isAssignedHelper && existingBooking.helperProfileId) {
+      const hp = await db.query.helperProfile.findFirst({
+        where: (hpRecord: any, { eq: equals }: any) =>
+          equals(hpRecord.userId, session.user.id),
+        columns: { id: true },
+      });
+      if (hp && hp.id === existingBooking.helperProfileId) {
+        isAssignedHelper = true;
+      }
+    }
+
+    if (!isCustomer && !isAdmin && !isAssignedHelper) {
+      return apiError({
         requestId,
         message: "You are not authorized to cancel this booking.",
         code: "BOOKING_CANCEL_FORBIDDEN",
@@ -67,7 +81,7 @@ export async function POST(
       });
     }
 
-    if (!isCustomerCancellableBookingStatus(existingBooking.status)) {
+    if (!isCustomerCancellableBookingStatus(existingBooking.status) && !isAdmin) {
       return apiError({
         requestId,
         message: `Cancellation is not allowed once a booking is ${existingBooking.status}.`,
@@ -76,6 +90,7 @@ export async function POST(
       });
     }
 
+    const cancellerRole = isCustomer ? "customer" : isAdmin ? "admin" : "helper";
     const now = new Date();
     const updatedBooking = await (typeof db.transaction === "function"
       ? db.transaction(async (tx: typeof db) => {
@@ -84,7 +99,7 @@ export async function POST(
             .set({
               status: "cancelled",
               cancelledAt: now,
-              cancelledBy: "customer",
+              cancelledBy: cancellerRole,
               cancellationReason: reason,
               updatedAt: now,
             })
@@ -105,9 +120,9 @@ export async function POST(
             bookingId,
             status: "cancelled",
             actorUserId: session.user.id,
-            note: "Customer cancelled booking",
+            note: `${cancellerRole.charAt(0).toUpperCase() + cancellerRole.slice(1)} cancelled booking`,
             metadata: {
-              cancelledBy: "customer",
+              cancelledBy: cancellerRole,
               reason,
             },
           });
@@ -120,7 +135,7 @@ export async function POST(
             .set({
               status: "cancelled",
               cancelledAt: now,
-              cancelledBy: "customer",
+              cancelledBy: cancellerRole,
               cancellationReason: reason,
               updatedAt: now,
             })
@@ -141,9 +156,9 @@ export async function POST(
             bookingId,
             status: "cancelled",
             actorUserId: session.user.id,
-            note: "Customer cancelled booking",
+            note: `${cancellerRole.charAt(0).toUpperCase() + cancellerRole.slice(1)} cancelled booking`,
             metadata: {
-              cancelledBy: "customer",
+              cancelledBy: cancellerRole,
               reason,
             },
           });
@@ -163,11 +178,11 @@ export async function POST(
     // Notify realtime
     await publishBookingEvent({
       bookingId,
-      customerId: session.user.id,
+      customerId: existingBooking.customerId,
       helperId: existingBooking.helperId ?? undefined,
       eventType: "cancelled",
       data: {
-        cancelledBy: "customer",
+        cancelledBy: cancellerRole,
         reason,
         booking: updatedBooking,
       },

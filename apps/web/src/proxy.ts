@@ -7,11 +7,11 @@ import { getSessionCookie } from "better-auth/cookies";
 const securityHeaders = {
   "Content-Security-Policy":
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com; " +
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://static.cloudflareinsights.com https://*.cloudflareinsights.com https://va.vercel-scripts.com; " +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' blob: data: https://res.cloudinary.com https://*.cartocdn.com https://*.openfreemap.org https://tiles.openfreemap.org https://lh3.googleusercontent.com; " +
     "font-src 'self' data:; " +
-    "connect-src 'self' https://api.razorpay.com https://basemaps.cartocdn.com https://*.cartocdn.com https://nominatim.openstreetmap.org https://router.project-osrm.org https://*.openfreemap.org https://tiles.openfreemap.org wss://*.helper-platform.com wss://*.dozo.work wss://dozo.work ws://localhost:3001; " +
+    "connect-src 'self' https://api.razorpay.com https://basemaps.cartocdn.com https://*.cartocdn.com https://nominatim.openstreetmap.org https://router.project-osrm.org https://*.openfreemap.org https://tiles.openfreemap.org https://cloudflareinsights.com https://*.cloudflareinsights.com https://vitals.vercel-insights.com https://*.onrender.com wss: ws:; " +
     "worker-src 'self' blob: https://*.cartocdn.com https://*.openfreemap.org https://tiles.openfreemap.org; " +
     "child-src 'self' blob:; ",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",

@@ -68,8 +68,8 @@ export async function GET(request: NextRequest) {
 
     if (!profile) {
       return NextResponse.json(
-        { message: "Helper profile not found." },
-        { status: 404, headers: NO_STORE_HEADERS },
+        { message: "Payments fetched successfully", payments: [] },
+        { status: 200, headers: NO_STORE_HEADERS },
       );
     }
 
