@@ -326,18 +326,21 @@ type MyMapProps = {
   initialSubcategoryId?: string;
 };
 
+const DEFAULT_MAP_COORDS = { lat: 28.6139, lng: 77.209 };
+
 export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcategoryId }: MyMapProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [location, setLocation] = useState<{ lat: number; lng: number }>(DEFAULT_MAP_COORDS);
+  const [isLocating, setIsLocating] = useState(false);
   const [mapCenter, setMapCenter] = useState({ lat: 28.6139, lng: 77.209 });
   const [draggableMarker, setDraggableMarker] = useState({ lng: 77.209, lat: 28.6139 });
   const [nearbyHelpers, setNearbyHelpers] = useState<NearbyHelper[]>([]);
   const [prefillAddress, setPrefillAddress] = useState({ addressLine: "", area: "", city: "", state: "", postalCode: "" });
   const [currentBookingId, setCurrentBookingId] = useState<string | null>(null);
-  const [fetchCity, setFetchCity] = useState<string>("");
+  const [fetchCity, setFetchCity] = useState<string>("New Delhi");
 
   const selectedCategory = initialCategoryId ?? "";
   const currentSlug = serviceSlug ?? searchParams.get("service") ?? "all";
@@ -348,26 +351,58 @@ export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcatego
   const helperRemovalsRef = useRef<Set<string>>(new Set());
   const batchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // On mount, get the user's position and reverse-geocode for city
+  // On mount, attempt to get user position with safety timeout so map never hangs
   useEffect(() => {
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setLocation({ lat, lng });
-        setMapCenter({ lat, lng });
-        setDraggableMarker({ lat, lng });
-        const { addressLine, area, city, state, postalCode } = await reverseGeocode(lat, lng);
-        setFetchCity(city);
-        setPrefillAddress({ addressLine, area, city, state, postalCode });
-      },
-      async () => {
-        // Default to New Delhi if geolocation denied
-        const fallback = { lat: 28.6139, lng: 77.209 };
-        setLocation(fallback);
-        setFetchCity("New Delhi");
-      },
-    );
+    let isCancelled = false;
+
+    const safetyTimer = setTimeout(() => {
+      if (!isCancelled) {
+        setIsLocating(false);
+        setFetchCity((prev) => prev || "New Delhi");
+      }
+    }, 3500);
+
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+      setIsLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          if (isCancelled) return;
+          clearTimeout(safetyTimer);
+          setIsLocating(false);
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setLocation({ lat, lng });
+          setMapCenter({ lat, lng });
+          setDraggableMarker({ lat, lng });
+          try {
+            const { addressLine, area, city, state, postalCode } = await reverseGeocode(lat, lng);
+            if (!isCancelled) {
+              setFetchCity(city);
+              setPrefillAddress({ addressLine, area, city, state, postalCode });
+              mapRef.current?.flyTo({ center: [lng, lat], zoom: 14, duration: 1000 });
+            }
+          } catch {
+            // Keep New Delhi fallback
+          }
+        },
+        () => {
+          if (isCancelled) return;
+          clearTimeout(safetyTimer);
+          setIsLocating(false);
+          setFetchCity((prev) => prev || "New Delhi");
+        },
+        { timeout: 3500, enableHighAccuracy: false, maximumAge: 300000 },
+      );
+    } else {
+      clearTimeout(safetyTimer);
+      setIsLocating(false);
+      setFetchCity("New Delhi");
+    }
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   // Listen to both helper_presence (online/offline + coords) and location_update (in-job GPS)
@@ -531,14 +566,6 @@ export function MyMap({ userId, serviceSlug, initialCategoryId, initialSubcatego
     });
     setFetchCity(loc.city); // re-fetch helpers for this city
     mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 14, duration: 1200 });
-  }
-
-  if (!location) {
-    return (
-      <div className="h-105 rounded-2xl bg-muted animate-pulse flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Locating you...</p>
-      </div>
-    );
   }
 
   // Separate helpers with real GPS coords from those without

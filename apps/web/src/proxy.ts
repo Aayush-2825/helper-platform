@@ -7,7 +7,7 @@ import { getSessionCookie } from "better-auth/cookies";
 const securityHeaders = {
   "Content-Security-Policy":
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.razorpay.com https://static.cloudflareinsights.com https://*.cloudflareinsights.com https://va.vercel-scripts.com; " +
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://checkout.razorpay.com https://static.cloudflareinsights.com https://*.cloudflareinsights.com https://va.vercel-scripts.com; " +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' blob: data: https://res.cloudinary.com https://*.cartocdn.com https://*.openfreemap.org https://tiles.openfreemap.org https://lh3.googleusercontent.com; " +
     "font-src 'self' data:; " +
