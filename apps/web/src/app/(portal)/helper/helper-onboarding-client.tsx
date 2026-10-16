@@ -121,7 +121,10 @@ export function HelperOnboardingClientPage({
     const json: unknown = await res.json().catch(() => null);
 
     if (!res.ok) {
-      const message = getStringProp(json, "message") ?? `Request failed with status ${res.status}`;
+      const message =
+        getStringProp(json, "message") ??
+        getStringProp(json, "error") ??
+        `Request failed with status ${res.status}`;
       setSubmissionError(message);
       throw new Error(message);
     }

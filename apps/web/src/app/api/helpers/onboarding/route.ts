@@ -598,16 +598,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (existingProfile?.blockResubmission) {
-      return NextResponse.json(
-        { error: "Resubmission blocked. Contact support." },
-        { status: 403, headers: NO_STORE_HEADERS },
-      );
-    }
-
     const isRejectedOrFailed =
       existingProfile?.verificationStatus === "rejected" ||
       existingProfile?.videoKycStatus === "failed";
+
+    if (existingProfile?.blockResubmission && !isRejectedOrFailed) {
+      return NextResponse.json(
+        { message: "Resubmission blocked. Contact support." },
+        { status: 403, headers: NO_STORE_HEADERS },
+      );
+    }
 
     if (existingProfile?.lastResubmittedAt && !isRejectedOrFailed) {
       const hoursSince =
