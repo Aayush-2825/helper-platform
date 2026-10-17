@@ -243,12 +243,6 @@ const Map = forwardRef<MapRef, MapProps>(function Map(
         if (props.transformRequest) {
           return props.transformRequest(url, resourceType);
         }
-        if (resourceType === "Tile") {
-          return {
-            url,
-            headers: { "Cache-Control": "max-age=86400" },
-          };
-        }
         return { url };
       },
       ...props,
