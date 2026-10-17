@@ -7,11 +7,11 @@ import { getSessionCookie } from "better-auth/cookies";
 const securityHeaders = {
   "Content-Security-Policy":
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://checkout.razorpay.com https://static.cloudflareinsights.com https://*.cloudflareinsights.com https://va.vercel-scripts.com; " +
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://checkout.razorpay.com https://cdn.razorpay.com https://static.cloudflareinsights.com https://*.cloudflareinsights.com https://va.vercel-scripts.com; " +
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' blob: data: https://res.cloudinary.com https://*.cloudinary.com https://*.cartocdn.com https://*.openfreemap.org https://tiles.openfreemap.org https://lh3.googleusercontent.com https://images.unsplash.com https://i.pravatar.cc https://randomuser.me; " +
     "font-src 'self' data:; " +
-    "connect-src 'self' https://api.cloudinary.com https://*.cloudinary.com https://api.razorpay.com https://basemaps.cartocdn.com https://*.cartocdn.com https://nominatim.openstreetmap.org https://router.project-osrm.org https://*.openfreemap.org https://tiles.openfreemap.org https://cloudflareinsights.com https://*.cloudflareinsights.com https://static.cloudflareinsights.com https://vitals.vercel-insights.com https://*.onrender.com wss: ws:; " +
+    "connect-src 'self' https://api.cloudinary.com https://*.cloudinary.com https://api.razorpay.com https://lumberjack.razorpay.com https://*.razorpay.com https://basemaps.cartocdn.com https://*.cartocdn.com https://nominatim.openstreetmap.org https://router.project-osrm.org https://*.openfreemap.org https://tiles.openfreemap.org https://cloudflareinsights.com https://*.cloudflareinsights.com https://static.cloudflareinsights.com https://vitals.vercel-insights.com https://*.onrender.com wss: ws:; " +
     "worker-src 'self' blob: https://*.cartocdn.com https://*.openfreemap.org https://tiles.openfreemap.org; " +
     "child-src 'self' blob: https://checkout.razorpay.com https://api.razorpay.com; " +
     "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com; " +
@@ -20,8 +20,9 @@ const securityHeaders = {
   "X-Frame-Options": "DENY",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(self), browsing-topics=()",
+  "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(self), accelerometer=*, gyroscope=*, browsing-topics=()",
 };
+
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
