@@ -93,14 +93,13 @@ function esc(value: string): string {
     .replaceAll("\n", " ");
 }
 
-/** Format currency in Indian locale */
-function formatMoney(amount: number, currency: string): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
+/** Format currency in Indian locale without relying on unsupported Type1 font glyphs */
+function formatMoney(amount: number, _currency: string): string {
+  const formatted = new Intl.NumberFormat("en-IN", {
     minimumFractionDigits: 2,
-  }).format(amount); // DB amounts are in rupees
+    maximumFractionDigits: 2,
+  }).format(amount);
+  return `Rs. ${formatted}`;
 }
 
 /** Format a Date nicely for Indian locale */
